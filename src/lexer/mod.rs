@@ -21,7 +21,7 @@ pub enum TokenKind {
     Lt,
     Gt,
     Eq,
-    Neq,
+    NotEq,
 
     // Delimiters
     Comma,
@@ -163,7 +163,7 @@ impl<'a> Lexer<'a> {
                     if let Some('=') = self.input.peek() {
                         self.input.next();
                         self.next_col += 1;
-                        self.new_token(TokenKind::Neq)
+                        self.new_token(TokenKind::NotEq)
                     } else {
                         self.new_token(TokenKind::Bang)
                     }
@@ -290,7 +290,7 @@ mod tests {
             Token { file: None, line: 17, col: 7, kind: TokenKind::Int(10) },
             Token { file: None, line: 17, col: 9, kind: TokenKind::Semicolon },
             Token { file: None, line: 18, col: 1, kind: TokenKind::Int(10) },
-            Token { file: None, line: 18, col: 4, kind: TokenKind::Neq },
+            Token { file: None, line: 18, col: 4, kind: TokenKind::NotEq },
             Token { file: None, line: 18, col: 7, kind: TokenKind::Int(9) },
             Token { file: None, line: 18, col: 8, kind: TokenKind::Semicolon },
             // end

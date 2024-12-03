@@ -1,4 +1,6 @@
+mod ast;
 mod lexer;
+mod parser;
 mod repl;
 use std::io::{stdin, stdout};
 
