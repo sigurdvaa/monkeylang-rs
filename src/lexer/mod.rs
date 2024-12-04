@@ -48,14 +48,14 @@ impl fmt::Display for TokenKind {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Token<'a> {
+pub struct Token {
     pub kind: TokenKind,
-    pub file: Option<&'a str>,
+    pub file: Option<String>,
     pub line: usize,
     pub col: usize,
 }
 
-impl fmt::Display for Token<'_> {
+impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self)
     }
@@ -87,7 +87,7 @@ impl<'a> Lexer<'a> {
     fn new_token(&mut self, kind: TokenKind) -> Token {
         let token = Token {
             kind,
-            file: self.file.as_deref(),
+            file: self.file.clone(),
             line: self.line,
             col: self.curr_col,
         };
@@ -190,7 +190,7 @@ impl<'a> Lexer<'a> {
     }
 }
 
-#[cfg(test)]
+#[cfg(test)
 mod tests {
     use super::*;
 

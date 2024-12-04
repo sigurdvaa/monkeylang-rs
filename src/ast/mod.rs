@@ -1,22 +1,41 @@
 use crate::lexer::Token;
 
-struct Node {}
-struct Expression {}
-struct Statement<'a> {
-    token: Token<'a>,
-}
-
-struct Identifier<'a> {
-    token: Token<'a>,
+pub struct Identifier {
+    token: Token,
     value: String,
 }
 
-struct Program<'a> {
-    statements: Vec<Statement<'a>>,
+// pub struct Expression {
+//     token: Token,
+//     // TODO: enum?
+//     operator: String,
+//     // right: Self
+// }
+
+pub enum Expression {
+    Prefix {
+        token: Token,
+        // TODO: enum?
+        operator: String,
+        // right: Rc<Self>
+    },
 }
 
-struct LetStatement<'a> {
-    name: Identifier<'a>,
-    value: Expression,
-    token: Token<'a>,
+pub enum Statement {
+    Let {
+        token: Token,
+        name: Identifier,
+        value: Expression,
+    },
+    If {
+        token: Token,
+        left: Expression,
+        right: Expression,
+    },
 }
+
+pub struct Program {
+    pub statements: Vec<Statement>,
+}
+
+struct LetStatement {}
