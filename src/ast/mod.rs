@@ -1,8 +1,9 @@
 use crate::lexer::Token;
 
+#[derive(Debug)]
 pub struct Identifier {
-    token: Token,
-    value: String,
+    pub token: Token,
+    pub value: String,
 }
 
 // pub struct Expression {
@@ -12,24 +13,38 @@ pub struct Identifier {
 //     // right: Self
 // }
 
+#[derive(Debug)]
+pub enum Operator {
+    Add,
+    Minus,
+    Multiply,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Prefix {
         token: Token,
-        // TODO: enum?
-        operator: String,
+        operator: Operator,
         // right: Rc<Self>
     },
 }
 
+enum StatementKind {
+    Let,
+    If,
+}
+
+#[derive(Debug)]
 pub enum Statement {
     Let {
         token: Token,
         name: Identifier,
-        value: Expression,
+        // value: Expression,
     },
     If {
         token: Token,
         left: Expression,
+        operator: Operator,
         right: Expression,
     },
 }
@@ -38,4 +53,8 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-struct LetStatement {}
+impl Program {
+    pub fn new() -> Self {
+        Self { statements: vec![] }
+    }
+}

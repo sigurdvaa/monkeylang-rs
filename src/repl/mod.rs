@@ -13,12 +13,12 @@ where
         output
             .write_all(PROMPT.as_bytes())
             .expect("failed to write prompt");
-        output.flush().expect("failed to flush prompt");
+        // output.flush().expect("failed to flush prompt");
         input.read_line(&mut buf).expect("invalid input");
         let mut lexer = Lexer::new(None, buf.chars().peekable());
         loop {
             let token = lexer.next_token();
-            if token.kind == TokenKind::Eof {
+            if token.kind == TokenKind::EndOfFile {
                 break;
             }
             writeln!(&mut output, "{}", token).expect("writing to output buffer failed");

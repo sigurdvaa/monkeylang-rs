@@ -2,14 +2,14 @@ use std::fmt;
 use std::iter::Peekable;
 use std::str::Chars;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenKind {
-    Illegal(String),
-    Eof,
+    Illegal,
+    EndOfFile,
 
     // Identifiers and literals
-    Ident(String),
-    Int(usize),
+    Ident,
+    Int,
 
     // Operators
     Assign,
@@ -47,9 +47,10 @@ impl fmt::Display for TokenKind {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
     pub kind: TokenKind,
+    pub literal: String,
     pub file: Option<String>,
     pub line: usize,
     pub col: usize,
@@ -84,9 +85,10 @@ impl<'a> Lexer<'a> {
         c.is_ascii_alphabetic() || *c == '_'
     }
 
-    fn new_token(&mut self, kind: TokenKind) -> Token {
+    fn new_token(&mut self, kind: TokenKind, literal: String) -> Token {
         let token = Token {
             kind,
+            literal,
             file: self.file.clone(),
             line: self.line,
             col: self.curr_col,
@@ -95,43 +97,43 @@ impl<'a> Lexer<'a> {
         token
     }
 
-    fn lookup_ident(&mut self, ident: String) -> Token {
-        match ident.as_str() {
-            "let" => self.new_token(TokenKind::Let),
-            "fn" => self.new_token(TokenKind::Function),
-            "if" => self.new_token(TokenKind::If),
-            "else" => self.new_token(TokenKind::Else),
-            "return" => self.new_token(TokenKind::Return),
-            "true" => self.new_token(TokenKind::True),
-            "false" => self.new_token(TokenKind::False),
-            _ => self.new_token(TokenKind::Ident(ident)),
+    fn lookup_ident(&mut self, literal: String) -> Token {
+        match literal.as_str() {
+            "let" => self.new_token(TokenKind::Let, literal),
+            "fn" => self.new_token(TokenKind::Function, literal),
+            "if" => self.new_token(TokenKind::If, literal),
+            "else" => self.new_token(TokenKind::Else, literal),
+            "return" => self.new_token(TokenKind::Return, literal),
+            "true" => self.new_token(TokenKind::True, literal),
+            "false" => self.new_token(TokenKind::False, literal),
+            _ => self.new_token(TokenKind::Ident, literal),
         }
     }
 
     fn read_ident(&mut self, c: char) -> Token {
-        let mut ident = c.to_string();
+        let mut literal = c.to_string();
         while let Some(c) = self.input.peek() {
             if c.is_ascii_alphabetic() || *c == '_' {
-                ident.push(self.input.next().expect("invalid char"));
+                literal.push(self.input.next().expect("invalid char"));
                 self.next_col += 1;
             } else {
                 break;
             }
         }
-        self.lookup_ident(ident)
+        self.lookup_ident(literal)
     }
 
     fn read_number(&mut self, c: char) -> Token {
-        let mut number = c.to_string();
+        let mut literal = c.to_string();
         while let Some(c) = self.input.peek() {
             if c.is_ascii_digit() {
-                number.push(self.input.next().expect("invalid char"));
+                literal.push(self.input.next().expect("invalid char"));
                 self.next_col += 1;
             } else {
                 break;
             }
         }
-        self.new_token(TokenKind::Int(number.parse().expect("Invalid number")))
+        self.new_token(TokenKind::Int, literal)
     }
 
     pub fn next_token(&mut self) -> Token {
@@ -139,39 +141,39 @@ impl<'a> Lexer<'a> {
         match self.input.next() {
             None => {
                 self.next_col -= 1;
-                self.new_token(TokenKind::Eof)
+                self.new_token(TokenKind::EndOfFile, "".into())
             }
             Some(c) => match c {
                 '=' => {
                     if let Some('=') = self.input.peek() {
                         self.input.next();
                         self.next_col += 1;
-                        self.new_token(TokenKind::Eq)
+                        self.new_token(TokenKind::Eq, "==".into())
                     } else {
-                        self.new_token(TokenKind::Assign)
+                        self.new_token(TokenKind::Assign, c.into())
                     }
                 }
-                '+' => self.new_token(TokenKind::Plus),
-                '-' => self.new_token(TokenKind::Minus),
-                '(' => self.new_token(TokenKind::Lparen),
-                ')' => self.new_token(TokenKind::Rparen),
-                '{' => self.new_token(TokenKind::Lbrace),
-                '}' => self.new_token(TokenKind::Rbrace),
-                ';' => self.new_token(TokenKind::Semicolon),
-                ',' => self.new_token(TokenKind::Comma),
+                '+' => self.new_token(TokenKind::Plus, c.into()),
+                '-' => self.new_token(TokenKind::Minus, c.into()),
+                '(' => self.new_token(TokenKind::Lparen, c.into()),
+                ')' => self.new_token(TokenKind::Rparen, c.into()),
+                '{' => self.new_token(TokenKind::Lbrace, c.into()),
+                '}' => self.new_token(TokenKind::Rbrace, c.into()),
+                ';' => self.new_token(TokenKind::Semicolon, c.into()),
+                ',' => self.new_token(TokenKind::Comma, c.into()),
                 '!' => {
                     if let Some('=') = self.input.peek() {
                         self.input.next();
                         self.next_col += 1;
-                        self.new_token(TokenKind::NotEq)
+                        self.new_token(TokenKind::NotEq, "!=".into())
                     } else {
-                        self.new_token(TokenKind::Bang)
+                        self.new_token(TokenKind::Bang, c.into())
                     }
                 }
-                '*' => self.new_token(TokenKind::Asterisk),
-                '/' => self.new_token(TokenKind::Slash),
-                '<' => self.new_token(TokenKind::Lt),
-                '>' => self.new_token(TokenKind::Gt),
+                '*' => self.new_token(TokenKind::Asterisk, c.into()),
+                '/' => self.new_token(TokenKind::Slash, c.into()),
+                '<' => self.new_token(TokenKind::Lt, c.into()),
+                '>' => self.new_token(TokenKind::Gt, c.into()),
                 '\n' => {
                     self.line += 1;
                     self.curr_col = 1;
@@ -184,15 +186,25 @@ impl<'a> Lexer<'a> {
                 }
                 c if Self::is_letter(&c) => self.read_ident(c),
                 c if c.is_ascii_digit() => self.read_number(c),
-                _ => self.new_token(TokenKind::Illegal(c.to_string())),
+                _ => self.new_token(TokenKind::Illegal, c.into()),
             },
         }
     }
 }
 
-#[cfg(test)
+#[cfg(test)]
 mod tests {
     use super::*;
+
+    fn create_token(line: usize, col: usize, kind: TokenKind, literal: &str) -> Token {
+        Token {
+            file: None,
+            line,
+            col,
+            kind,
+            literal: literal.into(),
+        }
+    }
 
     #[test]
     fn test_parse_tokens() {
@@ -218,84 +230,82 @@ mod tests {
         );
 
         let mut lexer = Lexer::new(None, input.chars().peekable());
-        #[rustfmt::skip]
         let tests = [
-            Token { file: None, line: 1, col: 1, kind: TokenKind::Let },
-            Token { file: None, line: 1, col: 5, kind: TokenKind::Ident("five".to_string()) },
-            Token { file: None, line: 1, col: 10, kind: TokenKind::Assign },
-            Token { file: None, line: 1, col: 12, kind: TokenKind::Int(5) },
-            Token { file: None, line: 1, col: 13, kind: TokenKind::Semicolon },
-            Token { file: None, line: 2, col: 1, kind: TokenKind::Let },
-            Token { file: None, line: 2, col: 5, kind: TokenKind::Ident("ten".to_string()) },
-            Token { file: None, line: 2, col: 9, kind: TokenKind::Assign },
-            Token { file: None, line: 2, col: 11, kind: TokenKind::Int(10) },
-            Token { file: None, line: 2, col: 13, kind: TokenKind::Semicolon },
-            Token { file: None, line: 4, col: 1, kind: TokenKind::Let },
-            Token { file: None, line: 4, col: 5, kind: TokenKind::Ident("add".to_string()) },
-            Token { file: None, line: 4, col: 9, kind: TokenKind::Assign },
-            Token { file: None, line: 4, col: 11, kind: TokenKind::Function },
-            Token { file: None, line: 4, col: 13, kind: TokenKind::Lparen },
-            Token { file: None, line: 4, col: 14, kind: TokenKind::Ident("x".to_string()) },
-            Token { file: None, line: 4, col: 15, kind: TokenKind::Comma },
-            Token { file: None, line: 4, col: 17, kind: TokenKind::Ident("y".to_string()) },
-            Token { file: None, line: 4, col: 18, kind: TokenKind::Rparen },
-            Token { file: None, line: 4, col: 20, kind: TokenKind::Lbrace},
-            Token { file: None, line: 5, col: 5, kind: TokenKind::Ident("x".to_string()) },
-            Token { file: None, line: 5, col: 7, kind: TokenKind::Plus },
-            Token { file: None, line: 5, col: 9, kind: TokenKind::Ident("y".to_string()) },
-            Token { file: None, line: 5, col: 10, kind: TokenKind::Semicolon },
-            Token { file: None, line: 6, col: 1, kind: TokenKind::Rbrace},
-            Token { file: None, line: 6, col: 2, kind: TokenKind::Semicolon },
-            Token { file: None, line: 8, col: 1, kind: TokenKind::Let },
-            Token { file: None, line: 8, col: 5, kind: TokenKind::Ident("result".to_string()) },
-            Token { file: None, line: 8, col: 12, kind: TokenKind::Assign },
-            Token { file: None, line: 8, col: 14, kind: TokenKind::Ident("add".to_string()) },
-            Token { file: None, line: 8, col: 17, kind: TokenKind::Lparen },
-            Token { file: None, line: 8, col: 18, kind: TokenKind::Ident("five".to_string()) },
-            Token { file: None, line: 8, col: 22, kind: TokenKind::Comma },
-            Token { file: None, line: 8, col: 24, kind: TokenKind::Ident("ten".to_string()) },
-            Token { file: None, line: 8, col: 27, kind: TokenKind::Rparen },
-            Token { file: None, line: 8, col: 28, kind: TokenKind::Semicolon },
-            Token { file: None, line: 9, col: 1, kind: TokenKind::Bang },
-            Token { file: None, line: 9, col: 2, kind: TokenKind::Minus },
-            Token { file: None, line: 9, col: 3, kind: TokenKind::Slash },
-            Token { file: None, line: 9, col: 4, kind: TokenKind::Asterisk },
-            Token { file: None, line: 9, col: 5, kind: TokenKind::Int(5) },
-            Token { file: None, line: 9, col: 6, kind: TokenKind::Semicolon },
-            Token { file: None, line: 10, col: 1, kind: TokenKind::Int(5) },
-            Token { file: None, line: 10, col: 3, kind: TokenKind::Lt},
-            Token { file: None, line: 10, col: 5, kind: TokenKind::Int(10) },
-            Token { file: None, line: 10, col: 8, kind: TokenKind::Gt},
-            Token { file: None, line: 10, col: 10, kind: TokenKind::Int(5) },
-            Token { file: None, line: 10, col: 11, kind: TokenKind::Semicolon },
-            Token { file: None, line: 12, col: 1, kind: TokenKind::If },
-            Token { file: None, line: 12, col: 4, kind: TokenKind::Lparen },
-            Token { file: None, line: 12, col: 5, kind: TokenKind::Int(5) },
-            Token { file: None, line: 12, col: 7, kind: TokenKind::Lt},
-            Token { file: None, line: 12, col: 9, kind: TokenKind::Int(10) },
-            Token { file: None, line: 12, col: 11, kind: TokenKind::Rparen },
-            Token { file: None, line: 12, col: 13, kind: TokenKind::Lbrace },
-            Token { file: None, line: 13, col: 5, kind: TokenKind::Return },
-            Token { file: None, line: 13, col: 12, kind: TokenKind::True },
-            Token { file: None, line: 13, col: 16, kind: TokenKind::Semicolon },
-            Token { file: None, line: 14, col: 1, kind: TokenKind::Rbrace },
-            Token { file: None, line: 14, col: 3, kind: TokenKind::Else },
-            Token { file: None, line: 14, col: 8, kind: TokenKind::Lbrace },
-            Token { file: None, line: 15, col: 5, kind: TokenKind::Return },
-            Token { file: None, line: 15, col: 12, kind: TokenKind::False },
-            Token { file: None, line: 15, col: 17, kind: TokenKind::Semicolon },
-            Token { file: None, line: 16, col: 1, kind: TokenKind::Rbrace },
-            Token { file: None, line: 17, col: 1, kind: TokenKind::Int(10) },
-            Token { file: None, line: 17, col: 4, kind: TokenKind::Eq },
-            Token { file: None, line: 17, col: 7, kind: TokenKind::Int(10) },
-            Token { file: None, line: 17, col: 9, kind: TokenKind::Semicolon },
-            Token { file: None, line: 18, col: 1, kind: TokenKind::Int(10) },
-            Token { file: None, line: 18, col: 4, kind: TokenKind::NotEq },
-            Token { file: None, line: 18, col: 7, kind: TokenKind::Int(9) },
-            Token { file: None, line: 18, col: 8, kind: TokenKind::Semicolon },
-            // end
-            Token { file: None, line: 19, col: 1, kind: TokenKind::Eof },
-            Token { file: None, line: 19, col: 1, kind: TokenKind::Eof },
+            create_token(1, 1, TokenKind::Let, "let"),
+            create_token(1, 5, TokenKind::Ident, "five"),
+            create_token(1, 10, TokenKind::Assign, "="),
+            create_token(1, 12, TokenKind::Int, "5"),
+            create_token(1, 13, TokenKind::Semicolon, ";"),
+            create_token(2, 1, TokenKind::Let, "let"),
+            create_token(2, 5, TokenKind::Ident, "ten"),
+            create_token(2, 9, TokenKind::Assign, "="),
+            create_token(2, 11, TokenKind::Int, "10"),
+            create_token(2, 13, TokenKind::Semicolon, ";"),
+            create_token(4, 1, TokenKind::Let, "let"),
+            create_token(4, 5, TokenKind::Ident, "add"),
+            create_token(4, 9, TokenKind::Assign, "="),
+            create_token(4, 11, TokenKind::Function, "fn"),
+            create_token(4, 13, TokenKind::Lparen, "("),
+            create_token(4, 14, TokenKind::Ident, "x"),
+            create_token(4, 15, TokenKind::Comma, ","),
+            create_token(4, 17, TokenKind::Ident, "y"),
+            create_token(4, 18, TokenKind::Rparen, ")"),
+            create_token(4, 20, TokenKind::Lbrace, "{"),
+            create_token(5, 5, TokenKind::Ident, "x"),
+            create_token(5, 7, TokenKind::Plus, "+"),
+            create_token(5, 9, TokenKind::Ident, "y"),
+            create_token(5, 10, TokenKind::Semicolon, ";"),
+            create_token(6, 1, TokenKind::Rbrace, "}"),
+            create_token(6, 2, TokenKind::Semicolon, ";"),
+            create_token(8, 1, TokenKind::Let, "let"),
+            create_token(8, 5, TokenKind::Ident, "result"),
+            create_token(8, 12, TokenKind::Assign, "="),
+            create_token(8, 14, TokenKind::Ident, "add"),
+            create_token(8, 17, TokenKind::Lparen, "("),
+            create_token(8, 18, TokenKind::Ident, "five"),
+            create_token(8, 22, TokenKind::Comma, ","),
+            create_token(8, 24, TokenKind::Ident, "ten"),
+            create_token(8, 27, TokenKind::Rparen, ")"),
+            create_token(8, 28, TokenKind::Semicolon, ";"),
+            create_token(9, 1, TokenKind::Bang, "!"),
+            create_token(9, 2, TokenKind::Minus, "-"),
+            create_token(9, 3, TokenKind::Slash, "/"),
+            create_token(9, 4, TokenKind::Asterisk, "*"),
+            create_token(9, 5, TokenKind::Int, "5"),
+            create_token(9, 6, TokenKind::Semicolon, ";"),
+            create_token(10, 1, TokenKind::Int, "5"),
+            create_token(10, 3, TokenKind::Lt, "<"),
+            create_token(10, 5, TokenKind::Int, "10"),
+            create_token(10, 8, TokenKind::Gt, ">"),
+            create_token(10, 10, TokenKind::Int, "5"),
+            create_token(10, 11, TokenKind::Semicolon, ";"),
+            create_token(12, 1, TokenKind::If, "if"),
+            create_token(12, 4, TokenKind::Lparen, "("),
+            create_token(12, 5, TokenKind::Int, "5"),
+            create_token(12, 7, TokenKind::Lt, "<"),
+            create_token(12, 9, TokenKind::Int, "10"),
+            create_token(12, 11, TokenKind::Rparen, ")"),
+            create_token(12, 13, TokenKind::Lbrace, "{"),
+            create_token(13, 5, TokenKind::Return, "return"),
+            create_token(13, 12, TokenKind::True, "true"),
+            create_token(13, 16, TokenKind::Semicolon, ";"),
+            create_token(14, 1, TokenKind::Rbrace, "}"),
+            create_token(14, 3, TokenKind::Else, "else"),
+            create_token(14, 8, TokenKind::Lbrace, "{"),
+            create_token(15, 5, TokenKind::Return, "return"),
+            create_token(15, 12, TokenKind::False, "false"),
+            create_token(15, 17, TokenKind::Semicolon, ";"),
+            create_token(16, 1, TokenKind::Rbrace, "}"),
+            create_token(17, 1, TokenKind::Int, "10"),
+            create_token(17, 4, TokenKind::Eq, "=="),
+            create_token(17, 7, TokenKind::Int, "10"),
+            create_token(17, 9, TokenKind::Semicolon, ";"),
+            create_token(18, 1, TokenKind::Int, "10"),
+            create_token(18, 4, TokenKind::NotEq, "!="),
+            create_token(18, 7, TokenKind::Int, "9"),
+            create_token(18, 8, TokenKind::Semicolon, ";"),
+            create_token(19, 1, TokenKind::EndOfFile, ""),
+            create_token(19, 1, TokenKind::EndOfFile, ""),
         ];
 
         for token in tests {
