@@ -1,56 +1,83 @@
 use crate::lexer::Token;
-
-#[derive(Debug)]
-pub struct Identifier {
-    pub token: Token,
-    pub value: String,
-}
-
-// pub struct Expression {
-//     token: Token,
-//     // TODO: enum?
-//     operator: String,
-//     // right: Self
-// }
+use std::fmt;
 
 #[derive(Debug)]
 pub enum Operator {
-    Add,
+    Plus,
     Minus,
-    Multiply,
+    Asterisk,
 }
 
 #[derive(Debug)]
-pub enum Expression {
+pub enum ExpressionKind {
+    Boolean {
+        value: bool,
+    },
+    Identifier {
+        value: String,
+    },
     Prefix {
-        token: Token,
         operator: Operator,
-        // right: Rc<Self>
+    },
+    Infix {
+        left: Box<Expression>,
+        operator: Operator,
+        right: Box<Expression>,
     },
 }
 
-enum StatementKind {
-    Let,
-    If,
+#[derive(Debug)]
+pub struct Expression {
+    pub token: Token,
+    pub kind: ExpressionKind,
+}
+
+impl fmt::Display for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:}", self.token.literal)
+    }
 }
 
 #[derive(Debug)]
 pub enum Statement {
     Let {
         token: Token,
-        name: Identifier,
-        // value: Expression,
+        name: Expression,
+        value: Expression,
     },
-    If {
+    Return {
         token: Token,
-        left: Expression,
-        operator: Operator,
-        right: Expression,
+        value: Expression,
     },
+    Expression {
+        token: Token,
+        value: Expression,
+    },
+}
+
+impl fmt::Display for Statement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Statement::Let { token, name, value } => {
+                write!(f, "{} {} = {};", token.literal, name, value)
+            }
+            _ => write!(f, "{:?}", self),
+        }
+    }
 }
 
 pub struct Program {
     pub statements: Vec<Statement>,
+}
+
+impl fmt::Display for Program {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut string = String::new();
+        for stmt in &self.statements {
+            string.push_str(&stmt.to_string());
+        }
+        write!(f, "{string}")
+    }
 }
 
 impl Program {

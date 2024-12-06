@@ -1,4 +1,4 @@
-use crate::ast::{Identifier, Program, Statement};
+use crate::ast::{Expression, ExpressionKind, Program, Statement};
 use crate::lexer::{Lexer, Token, TokenKind};
 use std::fmt;
 
@@ -64,9 +64,11 @@ impl<'a> Parser<'a> {
         let token = self.curr_token.clone();
 
         self.expect_token(TokenKind::Ident)?;
-        let name = Identifier {
+        let name = Expression {
             token: self.curr_token.clone(),
-            value: self.curr_token.literal.clone(),
+            kind: ExpressionKind::Identifier {
+                value: self.curr_token.literal.clone(),
+            },
         };
 
         self.expect_token(TokenKind::Assign)?;
@@ -75,11 +77,57 @@ impl<'a> Parser<'a> {
         while self.curr_token.kind != TokenKind::Semicolon {
             self.update_tokens();
         }
+        let value = Expression {
+            token: Token {
+                file: None,
+                kind: TokenKind::Ident,
+                line: 0,
+                col: 0,
+                literal: "test".into(),
+            },
+            kind: ExpressionKind::Identifier {
+                value: "test".into(),
+            },
+        };
 
-        Ok(Statement::Let { token, name })
-        // Ok(Statement::Let { token, name, value })
+        Ok(Statement::Let { token, name, value })
     }
 
+    fn parse_return_statement(&mut self) -> Result<Statement, ParserError> {
+        let token = self.curr_token.clone();
+
+        // TODO: skipping the expression for now
+        while self.curr_token.kind != TokenKind::Semicolon {
+            self.update_tokens();
+        }
+        let value = Expression {
+            token: Token {
+                file: None,
+                kind: TokenKind::Ident,
+                line: 0,
+                col: 0,
+                literal: "test".into(),
+            },
+            kind: ExpressionKind::Identifier {
+                value: "test".into(),
+            },
+        };
+
+        Ok(Statement::Return { token, value })
+    }
+
+    fn parse_statement(&mut self) -> Result<Statement, ParserError> {
+        match self.curr_token.kind {
+            TokenKind::Let => self.parse_let_statement(),
+            TokenKind::Return => self.parse_return_statement(),
+            _ => Err(ParserError::StatementError(format!(
+                "Unexpected: {:?}",
+                self.curr_token
+            ))),
+        }
+    }
+
+    // TODO: consider not returning Result, as errors are stored in parser
     fn parse_program(&mut self) -> Result<Program, ParserError> {
         let mut prog = Program::new();
 
@@ -93,21 +141,21 @@ impl<'a> Parser<'a> {
 
         Ok(prog)
     }
-
-    fn parse_statement(&mut self) -> Result<Statement, ParserError> {
-        match self.curr_token.kind {
-            TokenKind::Let => self.parse_let_statement(),
-            _ => Err(ParserError::StatementError(format!(
-                "Unexpected: {:?}",
-                self.curr_token
-            ))),
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn check_for_errors(parser: &Parser) {
+        if !parser.errors.is_empty() {
+            println!("parser has {} errors", parser.errors.len());
+            for err in &parser.errors {
+                println!("{err}");
+            }
+            panic!();
+        }
+    }
 
     #[test]
     fn test_let_statements() {
@@ -115,35 +163,98 @@ mod tests {
         let input = concat!(
             "let x = 5;\n",
             "let y = 10;\n",
-            "let 1foobar = 838383;\n"
+            "let foobar = 838383;\n"
         );
         let lexer = Lexer::new(None, input.chars().peekable());
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
 
-        if !parser.errors.is_empty() {
-            println!("parser has {} errors", parser.errors.len());
-            for err in parser.errors {
-                println!("{err}");
-            }
-            panic!();
-        }
-
+        check_for_errors(&parser);
         assert!(program.is_ok());
         let program = program.unwrap();
-
         assert_eq!(program.statements.len(), 3);
 
-        for (i, _ident) in ["x", "y", "foobar"].iter().enumerate() {
+        for (i, ident) in ["x", "y", "foobar"].iter().enumerate() {
             let stmt = &program.statements[i];
             match stmt {
-                Statement::Let {
-                    token: _,
-                    name: _,
-                    // value: _,
-                } => (),
-                _ => panic!("Not a let statement"),
+                Statement::Let { token, name, value } => {
+                    assert_eq!(token.kind, TokenKind::Let);
+                    assert_eq!(token.literal, "let".to_string());
+                    assert_eq!(name.token.kind, TokenKind::Ident);
+                    assert_eq!(name.token.literal, ident.to_string());
+                    assert_eq!(value.to_string(), ident.to_string());
+                }
+                _ => panic!("Not a valid let statement"),
             }
         }
+    }
+
+    #[test]
+    fn test_resturn_statements() {
+        #[rustfmt::skip]
+        let input = concat!(
+            "return 5;\n",
+            "return 10;\n",
+            "return 993322;\n"
+        );
+        let lexer = Lexer::new(None, input.chars().peekable());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        check_for_errors(&parser);
+        assert!(program.is_ok());
+        let program = program.unwrap();
+        assert_eq!(program.statements.len(), 3);
+
+        for stmt in program.statements {
+            match stmt {
+                Statement::Return { token, .. } => {
+                    assert_eq!(token.kind, TokenKind::Return);
+                    assert_eq!(token.literal, "return".to_string());
+                }
+                _ => panic!("Not a valid return statement"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_program_to_string() {
+        let program = Program {
+            statements: vec![Statement::Let {
+                token: Token {
+                    file: None,
+                    col: 0,
+                    line: 0,
+                    kind: TokenKind::Let,
+                    literal: "let".into(),
+                },
+                name: Expression {
+                    token: Token {
+                        file: None,
+                        col: 0,
+                        line: 0,
+                        kind: TokenKind::Ident,
+                        literal: "myVar".into(),
+                    },
+                    kind: ExpressionKind::Identifier {
+                        value: "myVar".into(),
+                    },
+                },
+                value: Expression {
+                    token: Token {
+                        file: None,
+                        col: 0,
+                        line: 0,
+                        kind: TokenKind::Ident,
+                        literal: "anotherVar".into(),
+                    },
+                    kind: ExpressionKind::Identifier {
+                        value: "anotherVar".into(),
+                    },
+                },
+            }],
+        };
+
+        assert_eq!(program.to_string(), "let myVar = anotherVar;");
     }
 }
