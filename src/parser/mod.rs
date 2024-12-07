@@ -9,6 +9,7 @@ enum ParserError {
     ExpressionError(String),
     InvalidLetStatement(String),
     StatementError(String),
+    ParseIntError(String),
 }
 
 impl fmt::Display for ParserError {
@@ -18,25 +19,13 @@ impl fmt::Display for ParserError {
             Self::ExpressionError(err) => write!(f, "{}", err),
             Self::InvalidLetStatement(err) => write!(f, "{}", err),
             Self::StatementError(err) => write!(f, "{}", err),
+            Self::ParseIntError(err) => write!(f, "{}", err),
         }
     }
 }
 
-struct ParserFns {}
-
-impl ParserFns {
-    fn parse_identifier(parser: &mut Parser) -> Expression {
-        Expression {
-            token: parser.curr_token.clone(),
-            kind: ExpressionKind::Identifier {
-                value: parser.curr_token.literal.clone(),
-            },
-        }
-    }
-}
-
-type PrefixParseFn = fn(&mut Parser) -> Expression;
-type InfixParseFn = fn(parser: &mut Parser<'_>, expression: Expression) -> Expression;
+type PrefixParseFn = fn(&mut Parser) -> Result<Expression, ParserError>;
+type InfixParseFn = fn(&mut Parser<'_>, Expression) -> Result<Expression, ParserError>;
 
 struct Parser<'a> {
     curr_token: Token,
@@ -60,7 +49,10 @@ impl<'a> Parser<'a> {
 
         parser
             .prefix_parse_fns
-            .insert(TokenKind::Ident, ParserFns::parse_identifier);
+            .insert(TokenKind::Ident, Parser::parse_fn_identifier);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Int, Parser::parse_fn_integer_literal);
 
         parser
     }
@@ -101,23 +93,9 @@ impl<'a> Parser<'a> {
         };
 
         self.expect_token(TokenKind::Assign)?;
+        self.update_tokens();
 
-        // TODO: skipping the expression for now
-        while self.curr_token.kind != TokenKind::Semicolon {
-            self.update_tokens();
-        }
-        let value = Expression {
-            token: Token {
-                file: None,
-                kind: TokenKind::Ident,
-                line: 0,
-                col: 0,
-                literal: "test".into(),
-            },
-            kind: ExpressionKind::Identifier {
-                value: "test".into(),
-            },
-        };
+        let value = self.parse_expression(Precedence::Lowest)?;
 
         Ok(Statement::Let { token, name, value })
     }
@@ -125,30 +103,41 @@ impl<'a> Parser<'a> {
     fn parse_return_statement(&mut self) -> Result<Statement, ParserError> {
         let token = self.curr_token.clone();
 
-        // TODO: skipping the expression for now
-        while self.curr_token.kind != TokenKind::Semicolon {
-            self.update_tokens();
-        }
-        let value = Expression {
-            token: Token {
-                file: None,
-                kind: TokenKind::Ident,
-                line: 0,
-                col: 0,
-                literal: "test".into(),
-            },
-            kind: ExpressionKind::Identifier {
-                value: "test".into(),
-            },
-        };
+        self.update_tokens();
+        let value = self.parse_expression(Precedence::Lowest)?;
 
         Ok(Statement::Return { token, value })
     }
 
+    fn parse_fn_identifier(parser: &mut Parser) -> Result<Expression, ParserError> {
+        Ok(Expression {
+            token: parser.curr_token.clone(),
+            kind: ExpressionKind::Identifier {
+                value: parser.curr_token.literal.clone(),
+            },
+        })
+    }
+
+    fn parse_fn_integer_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let value = match parser.curr_token.literal.parse::<usize>() {
+            Ok(value) => value,
+            Err(err) => return Err(ParserError::ParseIntError(err.to_string())),
+        };
+        let expression = Ok(Expression {
+            token: parser.curr_token.clone(),
+            kind: ExpressionKind::IntegerLiteral { value },
+        });
+        parser.update_tokens();
+        expression
+    }
+
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParserError> {
         match self.prefix_parse_fns.get(&self.curr_token.kind) {
-            Some(prefix) => Ok(prefix(self)),
-            None => Err(ParserError::StatementError("Invalid prefix".into())),
+            Some(prefix) => prefix(self),
+            None => Err(ParserError::StatementError(format!(
+                "Invalid prefix: {}",
+                self.curr_token
+            ))),
         }
     }
 
@@ -219,7 +208,7 @@ mod tests {
         let program = program.unwrap();
         assert_eq!(program.statements.len(), 3);
 
-        for (i, ident) in ["x", "y", "foobar"].iter().enumerate() {
+        for (i, (ident, literal)) in [("x", 5), ("y", 10), ("foobar", 838383)].iter().enumerate() {
             let stmt = &program.statements[i];
             match stmt {
                 Statement::Let { token, name, value } => {
@@ -227,7 +216,10 @@ mod tests {
                     assert_eq!(token.literal, "let".to_string());
                     assert_eq!(name.token.kind, TokenKind::Ident);
                     assert_eq!(name.token.literal, ident.to_string());
-                    assert_eq!(value.to_string(), ident.to_string());
+                    assert_eq!(
+                        value.kind,
+                        ExpressionKind::IntegerLiteral { value: *literal }
+                    );
                 }
                 _ => panic!("Not a valid let statement"),
             }
@@ -235,7 +227,7 @@ mod tests {
     }
 
     #[test]
-    fn test_resturn_statements() {
+    fn test_return_statements() {
         #[rustfmt::skip]
         let input = concat!(
             "return 5;\n",
@@ -251,11 +243,15 @@ mod tests {
         let program = program.unwrap();
         assert_eq!(program.statements.len(), 3);
 
-        for stmt in program.statements {
-            match stmt {
-                Statement::Return { token, .. } => {
+        for (i, literal) in [5, 10, 993322].iter().enumerate() {
+            match &program.statements[i] {
+                Statement::Return { token, value } => {
                     assert_eq!(token.kind, TokenKind::Return);
                     assert_eq!(token.literal, "return".to_string());
+                    assert_eq!(
+                        value.kind,
+                        ExpressionKind::IntegerLiteral { value: *literal }
+                    );
                 }
                 _ => panic!("Not a valid return statement"),
             }
@@ -317,11 +313,43 @@ mod tests {
 
         for stmt in program.statements {
             match stmt {
-                Statement::Expression { token, .. } => {
+                Statement::Expression { token, value } => {
                     assert_eq!(token.kind, TokenKind::Ident);
+                    assert_eq!(token.literal, "foobar".to_string());
+                    assert_eq!(
+                        value.kind,
+                        ExpressionKind::Identifier {
+                            value: "foobar".to_string()
+                        }
+                    );
                     assert_eq!(token.literal, "foobar".to_string());
                 }
                 _ => panic!("Not a valid invalid identifier"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_integer_literal_expression() {
+        let input = "5;";
+        let lexer = Lexer::new(None, input.chars().peekable());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        check_for_errors(&parser);
+        assert!(program.is_ok());
+        let program = program.unwrap();
+        assert_eq!(program.statements.len(), 1);
+
+        for stmt in program.statements {
+            match stmt {
+                Statement::Expression { token, value } => {
+                    assert_eq!(token.kind, TokenKind::Int);
+                    assert_eq!(token.literal, "5".to_string());
+                    assert_eq!(value.kind, ExpressionKind::IntegerLiteral { value: 5 });
+                    assert_eq!(value.token.literal, "5".to_string());
+                }
+                _ => panic!("Not a valid integer literal"),
             }
         }
     }

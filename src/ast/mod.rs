@@ -11,14 +11,14 @@ pub enum Precedence {
     Call,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Operator {
     Plus,
     Minus,
     Asterisk,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ExpressionKind {
     Boolean {
         value: bool,
@@ -30,9 +30,12 @@ pub enum ExpressionKind {
         operator: Operator,
     },
     Infix {
-        left: Box<Expression>,
+        // left: Box<Expression>,
         operator: Operator,
-        right: Box<Expression>,
+        // right: Box<Expression>,
+    },
+    IntegerLiteral {
+        value: usize,
     },
 }
 
