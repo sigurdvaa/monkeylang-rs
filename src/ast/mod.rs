@@ -1,6 +1,16 @@
 use crate::lexer::Token;
 use std::fmt;
 
+pub enum Precedence {
+    Lowest,
+    Equals,
+    LessGreater,
+    Sum,
+    Product,
+    Prefix,
+    Call,
+}
+
 #[derive(Debug)]
 pub enum Operator {
     Plus,

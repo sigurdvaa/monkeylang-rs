@@ -1,39 +1,68 @@
-use crate::ast::{Expression, ExpressionKind, Program, Statement};
+use crate::ast::{Expression, ExpressionKind, Precedence, Program, Statement};
 use crate::lexer::{Lexer, Token, TokenKind};
+use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Debug)]
 enum ParserError {
-    StatementError(String),
     ExpectError(String),
+    ExpressionError(String),
     InvalidLetStatement(String),
+    StatementError(String),
 }
 
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::StatementError(err) => write!(f, "{}", err),
             Self::ExpectError(err) => write!(f, "{}", err),
+            Self::ExpressionError(err) => write!(f, "{}", err),
             Self::InvalidLetStatement(err) => write!(f, "{}", err),
+            Self::StatementError(err) => write!(f, "{}", err),
         }
     }
 }
+
+struct ParserFns {}
+
+impl ParserFns {
+    fn parse_identifier(parser: &mut Parser) -> Expression {
+        Expression {
+            token: parser.curr_token.clone(),
+            kind: ExpressionKind::Identifier {
+                value: parser.curr_token.literal.clone(),
+            },
+        }
+    }
+}
+
+type PrefixParseFn = fn(&mut Parser) -> Expression;
+type InfixParseFn = fn(parser: &mut Parser<'_>, expression: Expression) -> Expression;
 
 struct Parser<'a> {
     curr_token: Token,
     next_token: Token,
     lexer: Lexer<'a>,
     errors: Vec<ParserError>,
+    prefix_parse_fns: HashMap<TokenKind, PrefixParseFn>,
+    infix_parse_fns: HashMap<TokenKind, InfixParseFn>,
 }
 
 impl<'a> Parser<'a> {
     fn new(mut lexer: Lexer<'a>) -> Self {
-        Self {
+        let mut parser = Self {
             curr_token: lexer.next_token(),
             next_token: lexer.next_token(),
             lexer,
             errors: vec![],
-        }
+            prefix_parse_fns: HashMap::new(),
+            infix_parse_fns: HashMap::new(),
+        };
+
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Ident, ParserFns::parse_identifier);
+
+        parser
     }
 
     fn update_tokens(&mut self) {
@@ -116,14 +145,29 @@ impl<'a> Parser<'a> {
         Ok(Statement::Return { token, value })
     }
 
+    fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParserError> {
+        match self.prefix_parse_fns.get(&self.curr_token.kind) {
+            Some(prefix) => Ok(prefix(self)),
+            None => Err(ParserError::StatementError("Invalid prefix".into())),
+        }
+    }
+
+    fn parse_expression_statement(&mut self) -> Result<Statement, ParserError> {
+        let token = self.curr_token.clone();
+        let value = self.parse_expression(Precedence::Lowest)?;
+
+        if self.next_token.kind == TokenKind::Semicolon {
+            self.update_tokens();
+        }
+
+        Ok(Statement::Expression { token, value })
+    }
+
     fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         match self.curr_token.kind {
             TokenKind::Let => self.parse_let_statement(),
             TokenKind::Return => self.parse_return_statement(),
-            _ => Err(ParserError::StatementError(format!(
-                "Unexpected: {:?}",
-                self.curr_token
-            ))),
+            _ => self.parse_expression_statement(),
         }
     }
 
@@ -143,6 +187,7 @@ impl<'a> Parser<'a> {
     }
 }
 
+// TODO: consider moving tests to separate file
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,7 +198,7 @@ mod tests {
             for err in &parser.errors {
                 println!("{err}");
             }
-            panic!();
+            panic!("Parsing errors found");
         }
     }
 
@@ -256,5 +301,28 @@ mod tests {
         };
 
         assert_eq!(program.to_string(), "let myVar = anotherVar;");
+    }
+
+    #[test]
+    fn test_identifier_expression() {
+        let input = "foobar;";
+        let lexer = Lexer::new(None, input.chars().peekable());
+        let mut parser = Parser::new(lexer);
+        let program = parser.parse_program();
+
+        check_for_errors(&parser);
+        assert!(program.is_ok());
+        let program = program.unwrap();
+        assert_eq!(program.statements.len(), 1);
+
+        for stmt in program.statements {
+            match stmt {
+                Statement::Expression { token, .. } => {
+                    assert_eq!(token.kind, TokenKind::Ident);
+                    assert_eq!(token.literal, "foobar".to_string());
+                }
+                _ => panic!("Not a valid invalid identifier"),
+            }
+        }
     }
 }
