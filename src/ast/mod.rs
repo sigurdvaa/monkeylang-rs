@@ -14,7 +14,7 @@ pub enum Precedence {
 
 impl From<&TokenKind> for Precedence {
     fn from(value: &TokenKind) -> Self {
-        match *value {
+        match value {
             TokenKind::Eq => Self::Equals,
             TokenKind::NotEq => Self::Equals,
             TokenKind::Lt => Self::LessGreater,
@@ -39,6 +39,22 @@ pub enum Operator {
     Lt,
     Eq,
     NotEq,
+}
+
+impl fmt::Display for Operator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Bang => write!(f, "!"),
+            Self::Plus => write!(f, "+"),
+            Self::Minus => write!(f, "-"),
+            Self::Asterisk => write!(f, "*"),
+            Self::Slash => write!(f, "/"),
+            Self::Gt => write!(f, ">"),
+            Self::Lt => write!(f, "<"),
+            Self::Eq => write!(f, "=="),
+            Self::NotEq => write!(f, "!="),
+        }
+    }
 }
 
 impl TryFrom<&str> for Operator {
@@ -116,6 +132,22 @@ impl PartialEq for ExpressionKind {
     }
 }
 
+impl fmt::Display for ExpressionKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Identifier { value } => write!(f, "{value}"),
+            Self::IntegerLiteral { value } => write!(f, "{value}"),
+            Self::Prefix { operator, right } => write!(f, "({operator}{right})"),
+            Self::Infix {
+                left,
+                operator,
+                right,
+            } => write!(f, "({left} {operator} {right})"),
+            _ => todo!(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Expression {
     pub token: Token,
@@ -124,8 +156,7 @@ pub struct Expression {
 
 impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: might have to impl this per kind
-        write!(f, "{}", self.token.literal)
+        write!(f, "{}", self.kind)
     }
 }
 
@@ -156,7 +187,7 @@ impl fmt::Display for Statement {
                 write!(f, "{} {};", token.literal, value)
             }
             Statement::Expression { token: _, value } => {
-                write!(f, "{};", value)
+                write!(f, "{}", value)
             }
         }
     }

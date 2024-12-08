@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fmt;
 
 #[derive(Debug)]
-enum ParserError {
+pub enum ParserError {
     ExpectError(String),
     ExpressionError(String),
     InvalidLetStatement(String),
@@ -31,17 +31,17 @@ impl fmt::Display for ParserError {
 type PrefixParseFn = fn(&mut Parser) -> Result<Expression, ParserError>;
 type InfixParseFn = fn(&mut Parser, Box<Expression>) -> Result<Expression, ParserError>;
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     curr_token: Token,
     next_token: Token,
     lexer: Lexer<'a>,
-    errors: Vec<ParserError>,
+    pub errors: Vec<ParserError>,
     prefix_parse_fns: HashMap<TokenKind, PrefixParseFn>,
     infix_parse_fns: HashMap<TokenKind, InfixParseFn>,
 }
 
 impl<'a> Parser<'a> {
-    fn new(mut lexer: Lexer<'a>) -> Self {
+    pub fn new(mut lexer: Lexer<'a>) -> Self {
         let mut parser = Self {
             curr_token: lexer.next_token(),
             next_token: lexer.next_token(),
@@ -145,12 +145,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fn_identifier(parser: &mut Parser) -> Result<Expression, ParserError> {
-        Ok(Expression {
+        let expression = Ok(Expression {
             token: parser.curr_token.clone(),
             kind: ExpressionKind::Identifier {
                 value: parser.curr_token.literal.clone(),
             },
-        })
+        });
+        parser.update_tokens();
+        expression
     }
 
     fn parse_fn_integer_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -188,8 +190,6 @@ impl<'a> Parser<'a> {
         let operator = Operator::try_from(token.literal.as_str())
             .map_err(|err| ParserError::ParsePrefixError(format!("{}: {}", err, token)))?;
 
-        dbg!(&operator);
-
         parser.update_tokens();
         let right = Box::new(parser.parse_expression(Precedence::from(&token.kind))?);
 
@@ -214,16 +214,12 @@ impl<'a> Parser<'a> {
             }
         };
 
-        // dbg!(&precedence, Precedence::from(&self.curr_token.kind));
-        // dbg!(&precedence < &Precedence::from(&self.curr_token.kind));
-        // dbg!(&self.curr_token, &self.next_token);
         while self.curr_token.kind != TokenKind::Semicolon
             && precedence < Precedence::from(&self.curr_token.kind)
         {
             expression = match self.infix_parse_fns.get(&self.curr_token.kind) {
                 Some(infix) => infix(self, Box::new(expression))?,
                 None => {
-                    dbg!("skipped");
                     return Ok(expression);
                 }
             };
@@ -252,7 +248,7 @@ impl<'a> Parser<'a> {
     }
 
     // TODO: consider not returning Result, as errors are stored in parser
-    fn parse_program(&mut self) -> Result<Program, ParserError> {
+    pub fn parse_program(&mut self) -> Result<Program, ParserError> {
         let mut prog = Program::new();
 
         while self.curr_token.kind != TokenKind::EndOfFile {
@@ -509,8 +505,7 @@ mod tests {
             check_for_errors(&parser);
             assert!(program.is_ok());
             let program = program.unwrap();
-            dbg!(&program.statements);
-            // assert_eq!(program.statements.len(), 1);
+            assert_eq!(program.statements.len(), 1);
 
             for stmt in program.statements {
                 let expr = match &stmt {
@@ -551,6 +546,43 @@ mod tests {
                 };
                 assert_eq!(right_test, right_value);
             }
+        }
+    }
+
+    #[test]
+    fn test_operator_precedence_parsing() {
+        let precedence_test = [
+            ("-a * b", "((-a) * b)", 1),
+            ("!-a", "(!(-a))", 1),
+            ("a + b + c", "((a + b) + c)", 1),
+            ("a + b - c", "((a + b) - c)", 1),
+            ("a * b * c", "((a * b) * c)", 1),
+            ("a * b / c", "((a * b) / c)", 1),
+            ("a + b / c", "(a + (b / c))", 1),
+            (
+                "a + b * c + d / e - f",
+                "(((a + (b * c)) + (d / e)) - f)",
+                1,
+            ),
+            ("3 + 4; -5 * 5", "(3 + 4)((-5) * 5)", 2),
+            ("5 > 4 == 3 < 4", "((5 > 4) == (3 < 4))", 1),
+            ("5 < 4 != 3 > 4", "((5 < 4) != (3 > 4))", 1),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
+                1,
+            ),
+        ];
+
+        for (input_test, value_test, statements_test) in precedence_test {
+            let lexer = Lexer::new(None, input_test.chars().peekable());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            check_for_errors(&parser);
+            let program = program.expect("no program parsed");
+            assert_eq!(program.statements.len(), statements_test);
+            assert_eq!(program.to_string(), value_test.to_string());
         }
     }
 }
