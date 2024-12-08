@@ -10,6 +10,8 @@ enum ParserError {
     InvalidLetStatement(String),
     StatementError(String),
     ParseIntError(String),
+    ParsePrefixError(String),
+    ParseInfixError(String),
 }
 
 impl fmt::Display for ParserError {
@@ -20,12 +22,14 @@ impl fmt::Display for ParserError {
             Self::InvalidLetStatement(err) => write!(f, "{}", err),
             Self::StatementError(err) => write!(f, "{}", err),
             Self::ParseIntError(err) => write!(f, "{}", err),
+            Self::ParsePrefixError(err) => write!(f, "{}", err),
+            Self::ParseInfixError(err) => write!(f, "{}", err),
         }
     }
 }
 
 type PrefixParseFn = fn(&mut Parser) -> Result<Expression, ParserError>;
-type InfixParseFn = fn(&mut Parser<'_>, Expression) -> Result<Expression, ParserError>;
+type InfixParseFn = fn(&mut Parser, Box<Expression>) -> Result<Expression, ParserError>;
 
 struct Parser<'a> {
     curr_token: Token,
@@ -53,6 +57,37 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::Int, Parser::parse_fn_integer_literal);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Bang, Parser::parse_fn_prefix_expression);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Minus, Parser::parse_fn_prefix_expression);
+
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::Plus, Parser::parse_fn_infix_expression);
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::Minus, Parser::parse_fn_infix_expression);
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::Slash, Parser::parse_fn_infix_expression);
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::Asterisk, Parser::parse_fn_infix_expression);
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::Eq, Parser::parse_fn_infix_expression);
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::NotEq, Parser::parse_fn_infix_expression);
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::Lt, Parser::parse_fn_infix_expression);
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::Gt, Parser::parse_fn_infix_expression);
 
         parser
     }
@@ -131,14 +166,70 @@ impl<'a> Parser<'a> {
         expression
     }
 
+    fn parse_fn_prefix_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+        let operator = Operator::try_from(token.literal.as_str())
+            .map_err(|err| ParserError::ParsePrefixError(format!("{}: {}", err, token)))?;
+
+        parser.update_tokens();
+        let right = Box::new(parser.parse_expression(Precedence::Prefix)?);
+
+        Ok(Expression {
+            token,
+            kind: ExpressionKind::Prefix { operator, right },
+        })
+    }
+
+    fn parse_fn_infix_expression(
+        parser: &mut Parser,
+        left: Box<Expression>,
+    ) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+        let operator = Operator::try_from(token.literal.as_str())
+            .map_err(|err| ParserError::ParsePrefixError(format!("{}: {}", err, token)))?;
+
+        dbg!(&operator);
+
+        parser.update_tokens();
+        let right = Box::new(parser.parse_expression(Precedence::from(&token.kind))?);
+
+        Ok(Expression {
+            token,
+            kind: ExpressionKind::Infix {
+                left,
+                operator,
+                right,
+            },
+        })
+    }
+
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParserError> {
-        match self.prefix_parse_fns.get(&self.curr_token.kind) {
-            Some(prefix) => prefix(self),
-            None => Err(ParserError::StatementError(format!(
-                "Invalid prefix: {}",
-                self.curr_token
-            ))),
+        let mut expression = match self.prefix_parse_fns.get(&self.curr_token.kind) {
+            Some(prefix) => prefix(self)?,
+            None => {
+                return Err(ParserError::ExpressionError(format!(
+                    "no prefix parse function found for {}",
+                    self.curr_token
+                )))
+            }
+        };
+
+        // dbg!(&precedence, Precedence::from(&self.curr_token.kind));
+        // dbg!(&precedence < &Precedence::from(&self.curr_token.kind));
+        // dbg!(&self.curr_token, &self.next_token);
+        while self.curr_token.kind != TokenKind::Semicolon
+            && precedence < Precedence::from(&self.curr_token.kind)
+        {
+            expression = match self.infix_parse_fns.get(&self.curr_token.kind) {
+                Some(infix) => infix(self, Box::new(expression))?,
+                None => {
+                    dbg!("skipped");
+                    return Ok(expression);
+                }
+            };
         }
+
+        Ok(expression)
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, ParserError> {
@@ -395,6 +486,70 @@ mod tests {
                 };
 
                 assert_eq!(value_test, rhs_value);
+            }
+        }
+    }
+    #[test]
+    fn test_parsing_infix_expression() {
+        let infix_test = [
+            ("1 + 2;", 1, Operator::Plus, 2),
+            ("1 - 2;", 1, Operator::Minus, 2),
+            ("1 * 2;", 1, Operator::Asterisk, 2),
+            ("1 / 2;", 1, Operator::Slash, 2),
+            ("1 > 2;", 1, Operator::Gt, 2),
+            ("1 < 2;", 1, Operator::Lt, 2),
+            ("1 == 2;", 1, Operator::Eq, 2),
+            ("1 != 2;", 1, Operator::NotEq, 2),
+        ];
+        for (input_test, left_test, operator_test, right_test) in infix_test {
+            let lexer = Lexer::new(None, input_test.chars().peekable());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            check_for_errors(&parser);
+            assert!(program.is_ok());
+            let program = program.unwrap();
+            dbg!(&program.statements);
+            // assert_eq!(program.statements.len(), 1);
+
+            for stmt in program.statements {
+                let expr = match &stmt {
+                    Statement::Expression { token: _, value } => value,
+                    _ => panic!("not an expression statement, got {}", stmt),
+                };
+
+                let (left, operator, right) = match expr {
+                    Expression {
+                        token: _,
+                        kind:
+                            ExpressionKind::Infix {
+                                left,
+                                operator,
+                                right,
+                            },
+                    } => (left, operator, right),
+                    _ => panic!("not a infix expression, got {}", stmt),
+                };
+
+                let left_value = match **left {
+                    Expression {
+                        token: _,
+                        kind: ExpressionKind::IntegerLiteral { value },
+                    } => value,
+                    _ => panic!("left is not integer literal, got {}", left),
+                };
+                assert_eq!(left_test, left_value);
+
+                assert_eq!(operator_test, *operator);
+
+                let right_value = match **right {
+                    Expression {
+                        token: _,
+                        kind: ExpressionKind::IntegerLiteral { value },
+                    } => value,
+                    _ => panic!("right is not integer literal, got {}", right),
+                };
+                assert_eq!(right_test, right_value);
             }
         }
     }
