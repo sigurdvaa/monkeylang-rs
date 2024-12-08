@@ -1,4 +1,4 @@
-use crate::ast::{Expression, ExpressionKind, Precedence, Program, Statement};
+use crate::ast::{Expression, ExpressionKind, Operator, Precedence, Program, Statement};
 use crate::lexer::{Lexer, Token, TokenKind};
 use std::collections::HashMap;
 use std::fmt;
@@ -253,7 +253,10 @@ mod tests {
                         ExpressionKind::IntegerLiteral { value: *literal }
                     );
                 }
-                _ => panic!("Not a valid return statement"),
+                _ => panic!(
+                    "not a valid return statement, got {}",
+                    &program.statements[i]
+                ),
             }
         }
     }
@@ -324,7 +327,7 @@ mod tests {
                     );
                     assert_eq!(token.literal, "foobar".to_string());
                 }
-                _ => panic!("Not a valid invalid identifier"),
+                _ => panic!("not a valid expression statement, got {}", stmt),
             }
         }
     }
@@ -349,7 +352,49 @@ mod tests {
                     assert_eq!(value.kind, ExpressionKind::IntegerLiteral { value: 5 });
                     assert_eq!(value.token.literal, "5".to_string());
                 }
-                _ => panic!("Not a valid integer literal"),
+                _ => panic!("not a valid expression statement, got {}", stmt),
+            }
+        }
+    }
+
+    #[test]
+    fn test_parsing_prefix_expression() {
+        let prefix_test = [("!5;", Operator::Bang, 5), ("-15;", Operator::Minus, 15)];
+        for (input_test, operator_test, value_test) in prefix_test {
+            let lexer = Lexer::new(None, input_test.chars().peekable());
+            let mut parser = Parser::new(lexer);
+            let program = parser.parse_program();
+
+            check_for_errors(&parser);
+            assert!(program.is_ok());
+            let program = program.unwrap();
+            assert_eq!(program.statements.len(), 1);
+
+            for stmt in program.statements {
+                let expr = match &stmt {
+                    Statement::Expression { token: _, value } => value,
+                    _ => panic!("not an expression statement, got {}", stmt),
+                };
+
+                let (operator, right) = match expr {
+                    Expression {
+                        token: _,
+                        kind: ExpressionKind::Prefix { operator, right },
+                    } => (operator, right),
+                    _ => panic!("not a prefix expression, got {}", stmt),
+                };
+
+                assert_eq!(operator_test, *operator);
+
+                let rhs_value = match **right {
+                    Expression {
+                        token: _,
+                        kind: ExpressionKind::IntegerLiteral { value },
+                    } => value,
+                    _ => panic!("rhs is not integer litersl, got {}", right),
+                };
+
+                assert_eq!(value_test, rhs_value);
             }
         }
     }

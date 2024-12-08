@@ -13,12 +13,13 @@ pub enum Precedence {
 
 #[derive(Debug, PartialEq)]
 pub enum Operator {
+    Bang,
     Plus,
     Minus,
     Asterisk,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum ExpressionKind {
     Boolean {
         value: bool,
@@ -28,18 +29,53 @@ pub enum ExpressionKind {
     },
     Prefix {
         operator: Operator,
+        right: Box<Expression>,
     },
     Infix {
-        // left: Box<Expression>,
+        left: Box<Expression>,
         operator: Operator,
-        // right: Box<Expression>,
+        right: Box<Expression>,
     },
     IntegerLiteral {
         value: usize,
     },
 }
 
-#[derive(Debug)]
+impl PartialEq for ExpressionKind {
+    fn eq(&self, other: &Self) -> bool {
+        use ExpressionKind::*;
+        match (self, other) {
+            (Boolean { value: a }, Boolean { value: b }) => a == b,
+            (Identifier { value: a }, Identifier { value: b }) => a == b,
+            (
+                Prefix {
+                    operator: a_op,
+                    right: a_rhs,
+                },
+                Prefix {
+                    operator: b_op,
+                    right: b_rhs,
+                },
+            ) => a_op == b_op && *a_rhs == *b_rhs,
+            (
+                Infix {
+                    left: a_lhs,
+                    operator: a_op,
+                    right: a_rhs,
+                },
+                Infix {
+                    left: b_lhs,
+                    operator: b_op,
+                    right: b_rhs,
+                },
+            ) => a_op == b_op && *a_lhs == *b_lhs && *a_rhs == *b_rhs,
+            (IntegerLiteral { value: a }, IntegerLiteral { value: b }) => a == b,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct Expression {
     pub token: Token,
     pub kind: ExpressionKind,
