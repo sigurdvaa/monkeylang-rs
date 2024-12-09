@@ -62,15 +62,15 @@ impl TryFrom<&str> for Operator {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         match value {
-            "!" => Ok(Self::Bang),
-            "+" => Ok(Self::Plus),
-            "-" => Ok(Self::Minus),
-            "*" => Ok(Self::Asterisk),
-            "/" => Ok(Self::Slash),
-            "<" => Ok(Self::Lt),
-            ">" => Ok(Self::Gt),
-            "==" => Ok(Self::Eq),
-            "!=" => Ok(Self::NotEq),
+            v if v == Self::Bang.to_string() => Ok(Self::Bang),
+            v if v == Self::Plus.to_string() => Ok(Self::Plus),
+            v if v == Self::Minus.to_string() => Ok(Self::Minus),
+            v if v == Self::Asterisk.to_string() => Ok(Self::Asterisk),
+            v if v == Self::Slash.to_string() => Ok(Self::Slash),
+            v if v == Self::Gt.to_string() => Ok(Self::Gt),
+            v if v == Self::Lt.to_string() => Ok(Self::Lt),
+            v if v == Self::Eq.to_string() => Ok(Self::Eq),
+            v if v == Self::NotEq.to_string() => Ok(Self::NotEq),
             _ => Err("Unknown operator"),
         }
     }
