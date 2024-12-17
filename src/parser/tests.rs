@@ -1,9 +1,7 @@
 #[cfg(test)]
 use super::*;
 
-use super::{Expression, ExpressionKind, Lexer, Parser, Program};
-use crate::lexer::TokenKind;
-#[allow(dead_code)]
+#[cfg(test)]
 fn get_program(input: &str, statements: usize) -> Program {
     let lexer = Lexer::new(None, input.chars().peekable());
     let mut parser = Parser::new(lexer);
@@ -23,7 +21,7 @@ fn get_program(input: &str, statements: usize) -> Program {
     program
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 fn assert_identifier(expression: &Expression, assert_value: &str) {
     assert_eq!(expression.token.kind, TokenKind::Ident);
     assert_eq!(expression.token.literal, assert_value);
@@ -33,7 +31,7 @@ fn assert_identifier(expression: &Expression, assert_value: &str) {
     }
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 fn assert_integer_literal(expression: &Expression, assert_value: &usize) {
     assert_eq!(expression.token.kind, TokenKind::Int);
     assert_eq!(expression.token.literal, assert_value.to_string());
