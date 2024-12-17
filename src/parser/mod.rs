@@ -7,25 +7,27 @@ use std::fmt;
 
 #[derive(Debug)]
 pub enum ParserError {
-    ExpectError(String),
-    ExpressionError(String),
-    InvalidLetStatement(String),
-    StatementError(String),
-    ParseIntError(String),
-    ParsePrefixError(String),
-    ParseInfixError(String),
+    Expect(String),
+    Expression(String),
+    // TODO: remove or use
+    // InvalidLetStatement(String),
+    // StatementError(String),
+    ParseInt(String),
+    ParsePrefix(String),
+    ParseInfix(String),
 }
 
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::ExpectError(err) => write!(f, "{}", err),
-            Self::ExpressionError(err) => write!(f, "{}", err),
-            Self::InvalidLetStatement(err) => write!(f, "{}", err),
-            Self::StatementError(err) => write!(f, "{}", err),
-            Self::ParseIntError(err) => write!(f, "{}", err),
-            Self::ParsePrefixError(err) => write!(f, "{}", err),
-            Self::ParseInfixError(err) => write!(f, "{}", err),
+            Self::Expect(err) => write!(f, "{}", err),
+            Self::Expression(err) => write!(f, "{}", err),
+            // TODO: remove or use
+            // Self::InvalidLetStatement(err) => write!(f, "{}", err),
+            // Self::StatementError(err) => write!(f, "{}", err),
+            Self::ParseInt(err) => write!(f, "{}", err),
+            Self::ParsePrefix(err) => write!(f, "{}", err),
+            Self::ParseInfix(err) => write!(f, "{}", err),
         }
     }
 }
@@ -71,6 +73,9 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::False, Parser::parse_fn_boolean_literal);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Lparen, Parser::parse_fn_grouped_expression);
 
         parser
             .infix_parse_fns
@@ -110,19 +115,20 @@ impl<'a> Parser<'a> {
             self.update_tokens();
             Ok(())
         } else {
-            Err(ParserError::ExpectError(format!(
-                "Expected next token to be {token:?}, but got: {:?}",
+            Err(ParserError::Expect(format!(
+                "expected next token to be {token:?}, but got: {:?}",
                 self.next_token
             )))
         }
     }
 
-    fn expect_error(&mut self, token: TokenKind) {
-        self.errors.push(ParserError::ExpectError(format!(
-            "Expected next token to be {token:?}, but got: {:?}",
-            self.next_token
-        )));
-    }
+    // TODO: remove
+    // fn expect_error(&mut self, token: TokenKind) {
+    //     self.errors.push(ParserError::ExpectError(format!(
+    //         "expected next token to be {token:?}, but got: {:?}",
+    //         self.next_token
+    //     )));
+    // }
 
     fn parse_let_statement(&mut self) -> Result<Statement, ParserError> {
         let token = self.curr_token.clone();
@@ -140,6 +146,10 @@ impl<'a> Parser<'a> {
 
         let value = self.parse_expression(Precedence::Lowest)?;
 
+        if self.next_token.kind == TokenKind::Semicolon {
+            self.update_tokens();
+        }
+
         Ok(Statement::Let { token, name, value })
     }
 
@@ -148,6 +158,10 @@ impl<'a> Parser<'a> {
 
         self.update_tokens();
         let value = self.parse_expression(Precedence::Lowest)?;
+
+        if self.next_token.kind == TokenKind::Semicolon {
+            self.update_tokens();
+        }
 
         Ok(Statement::Return { token, value })
     }
@@ -159,20 +173,20 @@ impl<'a> Parser<'a> {
                 value: parser.curr_token.literal.clone(),
             },
         });
-        parser.update_tokens();
+        // parser.update_tokens();
         expression
     }
 
     fn parse_fn_integer_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
         let value = match parser.curr_token.literal.parse::<usize>() {
             Ok(value) => value,
-            Err(err) => return Err(ParserError::ParseIntError(err.to_string())),
+            Err(err) => return Err(ParserError::ParseInt(err.to_string())),
         };
         let expression = Ok(Expression {
             token: parser.curr_token.clone(),
             kind: ExpressionKind::IntegerLiteral { value },
         });
-        parser.update_tokens();
+        // parser.update_tokens();
         expression
     }
 
@@ -182,14 +196,14 @@ impl<'a> Parser<'a> {
             token: parser.curr_token.clone(),
             kind: ExpressionKind::Boolean { value },
         });
-        parser.update_tokens();
+        // parser.update_tokens();
         expression
     }
 
     fn parse_fn_prefix_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
         let token = parser.curr_token.clone();
         let operator = Operator::try_from(token.literal.as_str())
-            .map_err(|err| ParserError::ParsePrefixError(format!("{}: {}", err, token)))?;
+            .map_err(|err| ParserError::ParsePrefix(format!("{}: {}", err, token)))?;
 
         parser.update_tokens();
         let right = Box::new(parser.parse_expression(Precedence::Prefix)?);
@@ -204,9 +218,10 @@ impl<'a> Parser<'a> {
         parser: &mut Parser,
         left: Box<Expression>,
     ) -> Result<Expression, ParserError> {
+        parser.update_tokens();
         let token = parser.curr_token.clone();
         let operator = Operator::try_from(token.literal.as_str())
-            .map_err(|err| ParserError::ParsePrefixError(format!("{}: {}", err, token)))?;
+            .map_err(|err| ParserError::ParseInfix(format!("{err}: {token}")))?;
 
         parser.update_tokens();
         let right = Box::new(parser.parse_expression(Precedence::from(&token.kind))?);
@@ -221,28 +236,34 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn parse_fn_grouped_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
+        parser.update_tokens();
+        let expression = parser.parse_expression(Precedence::Lowest)?;
+        parser.expect_token(TokenKind::Rparen)?;
+        Ok(expression)
+    }
+
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParserError> {
         let mut expression = match self.prefix_parse_fns.get(&self.curr_token.kind) {
             Some(prefix) => prefix(self)?,
             None => {
-                return Err(ParserError::ExpressionError(format!(
+                return Err(ParserError::Expression(format!(
                     "no prefix parse function found for {}",
                     self.curr_token
-                )))
+                )));
             }
         };
 
-        while self.curr_token.kind != TokenKind::Semicolon
-            && precedence < Precedence::from(&self.curr_token.kind)
+        while self.next_token.kind != TokenKind::Semicolon
+            && precedence < Precedence::from(&self.next_token.kind)
         {
-            expression = match self.infix_parse_fns.get(&self.curr_token.kind) {
+            expression = match self.infix_parse_fns.get(&self.next_token.kind) {
                 Some(infix) => infix(self, Box::new(expression))?,
                 None => {
                     return Ok(expression);
                 }
             };
         }
-
         Ok(expression)
     }
 

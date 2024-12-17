@@ -9,7 +9,8 @@ pub enum Precedence {
     Sum,
     Product,
     Prefix,
-    Call,
+    // Todo: add call
+    // Call,
 }
 
 impl From<&TokenKind> for Precedence {

@@ -16,11 +16,10 @@ fn parse_program(input: &str, statements: usize) -> Program {
     let program = parser.parse_program();
 
     if !parser.errors.is_empty() {
-        println!("parser has {} errors", parser.errors.len());
         for err in &parser.errors {
             println!("{err}");
         }
-        panic!("Parsing errors found");
+        panic!("parser errors found: {}", parser.errors.len());
     }
 
     assert!(program.is_ok());
@@ -30,7 +29,7 @@ fn parse_program(input: &str, statements: usize) -> Program {
 }
 
 #[cfg(test)]
-fn assert_identifier(expression: &Expression, assert_value: &str) {
+fn assert_identifier_literal(expression: &Expression, assert_value: &str) {
     assert_eq!(expression.token.kind, TokenKind::Ident);
     assert_eq!(expression.token.literal, assert_value);
     match &expression.kind {
@@ -70,14 +69,14 @@ fn assert_literal(expression: &Expression, assert_value: &Literal) {
             assert_boolean_literal(expression, value)
         }
         (ExpressionKind::Identifier { .. }, Literal::Ident(value)) => {
-            assert_identifier(expression, value)
+            assert_identifier_literal(expression, value)
         }
         (ExpressionKind::IntegerLiteral { .. }, Literal::Int(value)) => {
             assert_integer_literal(expression, value)
         }
-        _ => panic!(
-            "Mismatched expression and literal value, got {expression:?} and {assert_value:?}"
-        ),
+        _ => {
+            panic!("Mismatched expression and literal value, got {expression} and {assert_value:?}")
+        }
     }
 }
 
@@ -98,7 +97,7 @@ fn assert_infix_expression(
                     right,
                 },
         } => (left, operator, right),
-        _ => panic!("not a infix expression, got: {expression:?}"),
+        _ => panic!("not a infix expression, got: {expression}"),
     };
 
     assert_literal(left, left_test);
@@ -138,8 +137,8 @@ fn test_let_statements() {
         match stmt {
             Statement::Let { token, name, value } => {
                 assert_eq!(token.kind, TokenKind::Let);
-                assert_eq!(token.literal, "let".to_string());
-                assert_identifier(name, ident);
+                assert_eq!(token.literal, "let");
+                assert_identifier_literal(name, ident);
                 assert_integer_literal(value, literal);
             }
             _ => panic!("Not a valid let statement, got: {stmt}"),
@@ -161,7 +160,7 @@ fn test_return_statements() {
         match &program.statements[i] {
             Statement::Return { token, value } => {
                 assert_eq!(token.kind, TokenKind::Return);
-                assert_eq!(token.literal, "return".to_string());
+                assert_eq!(token.literal, "return");
                 assert_integer_literal(value, literal);
             }
             _ => panic!(
@@ -215,15 +214,15 @@ fn test_program_to_string() {
 
 #[test]
 fn test_identifier_expression() {
-    let input = "foobar;";
-    let program = parse_program(input, 1);
+    let (test_input, test_value) = ("foobar;", "foobar");
+    let program = parse_program(test_input, 1);
 
     for stmt in &program.statements {
         match stmt {
             Statement::Expression { token, value } => {
                 assert_eq!(token.kind, TokenKind::Ident);
-                assert_eq!(token.literal, "foobar".to_string());
-                assert_identifier(value, "foobar");
+                assert_eq!(token.literal, test_value);
+                assert_literal(value, &Literal::Ident(test_value));
             }
             _ => panic!("not a valid expression statement, got: {stmt}"),
         }
@@ -232,15 +231,15 @@ fn test_identifier_expression() {
 
 #[test]
 fn test_integer_literal_expression() {
-    let input = "5;";
-    let program = parse_program(input, 1);
+    let (test_input, test_value) = ("5;", 5);
+    let program = parse_program(test_input, 1);
 
     for stmt in &program.statements {
         match stmt {
             Statement::Expression { token, value } => {
                 assert_eq!(token.kind, TokenKind::Int);
-                assert_eq!(token.literal, "5".to_string());
-                assert_integer_literal(value, &5);
+                assert_eq!(token.literal, test_value.to_string());
+                assert_literal(value, &Literal::Int(test_value));
             }
             _ => panic!("not a valid expression statement, got: {stmt}"),
         }
@@ -345,6 +344,11 @@ fn test_operator_precedence_parsing() {
         ("false", "false", 1),
         ("3 > 5 == false", "((3 > 5) == false)", 1),
         ("3 < 5 == true", "((3 < 5) == true)", 1),
+        ("1 + (2 + 3) + 4", "((1 + (2 + 3)) + 4)", 1),
+        ("(5 + 5) * 2", "((5 + 5) * 2)", 1),
+        ("2 / (5 + 5)", "(2 / (5 + 5))", 1),
+        ("-(5 + 5)", "(-(5 + 5))", 1),
+        ("!(true == true)", "(!(true == true))", 1),
     ];
 
     for (input_test, value_test, statements_test) in precedence_test {
@@ -355,21 +359,19 @@ fn test_operator_precedence_parsing() {
 
 #[test]
 fn test_boolean_expression() {
-    let boolean_test = [("true;", true), ("false;", false)];
+    let boolean_test = [
+        ("true;", TokenKind::True, "true", Literal::Bool(true)),
+        ("false;", TokenKind::False, "false", Literal::Bool(false)),
+    ];
 
-    for (test_input, test_value) in boolean_test {
+    for (test_input, test_token, test_literal, test_value) in &boolean_test {
         let program = parse_program(test_input, 1);
-
         for stmt in &program.statements {
             match stmt {
                 Statement::Expression { token, value } => {
-                    if test_value {
-                        assert_eq!(token.kind, TokenKind::True);
-                    } else {
-                        assert_eq!(token.kind, TokenKind::False);
-                    }
-                    assert_eq!(token.literal, test_value.to_string());
-                    assert_boolean_literal(value, &test_value);
+                    assert_eq!(token.kind, *test_token);
+                    assert_eq!(token.literal, *test_literal);
+                    assert_literal(value, test_value);
                 }
                 _ => panic!("not a valid expression statement, got: {stmt}"),
             }
