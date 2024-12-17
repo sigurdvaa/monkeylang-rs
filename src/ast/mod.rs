@@ -97,6 +97,11 @@ pub enum ExpressionKind {
     IntegerLiteral {
         value: usize,
     },
+    If {
+        condition: Box<Expression>,
+        consequence: Box<Statement>,
+        alternative: Option<Box<Statement>>,
+    },
 }
 
 impl PartialEq for ExpressionKind {
@@ -145,6 +150,17 @@ impl fmt::Display for ExpressionKind {
                 operator,
                 right,
             } => write!(f, "({left} {operator} {right})"),
+            Self::If {
+                condition,
+                consequence,
+                alternative,
+            } => {
+                if let Some(alternative) = alternative {
+                    write!(f, "if {condition} {consequence} else {alternative}")
+                } else {
+                    write!(f, "if {condition} {consequence}")
+                }
+            }
         }
     }
 }
@@ -176,6 +192,10 @@ pub enum Statement {
         token: Token,
         value: Expression,
     },
+    Block {
+        token: Token,
+        statements: Vec<Statement>,
+    },
 }
 
 impl fmt::Display for Statement {
@@ -189,6 +209,16 @@ impl fmt::Display for Statement {
             }
             Statement::Expression { token: _, value } => {
                 write!(f, "{}", value)
+            }
+            Statement::Block {
+                token: _,
+                statements,
+            } => {
+                let mut string = String::new();
+                for stmt in statements {
+                    string.push_str(&stmt.to_string());
+                }
+                write!(f, "{string}")
             }
         }
     }

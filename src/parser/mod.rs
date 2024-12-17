@@ -76,6 +76,9 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::Lparen, Parser::parse_fn_grouped_expression);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::If, Parser::parse_fn_if_expression);
 
         parser
             .infix_parse_fns
@@ -167,14 +170,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fn_identifier(parser: &mut Parser) -> Result<Expression, ParserError> {
-        let expression = Ok(Expression {
+        Ok(Expression {
             token: parser.curr_token.clone(),
             kind: ExpressionKind::Identifier {
                 value: parser.curr_token.literal.clone(),
             },
-        });
-        // parser.update_tokens();
-        expression
+        })
     }
 
     fn parse_fn_integer_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -182,22 +183,48 @@ impl<'a> Parser<'a> {
             Ok(value) => value,
             Err(err) => return Err(ParserError::ParseInt(err.to_string())),
         };
-        let expression = Ok(Expression {
+        Ok(Expression {
             token: parser.curr_token.clone(),
             kind: ExpressionKind::IntegerLiteral { value },
-        });
-        // parser.update_tokens();
-        expression
+        })
     }
 
     fn parse_fn_boolean_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
         let value = parser.curr_token.kind == TokenKind::True;
-        let expression = Ok(Expression {
+        Ok(Expression {
             token: parser.curr_token.clone(),
             kind: ExpressionKind::Boolean { value },
-        });
-        // parser.update_tokens();
-        expression
+        })
+    }
+
+    fn parse_fn_if_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+
+        parser.expect_token(TokenKind::Lparen)?;
+        parser.update_tokens();
+
+        let condition = Box::new(parser.parse_expression(Precedence::Lowest)?);
+
+        parser.expect_token(TokenKind::Rparen)?;
+        parser.expect_token(TokenKind::Lbrace)?;
+
+        let consequence = Box::new(parser.parse_block_statement()?);
+
+        let mut alternative = None;
+        if parser.next_token.kind == TokenKind::Else {
+            parser.update_tokens();
+            parser.expect_token(TokenKind::Lbrace)?;
+            alternative = Some(Box::new(parser.parse_block_statement()?));
+        }
+
+        Ok(Expression {
+            token,
+            kind: ExpressionKind::If {
+                condition,
+                consequence,
+                alternative,
+            },
+        })
     }
 
     fn parse_fn_prefix_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -265,6 +292,24 @@ impl<'a> Parser<'a> {
             };
         }
         Ok(expression)
+    }
+
+    fn parse_block_statement(&mut self) -> Result<Statement, ParserError> {
+        let token = self.curr_token.clone();
+        self.update_tokens();
+
+        let mut statements = vec![];
+        while self.curr_token.kind != TokenKind::Rbrace
+            && self.curr_token.kind != TokenKind::EndOfFile
+        {
+            match self.parse_statement() {
+                Ok(stmt) => statements.push(stmt),
+                Err(err) => self.errors.push(err),
+            }
+            self.update_tokens();
+        }
+
+        Ok(Statement::Block { token, statements })
     }
 
     fn parse_expression_statement(&mut self) -> Result<Statement, ParserError> {

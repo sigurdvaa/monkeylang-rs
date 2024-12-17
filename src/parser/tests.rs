@@ -75,7 +75,7 @@ fn assert_literal(expression: &Expression, assert_value: &Literal) {
             assert_integer_literal(expression, value)
         }
         _ => {
-            panic!("Mismatched expression and literal value, got {expression} and {assert_value:?}")
+            panic!("mismatched expression and literal value, got {expression} and {assert_value:?}")
         }
     }
 }
@@ -375,6 +375,125 @@ fn test_boolean_expression() {
                 }
                 _ => panic!("not a valid expression statement, got: {stmt}"),
             }
+        }
+    }
+}
+
+#[test]
+fn test_if_expression() {
+    let input = "if (x < y) { x }";
+    let program = parse_program(input, 1);
+
+    for stmt in &program.statements {
+        let expr = match stmt {
+            Statement::Expression { token, value } => {
+                assert_eq!(token.kind, TokenKind::If);
+                assert_eq!(token.literal, "if");
+                value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let (condition, consequence, alternative) = match &expr.kind {
+            ExpressionKind::If {
+                condition,
+                consequence,
+                alternative,
+            } => (condition, consequence, alternative),
+            _ => panic!("not a valid if expression, got: {expr}"),
+        };
+
+        assert_infix_expression(
+            condition,
+            &Literal::Ident("x"),
+            &Operator::Lt,
+            &Literal::Ident("y"),
+        );
+
+        match consequence.as_ref() {
+            Statement::Block {
+                token: _,
+                statements,
+            } => {
+                assert_eq!(statements.len(), 1);
+                match &statements[0] {
+                    Statement::Expression { token: _, value } => {
+                        assert_literal(value, &Literal::Ident("x"));
+                    }
+                    _ => panic!("not valid expression statement"),
+                }
+            }
+            _ => panic!("if consequence not valid block statement, got {consequence}"),
+        }
+
+        assert!(alternative.is_none());
+    }
+}
+
+#[test]
+fn test_if_else_expression() {
+    let input = "if (x < y) { x } else { y }";
+    let program = parse_program(input, 1);
+
+    for stmt in &program.statements {
+        let expr = match stmt {
+            Statement::Expression { token, value } => {
+                assert_eq!(token.kind, TokenKind::If);
+                assert_eq!(token.literal, "if");
+                value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let (condition, consequence, alternative) = match &expr.kind {
+            ExpressionKind::If {
+                condition,
+                consequence,
+                alternative,
+            } => (condition, consequence, alternative),
+            _ => panic!("not a valid if expression, got: {expr}"),
+        };
+
+        assert_infix_expression(
+            condition,
+            &Literal::Ident("x"),
+            &Operator::Lt,
+            &Literal::Ident("y"),
+        );
+
+        match consequence.as_ref() {
+            Statement::Block {
+                token: _,
+                statements,
+            } => {
+                assert_eq!(statements.len(), 1);
+                match &statements[0] {
+                    Statement::Expression { token: _, value } => {
+                        assert_literal(value, &Literal::Ident("x"));
+                    }
+                    _ => panic!("not valid expression statement"),
+                }
+            }
+            _ => panic!("if consequence not valid block statement, got {consequence}"),
+        }
+
+        match alternative {
+            Some(alternative) => match alternative.as_ref() {
+                Statement::Block {
+                    token: _,
+                    statements,
+                } => {
+                    assert_eq!(statements.len(), 1);
+                    match &statements[0] {
+                        Statement::Expression { token: _, value } => {
+                            assert_literal(value, &Literal::Ident("y"));
+                        }
+                        _ => panic!("not valid expression statement"),
+                    }
+                }
+                _ => panic!("if alternative not valid block statement, got {alternative}"),
+            },
+            None => panic!("if alternative block missing"),
         }
     }
 }
