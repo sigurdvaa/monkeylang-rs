@@ -2,7 +2,15 @@
 use super::*;
 
 #[cfg(test)]
-fn get_program(input: &str, statements: usize) -> Program {
+#[derive(Debug)]
+enum Literal {
+    Bool(bool),
+    Ident(&'static str),
+    Int(usize),
+}
+
+#[cfg(test)]
+fn parse_program(input: &str, statements: usize) -> Program {
     let lexer = Lexer::new(None, input.chars().peekable());
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
@@ -41,6 +49,80 @@ fn assert_integer_literal(expression: &Expression, assert_value: &usize) {
     }
 }
 
+#[cfg(test)]
+fn assert_boolean_literal(expression: &Expression, assert_value: &bool) {
+    if *assert_value {
+        assert_eq!(expression.token.kind, TokenKind::True);
+    } else {
+        assert_eq!(expression.token.kind, TokenKind::False);
+    }
+    assert_eq!(expression.token.literal, assert_value.to_string());
+    match &expression.kind {
+        ExpressionKind::Boolean { value } => assert_eq!(value, assert_value),
+        _ => panic!("invalid boolean literal, got {expression:?}"),
+    }
+}
+
+#[cfg(test)]
+fn assert_literal(expression: &Expression, assert_value: &Literal) {
+    match (&expression.kind, &assert_value) {
+        (ExpressionKind::Boolean { .. }, Literal::Bool(value)) => {
+            assert_boolean_literal(expression, value)
+        }
+        (ExpressionKind::Identifier { .. }, Literal::Ident(value)) => {
+            assert_identifier(expression, value)
+        }
+        (ExpressionKind::IntegerLiteral { .. }, Literal::Int(value)) => {
+            assert_integer_literal(expression, value)
+        }
+        _ => panic!(
+            "Mismatched expression and literal value, got {expression:?} and {assert_value:?}"
+        ),
+    }
+}
+
+#[cfg(test)]
+fn assert_infix_expression(
+    expression: &Expression,
+    left_test: &Literal,
+    operator_test: &Operator,
+    right_test: &Literal,
+) {
+    let (left, operator, right) = match expression {
+        Expression {
+            token: _,
+            kind:
+                ExpressionKind::Infix {
+                    left,
+                    operator,
+                    right,
+                },
+        } => (left, operator, right),
+        _ => panic!("not a infix expression, got: {expression:?}"),
+    };
+
+    assert_literal(left, left_test);
+    assert_eq!(operator_test, operator);
+    assert_literal(right, right_test);
+}
+
+#[cfg(test)]
+fn assert_prefix_expression(
+    expression: &Expression,
+    operator_test: &Operator,
+    right_test: &Literal,
+) {
+    let (operator, right) = match expression {
+        Expression {
+            token: _,
+            kind: ExpressionKind::Prefix { operator, right },
+        } => (operator, right),
+        _ => panic!("not a prefix expression, got: {expression}"),
+    };
+    assert_eq!(operator_test, operator);
+    assert_literal(right, right_test);
+}
+
 #[test]
 fn test_let_statements() {
     #[rustfmt::skip]
@@ -49,7 +131,7 @@ fn test_let_statements() {
         "let y = 10;\n",
         "let foobar = 838383;\n"
     );
-    let program = get_program(input, 3);
+    let program = parse_program(input, 3);
 
     for (i, (ident, literal)) in [("x", 5), ("y", 10), ("foobar", 838383)].iter().enumerate() {
         let stmt = &program.statements[i];
@@ -73,7 +155,7 @@ fn test_return_statements() {
         "return 10;\n",
         "return 993322;\n"
     );
-    let program = get_program(input, 3);
+    let program = parse_program(input, 3);
 
     for (i, literal) in [5, 10, 993322].iter().enumerate() {
         match &program.statements[i] {
@@ -134,7 +216,7 @@ fn test_program_to_string() {
 #[test]
 fn test_identifier_expression() {
     let input = "foobar;";
-    let program = get_program(input, 1);
+    let program = parse_program(input, 1);
 
     for stmt in &program.statements {
         match stmt {
@@ -151,7 +233,7 @@ fn test_identifier_expression() {
 #[test]
 fn test_integer_literal_expression() {
     let input = "5;";
-    let program = get_program(input, 1);
+    let program = parse_program(input, 1);
 
     for stmt in &program.statements {
         match stmt {
@@ -167,9 +249,14 @@ fn test_integer_literal_expression() {
 
 #[test]
 fn test_parsing_prefix_expression() {
-    let prefix_test = [("!5;", Operator::Bang, 5), ("-15;", Operator::Minus, 15)];
-    for (input_test, operator_test, right_test) in prefix_test {
-        let program = get_program(input_test, 1);
+    let prefix_test = [
+        ("!5;", Operator::Bang, Literal::Int(5)),
+        ("-15;", Operator::Minus, Literal::Int(15)),
+        ("!true", Operator::Bang, Literal::Bool(true)),
+        ("!false", Operator::Bang, Literal::Bool(false)),
+    ];
+    for (input_test, operator_test, right_test) in &prefix_test {
+        let program = parse_program(input_test, 1);
 
         for stmt in &program.statements {
             let expr = match &stmt {
@@ -177,33 +264,48 @@ fn test_parsing_prefix_expression() {
                 _ => panic!("not an expression statement, got: {stmt}"),
             };
 
-            let (operator, right) = match expr {
-                Expression {
-                    token: _,
-                    kind: ExpressionKind::Prefix { operator, right },
-                } => (operator, right),
-                _ => panic!("not a prefix expression, got: {stmt}"),
-            };
-            assert_eq!(operator_test, *operator);
-
-            assert_integer_literal(right.as_ref(), &right_test);
+            assert_prefix_expression(expr, operator_test, right_test);
         }
     }
 }
+
 #[test]
 fn test_parsing_infix_expression() {
     let infix_test = [
-        ("1 + 2;", 1, Operator::Plus, 2),
-        ("1 - 2;", 1, Operator::Minus, 2),
-        ("1 * 2;", 1, Operator::Asterisk, 2),
-        ("1 / 2;", 1, Operator::Slash, 2),
-        ("1 > 2;", 1, Operator::Gt, 2),
-        ("1 < 2;", 1, Operator::Lt, 2),
-        ("1 == 2;", 1, Operator::Eq, 2),
-        ("1 != 2;", 1, Operator::NotEq, 2),
+        ("1 + 2;", Literal::Int(1), Operator::Plus, Literal::Int(2)),
+        ("1 - 2;", Literal::Int(1), Operator::Minus, Literal::Int(2)),
+        (
+            "1 * 2;",
+            Literal::Int(1),
+            Operator::Asterisk,
+            Literal::Int(2),
+        ),
+        ("1 / 2;", Literal::Int(1), Operator::Slash, Literal::Int(2)),
+        ("1 > 2;", Literal::Int(1), Operator::Gt, Literal::Int(2)),
+        ("1 < 2;", Literal::Int(1), Operator::Lt, Literal::Int(2)),
+        ("1 == 2;", Literal::Int(1), Operator::Eq, Literal::Int(2)),
+        ("1 != 2;", Literal::Int(1), Operator::NotEq, Literal::Int(2)),
+        (
+            "true == true",
+            Literal::Bool(true),
+            Operator::Eq,
+            Literal::Bool(true),
+        ),
+        (
+            "true != false",
+            Literal::Bool(true),
+            Operator::NotEq,
+            Literal::Bool(false),
+        ),
+        (
+            "false == false",
+            Literal::Bool(false),
+            Operator::Eq,
+            Literal::Bool(false),
+        ),
     ];
-    for (input_test, left_test, operator_test, right_test) in infix_test {
-        let program = get_program(input_test, 1);
+    for (input_test, left_test, operator_test, right_test) in &infix_test {
+        let program = parse_program(input_test, 1);
 
         for stmt in &program.statements {
             let expr = match &stmt {
@@ -211,22 +313,7 @@ fn test_parsing_infix_expression() {
                 _ => panic!("not an expression statement, got: {stmt}"),
             };
 
-            let (left, operator, right) = match expr {
-                Expression {
-                    token: _,
-                    kind:
-                        ExpressionKind::Infix {
-                            left,
-                            operator,
-                            right,
-                        },
-                } => (left, operator, right),
-                _ => panic!("not a infix expression, got: {stmt}"),
-            };
-
-            assert_integer_literal(left.as_ref(), &left_test);
-            assert_eq!(operator_test, *operator);
-            assert_integer_literal(right.as_ref(), &right_test);
+            assert_infix_expression(expr, left_test, operator_test, right_test);
         }
     }
 }
@@ -254,10 +341,38 @@ fn test_operator_precedence_parsing() {
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)))",
             1,
         ),
+        ("true", "true", 1),
+        ("false", "false", 1),
+        ("3 > 5 == false", "((3 > 5) == false)", 1),
+        ("3 < 5 == true", "((3 < 5) == true)", 1),
     ];
 
     for (input_test, value_test, statements_test) in precedence_test {
-        let program = get_program(input_test, statements_test);
+        let program = parse_program(input_test, statements_test);
         assert_eq!(program.to_string(), value_test.to_string());
+    }
+}
+
+#[test]
+fn test_boolean_expression() {
+    let boolean_test = [("true;", true), ("false;", false)];
+
+    for (test_input, test_value) in boolean_test {
+        let program = parse_program(test_input, 1);
+
+        for stmt in &program.statements {
+            match stmt {
+                Statement::Expression { token, value } => {
+                    if test_value {
+                        assert_eq!(token.kind, TokenKind::True);
+                    } else {
+                        assert_eq!(token.kind, TokenKind::False);
+                    }
+                    assert_eq!(token.literal, test_value.to_string());
+                    assert_boolean_literal(value, &test_value);
+                }
+                _ => panic!("not a valid expression statement, got: {stmt}"),
+            }
+        }
     }
 }

@@ -65,6 +65,12 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::Minus, Parser::parse_fn_prefix_expression);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::True, Parser::parse_fn_boolean_literal);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::False, Parser::parse_fn_boolean_literal);
 
         parser
             .infix_parse_fns
@@ -165,6 +171,16 @@ impl<'a> Parser<'a> {
         let expression = Ok(Expression {
             token: parser.curr_token.clone(),
             kind: ExpressionKind::IntegerLiteral { value },
+        });
+        parser.update_tokens();
+        expression
+    }
+
+    fn parse_fn_boolean_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let value = parser.curr_token.kind == TokenKind::True;
+        let expression = Ok(Expression {
+            token: parser.curr_token.clone(),
+            kind: ExpressionKind::Boolean { value },
         });
         parser.update_tokens();
         expression

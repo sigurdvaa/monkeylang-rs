@@ -135,6 +135,7 @@ impl PartialEq for ExpressionKind {
 impl fmt::Display for ExpressionKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            Self::Boolean { value } => write!(f, "{value}"),
             Self::Identifier { value } => write!(f, "{value}"),
             Self::IntegerLiteral { value } => write!(f, "{value}"),
             Self::Prefix { operator, right } => write!(f, "({operator}{right})"),
@@ -143,7 +144,6 @@ impl fmt::Display for ExpressionKind {
                 operator,
                 right,
             } => write!(f, "({left} {operator} {right})"),
-            _ => todo!(),
         }
     }
 }
