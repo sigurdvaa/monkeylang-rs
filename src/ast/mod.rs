@@ -23,6 +23,7 @@ impl From<&TokenKind> for Precedence {
             TokenKind::Minus => Self::Sum,
             TokenKind::Slash => Self::Product,
             TokenKind::Asterisk => Self::Product,
+            TokenKind::Lparen => Self::Call,
             _ => Self::Lowest,
         }
     }
@@ -125,8 +126,16 @@ pub struct FunctionLiteral {
 }
 
 #[derive(Debug)]
+pub struct CallExpression {
+    pub token: Token,
+    pub function: Box<Expression>,
+    pub arguments: Vec<Expression>,
+}
+
+#[derive(Debug)]
 pub enum Expression {
     Boolean(BooleanLiteral),
+    Call(CallExpression),
     Function(FunctionLiteral),
     Identifier(IdentifierLiteral),
     If(IfExpression),
@@ -154,6 +163,16 @@ impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Boolean(expr) => write!(f, "{}", expr.value),
+            Self::Call(expr) => write!(
+                f,
+                "{}({})",
+                expr.function,
+                expr.arguments
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+            ),
             Self::Identifier(expr) => write!(f, "{}", expr.value),
             Self::IntegerLiteral(expr) => write!(f, "{}", expr.value),
             Self::Prefix(expr) => write!(f, "({}{})", expr.operator, expr.right),

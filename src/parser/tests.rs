@@ -321,6 +321,17 @@ fn test_operator_precedence_parsing() {
         ("2 / (5 + 5)", "(2 / (5 + 5))", 1),
         ("-(5 + 5)", "(-(5 + 5))", 1),
         ("!(true == true)", "(!(true == true))", 1),
+        ("a + add(b * c) + d", "((a + add((b * c))) + d)", 1),
+        (
+            "add(a, b, 1, 2 * 3, 4 + 5, add(6, 7 * 8))",
+            "add(a, b, 1, (2 * 3), (4 + 5), add(6, (7 * 8)))",
+            1,
+        ),
+        (
+            "add(a + b + c * d / f + g)",
+            "add((((a + b) + ((c * d) / f)) + g))",
+            1,
+        ),
     ];
 
     for (input_test, value_test, statements_test) in precedence_test {
@@ -517,5 +528,45 @@ fn test_function_parameters_parsing() {
                 assert_identifier_literal(param, test_params[i]);
             }
         }
+    }
+}
+
+#[test]
+fn test_call_expression_parsing() {
+    let input = "add(1, 2 * 3, 4 + 5);";
+    let program = parse_program(input, 1);
+
+    for stmt in &program.statements {
+        let stmt_expr = match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::Ident);
+                assert_eq!(stmt.token.literal, "add");
+                &stmt.value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let expr = match &stmt_expr {
+            Expression::Call(expr) => expr,
+            _ => panic!("not a valid call expression, got: {stmt_expr}"),
+        };
+
+        assert_literal(expr.function.as_ref(), &Literal::Ident("add"));
+
+        assert_eq!(expr.arguments.len(), 3);
+
+        assert_literal(&expr.arguments[0], &Literal::Int(1));
+        assert_infix_expression(
+            &expr.arguments[1],
+            &Literal::Int(2),
+            &Operator::Asterisk,
+            &Literal::Int(3),
+        );
+        assert_infix_expression(
+            &expr.arguments[2],
+            &Literal::Int(4),
+            &Operator::Plus,
+            &Literal::Int(5),
+        );
     }
 }

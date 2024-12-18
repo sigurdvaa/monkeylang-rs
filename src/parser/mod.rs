@@ -107,18 +107,21 @@ impl<'a> Parser<'a> {
         parser
             .infix_parse_fns
             .insert(TokenKind::Gt, Parser::parse_fn_infix_expression);
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::Lparen, Parser::parse_fn_call_expression);
 
         parser
     }
 
-    fn update_tokens(&mut self) {
+    fn next_tokens(&mut self) {
         std::mem::swap(&mut self.curr_token, &mut self.next_token);
         self.next_token = self.lexer.next_token();
     }
 
     fn expect_token(&mut self, token: TokenKind) -> Result<(), ParserError> {
         if self.next_token.kind == token {
-            self.update_tokens();
+            self.next_tokens();
             Ok(())
         } else {
             Err(ParserError::Expect(format!(
@@ -138,12 +141,12 @@ impl<'a> Parser<'a> {
         });
 
         self.expect_token(TokenKind::Assign)?;
-        self.update_tokens();
+        self.next_tokens();
 
         let value = self.parse_expression(Precedence::Lowest)?;
 
         if self.next_token.kind == TokenKind::Semicolon {
-            self.update_tokens();
+            self.next_tokens();
         }
 
         Ok(LetStatement { token, name, value })
@@ -152,11 +155,11 @@ impl<'a> Parser<'a> {
     fn parse_return_statement(&mut self) -> Result<ReturnStatement, ParserError> {
         let token = self.curr_token.clone();
 
-        self.update_tokens();
+        self.next_tokens();
         let value = self.parse_expression(Precedence::Lowest)?;
 
         if self.next_token.kind == TokenKind::Semicolon {
-            self.update_tokens();
+            self.next_tokens();
         }
 
         Ok(ReturnStatement { token, value })
@@ -166,20 +169,19 @@ impl<'a> Parser<'a> {
         let mut params = vec![];
 
         if self.next_token.kind == TokenKind::Rparen {
-            self.update_tokens();
+            self.next_tokens();
             return Ok(params);
         }
 
-        self.update_tokens();
-
+        self.next_tokens();
         params.push(IdentifierLiteral {
             token: self.curr_token.clone(),
             value: self.curr_token.literal.clone(),
         });
 
         while self.next_token.kind == TokenKind::Comma {
-            self.update_tokens();
-            self.update_tokens();
+            self.next_tokens();
+            self.next_tokens();
             params.push(IdentifierLiteral {
                 token: self.curr_token.clone(),
                 value: self.curr_token.literal.clone(),
@@ -189,6 +191,28 @@ impl<'a> Parser<'a> {
         self.expect_token(TokenKind::Rparen)?;
 
         Ok(params)
+    }
+
+    fn parse_call_arguments(&mut self) -> Result<Vec<Expression>, ParserError> {
+        let mut args = vec![];
+
+        if self.next_token.kind == TokenKind::Rparen {
+            self.next_tokens();
+            return Ok(args);
+        }
+
+        self.next_tokens();
+        args.push(self.parse_expression(Precedence::Lowest)?);
+
+        while self.next_token.kind == TokenKind::Comma {
+            self.next_tokens();
+            self.next_tokens();
+            args.push(self.parse_expression(Precedence::Lowest)?);
+        }
+
+        self.expect_token(TokenKind::Rparen)?;
+
+        Ok(args)
     }
 
     fn parse_fn_identifier_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -237,7 +261,7 @@ impl<'a> Parser<'a> {
         let token = parser.curr_token.clone();
 
         parser.expect_token(TokenKind::Lparen)?;
-        parser.update_tokens();
+        parser.next_tokens();
 
         let condition = Box::new(parser.parse_expression(Precedence::Lowest)?);
 
@@ -248,7 +272,7 @@ impl<'a> Parser<'a> {
 
         let mut alternative = None;
         if parser.next_token.kind == TokenKind::Else {
-            parser.update_tokens();
+            parser.next_tokens();
             parser.expect_token(TokenKind::Lbrace)?;
             alternative = Some(parser.parse_block_statement()?);
         }
@@ -266,7 +290,7 @@ impl<'a> Parser<'a> {
         let operator = Operator::try_from(token.literal.as_str())
             .map_err(|err| ParserError::ParsePrefix(format!("{}: {}", err, token)))?;
 
-        parser.update_tokens();
+        parser.next_tokens();
         let right = Box::new(parser.parse_expression(Precedence::Prefix)?);
 
         Ok(Expression::Prefix(PrefixExpression {
@@ -280,12 +304,12 @@ impl<'a> Parser<'a> {
         parser: &mut Parser,
         left: Box<Expression>,
     ) -> Result<Expression, ParserError> {
-        parser.update_tokens();
+        parser.next_tokens();
         let token = parser.curr_token.clone();
         let operator = Operator::try_from(token.literal.as_str())
             .map_err(|err| ParserError::ParseInfix(format!("{err}: {token}")))?;
 
-        parser.update_tokens();
+        parser.next_tokens();
         let right = Box::new(parser.parse_expression(Precedence::from(&token.kind))?);
 
         Ok(Expression::Infix(InfixExpression {
@@ -297,10 +321,24 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_fn_grouped_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
-        parser.update_tokens();
+        parser.next_tokens();
         let expression = parser.parse_expression(Precedence::Lowest)?;
         parser.expect_token(TokenKind::Rparen)?;
         Ok(expression)
+    }
+
+    fn parse_fn_call_expression(
+        parser: &mut Parser,
+        function: Box<Expression>,
+    ) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+        parser.next_tokens();
+        let arguments = parser.parse_call_arguments()?;
+        Ok(Expression::Call(CallExpression {
+            token,
+            function,
+            arguments,
+        }))
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParserError> {
@@ -324,12 +362,13 @@ impl<'a> Parser<'a> {
                 }
             };
         }
+
         Ok(expression)
     }
 
     fn parse_block_statement(&mut self) -> Result<BlockStatement, ParserError> {
         let token = self.curr_token.clone();
-        self.update_tokens();
+        self.next_tokens();
 
         let mut statements = vec![];
         while self.curr_token.kind != TokenKind::Rbrace
@@ -339,7 +378,7 @@ impl<'a> Parser<'a> {
                 Ok(stmt) => statements.push(stmt),
                 Err(err) => self.errors.push(err),
             }
-            self.update_tokens();
+            self.next_tokens();
         }
 
         Ok(BlockStatement { token, statements })
@@ -350,7 +389,7 @@ impl<'a> Parser<'a> {
         let value = self.parse_expression(Precedence::Lowest)?;
 
         if self.next_token.kind == TokenKind::Semicolon {
-            self.update_tokens();
+            self.next_tokens();
         }
 
         Ok(ExpressionStatement { token, value })
@@ -372,7 +411,7 @@ impl<'a> Parser<'a> {
                 Ok(stmt) => prog.statements.push(stmt),
                 Err(err) => self.errors.push(err),
             };
-            self.update_tokens();
+            self.next_tokens();
         }
 
         prog
