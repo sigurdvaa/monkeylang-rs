@@ -100,48 +100,49 @@ fn assert_prefix_expression(
 
 #[test]
 fn test_let_statements() {
-    #[rustfmt::skip]
-    let input = concat!(
-        "let x = 5;\n",
-        "let y = 10;\n",
-        "let foobar = 838383;\n"
-    );
-    let program = parse_program(input, 3);
+    let tests = [
+        ("let x = 5;", Literal::Ident("x"), Literal::Int(5)),
+        ("let y = true;", Literal::Ident("y"), Literal::Bool(true)),
+        (
+            "let foobar = y;",
+            Literal::Ident("foobar"),
+            Literal::Ident("y"),
+        ),
+    ];
 
-    for (i, (ident, literal)) in [("x", 5), ("y", 10), ("foobar", 838383)].iter().enumerate() {
-        let stmt = &program.statements[i];
-        match stmt {
+    for (test_input, test_ident, test_value) in &tests {
+        let program = parse_program(test_input, 1);
+        match &program.statements[0] {
             Statement::Let(stmt) => {
                 assert_eq!(stmt.token.kind, TokenKind::Let);
                 assert_eq!(stmt.token.literal, "let");
-                assert_literal(&stmt.name, &Literal::Ident(ident));
-                assert_literal(&stmt.value, &Literal::Int(*literal));
+                assert_literal(&stmt.name, test_ident);
+                assert_literal(&stmt.value, test_value);
             }
-            _ => panic!("Not a valid let statement, got: {stmt}"),
+            _ => panic!("Not a valid let statement, got: {}", program.statements[0]),
         }
     }
 }
 
 #[test]
 fn test_return_statements() {
-    #[rustfmt::skip]
-    let input = concat!(
-        "return 5;\n",
-        "return 10;\n",
-        "return 993322;\n"
-    );
-    let program = parse_program(input, 3);
+    let tests = [
+        ("return 5;", Literal::Int(5)),
+        ("return false;", Literal::Bool(false)),
+        ("return foobar;", Literal::Ident("foobar")),
+    ];
 
-    for (i, literal) in [5, 10, 993322].iter().enumerate() {
-        match &program.statements[i] {
+    for (test_input, test_value) in &tests {
+        let program = parse_program(test_input, 1);
+        match &program.statements[0] {
             Statement::Return(stmt) => {
                 assert_eq!(stmt.token.kind, TokenKind::Return);
                 assert_eq!(stmt.token.literal, "return");
-                assert_literal(&stmt.value, &Literal::Int(*literal));
+                assert_literal(&stmt.value, test_value);
             }
             _ => panic!(
                 "not a valid return statement, got: {}",
-                &program.statements[i]
+                &program.statements[0]
             ),
         }
     }
