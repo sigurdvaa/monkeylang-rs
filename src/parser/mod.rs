@@ -1,6 +1,6 @@
 mod tests;
 
-use crate::ast::{Expression, ExpressionKind, Operator, Precedence, Program, Statement};
+use crate::ast::*;
 use crate::lexer::{Lexer, Token, TokenKind};
 use std::collections::HashMap;
 use std::fmt;
@@ -133,16 +133,14 @@ impl<'a> Parser<'a> {
     //     )));
     // }
 
-    fn parse_let_statement(&mut self) -> Result<Statement, ParserError> {
+    fn parse_let_statement(&mut self) -> Result<LetStatement, ParserError> {
         let token = self.curr_token.clone();
 
         self.expect_token(TokenKind::Ident)?;
-        let name = Expression {
+        let name = Expression::Identifier(IdentifierLiteral {
             token: self.curr_token.clone(),
-            kind: ExpressionKind::Identifier {
-                value: self.curr_token.literal.clone(),
-            },
-        };
+            value: self.curr_token.literal.clone(),
+        });
 
         self.expect_token(TokenKind::Assign)?;
         self.update_tokens();
@@ -153,10 +151,10 @@ impl<'a> Parser<'a> {
             self.update_tokens();
         }
 
-        Ok(Statement::Let { token, name, value })
+        Ok(LetStatement { token, name, value })
     }
 
-    fn parse_return_statement(&mut self) -> Result<Statement, ParserError> {
+    fn parse_return_statement(&mut self) -> Result<ReturnStatement, ParserError> {
         let token = self.curr_token.clone();
 
         self.update_tokens();
@@ -166,16 +164,14 @@ impl<'a> Parser<'a> {
             self.update_tokens();
         }
 
-        Ok(Statement::Return { token, value })
+        Ok(ReturnStatement { token, value })
     }
 
     fn parse_fn_identifier(parser: &mut Parser) -> Result<Expression, ParserError> {
-        Ok(Expression {
+        Ok(Expression::Identifier(IdentifierLiteral {
             token: parser.curr_token.clone(),
-            kind: ExpressionKind::Identifier {
-                value: parser.curr_token.literal.clone(),
-            },
-        })
+            value: parser.curr_token.literal.clone(),
+        }))
     }
 
     fn parse_fn_integer_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -183,18 +179,18 @@ impl<'a> Parser<'a> {
             Ok(value) => value,
             Err(err) => return Err(ParserError::ParseInt(err.to_string())),
         };
-        Ok(Expression {
+        Ok(Expression::IntegerLiteral(IntegerLiteral {
             token: parser.curr_token.clone(),
-            kind: ExpressionKind::IntegerLiteral { value },
-        })
+            value,
+        }))
     }
 
     fn parse_fn_boolean_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
         let value = parser.curr_token.kind == TokenKind::True;
-        Ok(Expression {
+        Ok(Expression::Boolean(BooleanLiteral {
             token: parser.curr_token.clone(),
-            kind: ExpressionKind::Boolean { value },
-        })
+            value,
+        }))
     }
 
     fn parse_fn_if_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -208,23 +204,21 @@ impl<'a> Parser<'a> {
         parser.expect_token(TokenKind::Rparen)?;
         parser.expect_token(TokenKind::Lbrace)?;
 
-        let consequence = Box::new(parser.parse_block_statement()?);
+        let consequence = parser.parse_block_statement()?;
 
         let mut alternative = None;
         if parser.next_token.kind == TokenKind::Else {
             parser.update_tokens();
             parser.expect_token(TokenKind::Lbrace)?;
-            alternative = Some(Box::new(parser.parse_block_statement()?));
+            alternative = Some(parser.parse_block_statement()?);
         }
 
-        Ok(Expression {
+        Ok(Expression::If(IfExpression {
             token,
-            kind: ExpressionKind::If {
-                condition,
-                consequence,
-                alternative,
-            },
-        })
+            condition,
+            consequence,
+            alternative,
+        }))
     }
 
     fn parse_fn_prefix_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -235,10 +229,11 @@ impl<'a> Parser<'a> {
         parser.update_tokens();
         let right = Box::new(parser.parse_expression(Precedence::Prefix)?);
 
-        Ok(Expression {
+        Ok(Expression::Prefix(PrefixExpression {
             token,
-            kind: ExpressionKind::Prefix { operator, right },
-        })
+            operator,
+            right,
+        }))
     }
 
     fn parse_fn_infix_expression(
@@ -253,14 +248,12 @@ impl<'a> Parser<'a> {
         parser.update_tokens();
         let right = Box::new(parser.parse_expression(Precedence::from(&token.kind))?);
 
-        Ok(Expression {
+        Ok(Expression::Infix(InfixExpression {
             token,
-            kind: ExpressionKind::Infix {
-                left,
-                operator,
-                right,
-            },
-        })
+            left,
+            operator,
+            right,
+        }))
     }
 
     fn parse_fn_grouped_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -294,7 +287,7 @@ impl<'a> Parser<'a> {
         Ok(expression)
     }
 
-    fn parse_block_statement(&mut self) -> Result<Statement, ParserError> {
+    fn parse_block_statement(&mut self) -> Result<BlockStatement, ParserError> {
         let token = self.curr_token.clone();
         self.update_tokens();
 
@@ -309,10 +302,10 @@ impl<'a> Parser<'a> {
             self.update_tokens();
         }
 
-        Ok(Statement::Block { token, statements })
+        Ok(BlockStatement { token, statements })
     }
 
-    fn parse_expression_statement(&mut self) -> Result<Statement, ParserError> {
+    fn parse_expression_statement(&mut self) -> Result<ExpressionStatement, ParserError> {
         let token = self.curr_token.clone();
         let value = self.parse_expression(Precedence::Lowest)?;
 
@@ -320,14 +313,14 @@ impl<'a> Parser<'a> {
             self.update_tokens();
         }
 
-        Ok(Statement::Expression { token, value })
+        Ok(ExpressionStatement { token, value })
     }
 
     fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         match self.curr_token.kind {
-            TokenKind::Let => self.parse_let_statement(),
-            TokenKind::Return => self.parse_return_statement(),
-            _ => self.parse_expression_statement(),
+            TokenKind::Let => Ok(Statement::Let(self.parse_let_statement()?)),
+            TokenKind::Return => Ok(Statement::Return(self.parse_return_statement()?)),
+            _ => Ok(Statement::Expression(self.parse_expression_statement()?)),
         }
     }
 

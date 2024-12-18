@@ -9,8 +9,7 @@ pub enum Precedence {
     Sum,
     Product,
     Prefix,
-    // Todo: add call
-    // Call,
+    Call,
 }
 
 impl From<&TokenKind> for Precedence {
@@ -78,148 +77,166 @@ impl TryFrom<&str> for Operator {
 }
 
 #[derive(Debug)]
-pub enum ExpressionKind {
-    Boolean {
-        value: bool,
-    },
-    Identifier {
-        value: String,
-    },
-    Prefix {
-        operator: Operator,
-        right: Box<Expression>,
-    },
-    Infix {
-        left: Box<Expression>,
-        operator: Operator,
-        right: Box<Expression>,
-    },
-    IntegerLiteral {
-        value: usize,
-    },
-    If {
-        condition: Box<Expression>,
-        consequence: Box<Statement>,
-        alternative: Option<Box<Statement>>,
-    },
+pub struct BooleanLiteral {
+    pub token: Token,
+    pub value: bool,
 }
 
-impl PartialEq for ExpressionKind {
+#[derive(Debug)]
+pub struct IdentifierLiteral {
+    pub token: Token,
+    pub value: String,
+}
+
+#[derive(Debug)]
+pub struct IntegerLiteral {
+    pub token: Token,
+    pub value: usize,
+}
+
+#[derive(Debug)]
+pub struct PrefixExpression {
+    pub token: Token,
+    pub operator: Operator,
+    pub right: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct InfixExpression {
+    pub token: Token,
+    pub left: Box<Expression>,
+    pub operator: Operator,
+    pub right: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct IfExpression {
+    pub token: Token,
+    pub condition: Box<Expression>,
+    pub consequence: BlockStatement,
+    pub alternative: Option<BlockStatement>,
+}
+
+#[derive(Debug)]
+pub struct FunctionExpression {
+    pub token: Token,
+    pub parameters: Vec<IdentifierLiteral>,
+    pub block: BlockStatement,
+}
+
+#[derive(Debug)]
+pub enum Expression {
+    Boolean(BooleanLiteral),
+    Function(FunctionExpression),
+    Identifier(IdentifierLiteral),
+    If(IfExpression),
+    Infix(InfixExpression),
+    IntegerLiteral(IntegerLiteral),
+    Prefix(PrefixExpression),
+}
+
+impl PartialEq for Expression {
     fn eq(&self, other: &Self) -> bool {
-        use ExpressionKind::*;
         match (self, other) {
-            (Boolean { value: a }, Boolean { value: b }) => a == b,
-            (Identifier { value: a }, Identifier { value: b }) => a == b,
-            (
-                Prefix {
-                    operator: a_op,
-                    right: a_rhs,
-                },
-                Prefix {
-                    operator: b_op,
-                    right: b_rhs,
-                },
-            ) => a_op == b_op && *a_rhs == *b_rhs,
-            (
-                Infix {
-                    left: a_lhs,
-                    operator: a_op,
-                    right: a_rhs,
-                },
-                Infix {
-                    left: b_lhs,
-                    operator: b_op,
-                    right: b_rhs,
-                },
-            ) => a_op == b_op && *a_lhs == *b_lhs && *a_rhs == *b_rhs,
-            (IntegerLiteral { value: a }, IntegerLiteral { value: b }) => a == b,
+            (Self::Boolean(a), Self::Boolean(b)) => a.value == b.value,
+            (Self::Identifier(a), Self::Identifier(b)) => a.value == b.value,
+            (Self::Infix(a), Self::Infix(b)) => {
+                a.left == b.left && a.operator == b.operator && a.right == b.right
+            }
+            (Self::IntegerLiteral(a), Self::IntegerLiteral(b)) => a.value == b.value,
+            (Self::Prefix(a), Self::Prefix(b)) => a.operator == b.operator && a.right == b.right,
             _ => false,
         }
     }
 }
 
-impl fmt::Display for ExpressionKind {
+impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Boolean { value } => write!(f, "{value}"),
-            Self::Identifier { value } => write!(f, "{value}"),
-            Self::IntegerLiteral { value } => write!(f, "{value}"),
-            Self::Prefix { operator, right } => write!(f, "({operator}{right})"),
-            Self::Infix {
-                left,
-                operator,
-                right,
-            } => write!(f, "({left} {operator} {right})"),
-            Self::If {
-                condition,
-                consequence,
-                alternative,
-            } => {
-                if let Some(alternative) = alternative {
-                    write!(f, "if {condition} {consequence} else {alternative}")
+            Self::Boolean(expr) => write!(f, "{}", expr.value),
+            Self::Identifier(expr) => write!(f, "{}", expr.value),
+            Self::IntegerLiteral(expr) => write!(f, "{}", expr.value),
+            Self::Prefix(expr) => write!(f, "({}{})", expr.operator, expr.right),
+            Self::Infix(expr) => write!(f, "({} {} {})", expr.left, expr.operator, expr.right),
+            Self::If(expr) => {
+                if let Some(alternative) = &expr.alternative {
+                    write!(
+                        f,
+                        "if {} {} else {alternative}",
+                        expr.condition, expr.consequence
+                    )
                 } else {
-                    write!(f, "if {condition} {consequence}")
+                    write!(f, "if {} {}", expr.condition, expr.consequence)
                 }
             }
+            Self::Function(expr) => write!(
+                f,
+                "({}) {}",
+                expr.parameters
+                    .iter()
+                    .map(|i| i.value.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                expr.block,
+            ),
         }
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Expression {
+#[derive(Debug)]
+pub struct LetStatement {
     pub token: Token,
-    pub kind: ExpressionKind,
+    pub name: Expression,
+    pub value: Expression,
 }
 
-impl fmt::Display for Expression {
+#[derive(Debug)]
+pub struct ReturnStatement {
+    pub token: Token,
+    pub value: Expression,
+}
+
+#[derive(Debug)]
+pub struct ExpressionStatement {
+    pub token: Token,
+    pub value: Expression,
+}
+
+#[derive(Debug)]
+pub struct BlockStatement {
+    pub token: Token,
+    pub statements: Vec<Statement>,
+}
+
+impl fmt::Display for BlockStatement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.kind)
+        let mut string = String::new();
+        for sub in &self.statements {
+            string.push_str(&sub.to_string());
+        }
+        write!(f, "{string}")
     }
 }
 
 #[derive(Debug)]
 pub enum Statement {
-    Let {
-        token: Token,
-        name: Expression,
-        value: Expression,
-    },
-    Return {
-        token: Token,
-        value: Expression,
-    },
-    Expression {
-        token: Token,
-        value: Expression,
-    },
-    Block {
-        token: Token,
-        statements: Vec<Statement>,
-    },
+    Let(LetStatement),
+    Return(ReturnStatement),
+    Expression(ExpressionStatement),
+    Block(BlockStatement),
 }
 
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Statement::Let { token, name, value } => {
-                write!(f, "{} {} = {};", token.literal, name, value)
+            Statement::Let(stmt) => {
+                write!(f, "{} {} = {};", stmt.token.literal, stmt.name, stmt.value)
             }
-            Statement::Return { token, value } => {
-                write!(f, "{} {};", token.literal, value)
+            Statement::Return(stmt) => {
+                write!(f, "{} {};", stmt.token.literal, stmt.value)
             }
-            Statement::Expression { token: _, value } => {
-                write!(f, "{}", value)
-            }
-            Statement::Block {
-                token: _,
-                statements,
-            } => {
-                let mut string = String::new();
-                for stmt in statements {
-                    string.push_str(&stmt.to_string());
-                }
-                write!(f, "{string}")
-            }
+            Statement::Expression(stmt) => write!(f, "{}", stmt.value),
+            Statement::Block(stmt) => write!(f, "{stmt}"),
         }
     }
 }
