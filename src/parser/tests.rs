@@ -432,10 +432,90 @@ fn test_if_else_expression() {
                     Statement::Expression(stmt) => {
                         assert_literal(&stmt.value, &Literal::Ident("y"));
                     }
-                    _ => panic!("not valid expression statement"),
+                    _ => panic!(
+                        "not a valid expression statement, got {}",
+                        alternative.statements[0]
+                    ),
                 }
             }
             None => panic!("if alternative block missing"),
+        }
+    }
+}
+
+#[test]
+fn test_function_literal_parsing() {
+    let input = "fn(x, y) { x + y; }";
+    let program = parse_program(input, 1);
+
+    for stmt in &program.statements {
+        let stmt_expr = match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::Function);
+                assert_eq!(stmt.token.literal, "fn");
+                &stmt.value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let expr = match &stmt_expr {
+            Expression::Function(expr) => expr,
+            _ => panic!("not a valid function literal, got: {stmt_expr}"),
+        };
+
+        assert_eq!(expr.parameters.len(), 2);
+
+        assert_identifier_literal(&expr.parameters[0], "x");
+        assert_identifier_literal(&expr.parameters[1], "y");
+
+        assert_eq!(expr.body.statements.len(), 1);
+
+        match &expr.body.statements[0] {
+            Statement::Expression(stmt) => {
+                assert_infix_expression(
+                    &stmt.value,
+                    &Literal::Ident("x"),
+                    &Operator::Plus,
+                    &Literal::Ident("y"),
+                );
+            }
+            _ => panic!(
+                "not a valid expression statement, got {}",
+                expr.body.statements[0]
+            ),
+        }
+    }
+}
+
+#[test]
+fn test_function_parameters_parsing() {
+    let test = [
+        ("fn() {};", vec![]),
+        ("fn(x) {};", vec!["x"]),
+        ("fn(x, y, z) {};", vec!["x", "y", "z"]),
+    ];
+
+    for (test_input, test_params) in test {
+        let program = parse_program(test_input, 1);
+        for stmt in &program.statements {
+            let stmt_expr = match stmt {
+                Statement::Expression(stmt) => {
+                    assert_eq!(stmt.token.kind, TokenKind::Function);
+                    assert_eq!(stmt.token.literal, "fn");
+                    &stmt.value
+                }
+                _ => panic!("not a valid expression statement, got: {stmt}"),
+            };
+
+            let expr = match &stmt_expr {
+                Expression::Function(expr) => expr,
+                _ => panic!("not a valid function literal, got: {stmt_expr}"),
+            };
+
+            assert_eq!(expr.parameters.len(), test_params.len());
+            for (i, param) in expr.parameters.iter().enumerate() {
+                assert_identifier_literal(param, test_params[i]);
+            }
         }
     }
 }

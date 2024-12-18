@@ -118,16 +118,16 @@ pub struct IfExpression {
 }
 
 #[derive(Debug)]
-pub struct FunctionExpression {
+pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<IdentifierLiteral>,
-    pub block: BlockStatement,
+    pub body: BlockStatement,
 }
 
 #[derive(Debug)]
 pub enum Expression {
     Boolean(BooleanLiteral),
-    Function(FunctionExpression),
+    Function(FunctionLiteral),
     Identifier(IdentifierLiteral),
     If(IfExpression),
     Infix(InfixExpression),
@@ -145,7 +145,7 @@ impl PartialEq for Expression {
             }
             (Self::IntegerLiteral(a), Self::IntegerLiteral(b)) => a.value == b.value,
             (Self::Prefix(a), Self::Prefix(b)) => a.operator == b.operator && a.right == b.right,
-            _ => false,
+            _ => todo!(),
         }
     }
 }
@@ -171,13 +171,14 @@ impl fmt::Display for Expression {
             }
             Self::Function(expr) => write!(
                 f,
-                "({}) {}",
+                "{}({}) {}",
+                expr.token.literal,
                 expr.parameters
                     .iter()
                     .map(|i| i.value.to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
-                expr.block,
+                expr.body,
             ),
         }
     }

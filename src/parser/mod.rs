@@ -79,6 +79,9 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::If, Parser::parse_fn_if_expression);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Function, Parser::parse_fn_function_literal);
 
         parser
             .infix_parse_fns
@@ -159,6 +162,35 @@ impl<'a> Parser<'a> {
         Ok(ReturnStatement { token, value })
     }
 
+    fn parse_function_parameters(&mut self) -> Result<Vec<IdentifierLiteral>, ParserError> {
+        let mut params = vec![];
+
+        if self.next_token.kind == TokenKind::Rparen {
+            self.update_tokens();
+            return Ok(params);
+        }
+
+        self.update_tokens();
+
+        params.push(IdentifierLiteral {
+            token: self.curr_token.clone(),
+            value: self.curr_token.literal.clone(),
+        });
+
+        while self.next_token.kind == TokenKind::Comma {
+            self.update_tokens();
+            self.update_tokens();
+            params.push(IdentifierLiteral {
+                token: self.curr_token.clone(),
+                value: self.curr_token.literal.clone(),
+            });
+        }
+
+        self.expect_token(TokenKind::Rparen)?;
+
+        Ok(params)
+    }
+
     fn parse_fn_identifier_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
         Ok(Expression::Identifier(IdentifierLiteral {
             token: parser.curr_token.clone(),
@@ -182,6 +214,22 @@ impl<'a> Parser<'a> {
         Ok(Expression::Boolean(BooleanLiteral {
             token: parser.curr_token.clone(),
             value,
+        }))
+    }
+
+    fn parse_fn_function_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+
+        parser.expect_token(TokenKind::Lparen)?;
+        let parameters = parser.parse_function_parameters()?;
+
+        parser.expect_token(TokenKind::Lbrace)?;
+        let body = parser.parse_block_statement()?;
+
+        Ok(Expression::Function(FunctionLiteral {
+            token,
+            parameters,
+            body,
         }))
     }
 
