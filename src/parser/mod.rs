@@ -57,7 +57,7 @@ impl<'a> Parser<'a> {
 
         parser
             .prefix_parse_fns
-            .insert(TokenKind::Ident, Parser::parse_fn_identifier);
+            .insert(TokenKind::Ident, Parser::parse_fn_identifier_literal);
         parser
             .prefix_parse_fns
             .insert(TokenKind::Int, Parser::parse_fn_integer_literal);
@@ -125,14 +125,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // TODO: remove
-    // fn expect_error(&mut self, token: TokenKind) {
-    //     self.errors.push(ParserError::ExpectError(format!(
-    //         "expected next token to be {token:?}, but got: {:?}",
-    //         self.next_token
-    //     )));
-    // }
-
     fn parse_let_statement(&mut self) -> Result<LetStatement, ParserError> {
         let token = self.curr_token.clone();
 
@@ -167,7 +159,7 @@ impl<'a> Parser<'a> {
         Ok(ReturnStatement { token, value })
     }
 
-    fn parse_fn_identifier(parser: &mut Parser) -> Result<Expression, ParserError> {
+    fn parse_fn_identifier_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
         Ok(Expression::Identifier(IdentifierLiteral {
             token: parser.curr_token.clone(),
             value: parser.curr_token.literal.clone(),
@@ -324,8 +316,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // TODO: consider not returning Result, as errors are stored in parser
-    pub fn parse_program(&mut self) -> Result<Program, ParserError> {
+    pub fn parse_program(&mut self) -> Program {
         let mut prog = Program::new();
 
         while self.curr_token.kind != TokenKind::EndOfFile {
@@ -336,6 +327,6 @@ impl<'a> Parser<'a> {
             self.update_tokens();
         }
 
-        Ok(prog)
+        prog
     }
 }

@@ -24,12 +24,6 @@ where
             writeln!(&mut output, "error: {err}").expect("writing to output buffer failed")
         }
 
-        match program {
-            Ok(program) => {
-                writeln!(&mut output, "{program}").expect("writing to output buffer failed")
-            }
-            Err(err) => writeln!(&mut output, "Parsing program failed: {err}")
-                .expect("writing to output buffer failed"),
-        };
+        writeln!(&mut output, "{program}").expect("writing to output buffer failed")
     }
 }

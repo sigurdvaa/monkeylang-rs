@@ -22,8 +22,6 @@ fn parse_program(input: &str, statements: usize) -> Program {
         panic!("parser errors found: {}", parser.errors.len());
     }
 
-    assert!(program.is_ok());
-    let program = program.unwrap();
     assert_eq!(program.statements.len(), statements);
     program
 }
