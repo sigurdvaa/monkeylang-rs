@@ -101,13 +101,9 @@ fn assert_prefix_expression(
 #[test]
 fn test_let_statements() {
     let tests = [
-        ("let x = 5;", Literal::Ident("x"), Literal::Int(5)),
-        ("let y = true;", Literal::Ident("y"), Literal::Bool(true)),
-        (
-            "let foobar = y;",
-            Literal::Ident("foobar"),
-            Literal::Ident("y"),
-        ),
+        ("let x = 5;", "x", Literal::Int(5)),
+        ("let y = true;", "y", Literal::Bool(true)),
+        ("let foobar = y;", "foobar", Literal::Ident("y")),
     ];
 
     for (test_input, test_ident, test_value) in &tests {
@@ -116,7 +112,7 @@ fn test_let_statements() {
             Statement::Let(stmt) => {
                 assert_eq!(stmt.token.kind, TokenKind::Let);
                 assert_eq!(stmt.token.literal, "let");
-                assert_literal(&stmt.name, test_ident);
+                assert_identifier_literal(&stmt.name, test_ident);
                 assert_literal(&stmt.value, test_value);
             }
             _ => panic!("Not a valid let statement, got: {}", program.statements[0]),
@@ -159,7 +155,7 @@ fn test_program_to_string() {
                 kind: TokenKind::Let,
                 literal: "let".into(),
             },
-            name: Expression::Identifier(IdentifierLiteral {
+            name: IdentifierLiteral {
                 token: Token {
                     file: None,
                     col: 0,
@@ -168,7 +164,7 @@ fn test_program_to_string() {
                     literal: "myVar".into(),
                 },
                 value: "myVar".into(),
-            }),
+            },
             value: Expression::Identifier(IdentifierLiteral {
                 token: Token {
                     file: None,

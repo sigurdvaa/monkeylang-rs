@@ -135,10 +135,10 @@ impl<'a> Parser<'a> {
         let token = self.curr_token.clone();
 
         self.expect_token(TokenKind::Ident)?;
-        let name = Expression::Identifier(IdentifierLiteral {
+        let name = IdentifierLiteral {
             token: self.curr_token.clone(),
             value: self.curr_token.literal.clone(),
-        });
+        };
 
         self.expect_token(TokenKind::Assign)?;
         self.next_tokens();

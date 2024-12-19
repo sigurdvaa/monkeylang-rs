@@ -1,5 +1,6 @@
 use crate::evaluator::eval_program;
 use crate::lexer::Lexer;
+use crate::object::environment::Environment;
 use crate::parser::{Parser, ParserError};
 use std::io::{BufRead, Write};
 
@@ -37,6 +38,7 @@ where
     I: BufRead,
     O: Write,
 {
+    let env = Environment::new();
     loop {
         let mut buf = String::new();
         output
@@ -56,7 +58,7 @@ where
             continue;
         }
 
-        let eval = eval_program(&program);
+        let eval = eval_program(&program, env.clone());
         writeln!(&mut output, "{}", eval.inspect()).expect("writing to output buffer failed")
     }
 }

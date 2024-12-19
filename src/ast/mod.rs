@@ -29,7 +29,7 @@ impl From<&TokenKind> for Precedence {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Operator {
     Bang,
     Plus,
@@ -77,32 +77,32 @@ impl TryFrom<&str> for Operator {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IdentifierLiteral {
     pub token: Token,
     pub value: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: Operator,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Box<Expression>,
@@ -110,7 +110,7 @@ pub struct InfixExpression {
     pub right: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Box<Expression>,
@@ -118,21 +118,21 @@ pub struct IfExpression {
     pub alternative: Option<BlockStatement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<IdentifierLiteral>,
     pub body: BlockStatement,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct CallExpression {
     pub token: Token,
     pub function: Box<Expression>,
     pub arguments: Vec<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Boolean(BooleanLiteral),
     Call(CallExpression),
@@ -142,21 +142,6 @@ pub enum Expression {
     Infix(InfixExpression),
     IntegerLiteral(IntegerLiteral),
     Prefix(PrefixExpression),
-}
-
-impl PartialEq for Expression {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Boolean(a), Self::Boolean(b)) => a.value == b.value,
-            (Self::Identifier(a), Self::Identifier(b)) => a.value == b.value,
-            (Self::Infix(a), Self::Infix(b)) => {
-                a.left == b.left && a.operator == b.operator && a.right == b.right
-            }
-            (Self::IntegerLiteral(a), Self::IntegerLiteral(b)) => a.value == b.value,
-            (Self::Prefix(a), Self::Prefix(b)) => a.operator == b.operator && a.right == b.right,
-            _ => todo!(),
-        }
-    }
 }
 
 impl fmt::Display for Expression {
@@ -203,26 +188,26 @@ impl fmt::Display for Expression {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct LetStatement {
     pub token: Token,
-    pub name: Expression, // TODO: change to identifier struct?
+    pub name: IdentifierLiteral,
     pub value: Expression,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ReturnStatement {
     pub token: Token,
     pub value: Expression,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ExpressionStatement {
     pub token: Token,
     pub value: Expression,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BlockStatement {
     pub token: Token,
     pub statements: Vec<Statement>,
@@ -238,25 +223,27 @@ impl fmt::Display for BlockStatement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
     Expression(ExpressionStatement),
-    Block(BlockStatement),
 }
 
 impl fmt::Display for Statement {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Statement::Let(stmt) => {
-                write!(f, "{} {} = {};", stmt.token.literal, stmt.name, stmt.value)
+                write!(
+                    f,
+                    "{} {} = {};",
+                    stmt.token.literal, stmt.name.value, stmt.value
+                )
             }
             Statement::Return(stmt) => {
                 write!(f, "{} {};", stmt.token.literal, stmt.value)
             }
             Statement::Expression(stmt) => write!(f, "{}", stmt.value),
-            Statement::Block(stmt) => write!(f, "{stmt}"),
         }
     }
 }

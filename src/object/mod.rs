@@ -1,12 +1,25 @@
+pub mod environment;
+
+use crate::ast::{BlockStatement, IdentifierLiteral};
+use environment::Env;
+
 pub type Integer = isize;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct FunctionObject {
+    pub parameters: Vec<IdentifierLiteral>,
+    pub body: BlockStatement,
+    pub env: Env,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Object {
     Null,
     Integer(Integer),
     Boolean(bool),
     Return(Box<Self>),
     Error(String),
+    Function(FunctionObject),
 }
 
 impl Object {
@@ -17,6 +30,7 @@ impl Object {
             Self::Boolean(_) => "BOOLEAN",
             Self::Return(_) => "RETURN",
             Self::Error(_) => "ERROR",
+            Self::Function(_) => "FUNCTION",
         }
     }
 
@@ -27,6 +41,21 @@ impl Object {
             Self::Boolean(value) => value.to_string(),
             Self::Return(value) => value.inspect(),
             Self::Error(value) => format!("ERROR: {value}"),
+            Self::Function(func) => {
+                let mut buffer = String::from("fn(");
+                buffer.push_str(
+                    &func
+                        .parameters
+                        .iter()
+                        .map(|i| i.value.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                );
+                buffer.push_str(") {\n");
+                buffer.push_str(&func.body.to_string());
+                buffer.push_str("\n}");
+                buffer
+            }
         }
     }
 }
