@@ -84,10 +84,20 @@ fn eval_boolean_infix_expression(operator: &Operator, a: bool, b: bool) -> Objec
     }
 }
 
+fn eval_string_infix_expression(operator: &Operator, a: &str, b: &str) -> Object {
+    match operator {
+        Operator::Plus => Object::String(String::from_iter([a, b])),
+        Operator::Eq => Object::Boolean(a == b),
+        Operator::NotEq => Object::Boolean(a != b),
+        _ => Object::Error(format!("unknown string operator: {operator}",)),
+    }
+}
+
 fn eval_infix_expression(operator: &Operator, left: Object, right: Object) -> Object {
     match (&left, &right) {
         (Object::Integer(a), Object::Integer(b)) => eval_integer_infix_expression(operator, *a, *b),
         (Object::Boolean(a), Object::Boolean(b)) => eval_boolean_infix_expression(operator, *a, *b),
+        (Object::String(a), Object::String(b)) => eval_string_infix_expression(operator, a, b),
         (a, b) if a.kind() != b.kind() => Object::Error(format!(
             "type mismatch: {} {operator} {}",
             left.kind(),
@@ -184,7 +194,7 @@ fn eval_expression(expression: &Expression, env: Env) -> Object {
 
             eval_infix_expression(&expr.operator, left, right)
         }
-        Expression::IntegerLiteral(expr) => {
+        Expression::Integer(expr) => {
             Object::Integer(expr.value.try_into().expect("integer too large"))
         }
         Expression::Prefix(expr) => {
@@ -194,6 +204,7 @@ fn eval_expression(expression: &Expression, env: Env) -> Object {
                 _ => eval_prefix_expression(&expr.operator, right),
             }
         }
+        Expression::String(expr) => Object::String(expr.value.to_owned()),
     }
 }
 

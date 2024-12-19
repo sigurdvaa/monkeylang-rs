@@ -55,10 +55,16 @@ fn test_eval_boolean_expression() {
         ("true == false", false),
         ("true != false", true),
         ("false != true", true),
+        ("\"foo\" != \"bar\"", true),
+        ("\"foo\" == \"bar\"", false),
+        ("\"foo\" == \"foo\"", true),
         ("(1 < 2) == true", true),
         ("(1 < 2) == false", false),
         ("(1 > 2) == true", false),
         ("(1 > 2) == false", true),
+        ("(\"foo\" == \"bar\") == false", true),
+        ("(\"foo\" != \"bar\") == true", true),
+        ("(\"foo\" == \"foo\") == true", true),
     ];
     for (test_input, test_value) in &tests {
         assert_eq!(test_eval(test_input), Object::Boolean(*test_value));
@@ -127,6 +133,7 @@ fn test_error_handling() {
             "unknown boolean operator: +",
         ),
         ("foobar", "identifier not found: foobar"),
+        ("\"Hello\" - \"World\"", "unknown string operator: -"),
     ];
     for (test_input, test_value) in &tests {
         assert_eq!(test_eval(test_input), Object::Error(test_value.to_string()));
@@ -186,4 +193,16 @@ fn test_closures() {
         "addTwo(2);"
     );
     assert_eq!(test_eval(input), Object::Integer(4));
+}
+
+#[test]
+fn test_string_literal() {
+    let (test_input, test_value) = ("\"Hello World!\";", "Hello World!");
+    assert_eq!(test_eval(test_input), Object::String(test_value.into()));
+}
+
+#[test]
+fn test_string_concatenation() {
+    let (test_input, test_value) = ("\"Hello\" + \" \" + \"World!\";", "Hello World!");
+    assert_eq!(test_eval(test_input), Object::String(test_value.into()));
 }

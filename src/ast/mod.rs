@@ -96,6 +96,12 @@ pub struct IntegerLiteral {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct StringLiteral {
+    pub token: Token,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: Operator,
@@ -140,8 +146,9 @@ pub enum Expression {
     Identifier(IdentifierLiteral),
     If(IfExpression),
     Infix(InfixExpression),
-    IntegerLiteral(IntegerLiteral),
+    Integer(IntegerLiteral),
     Prefix(PrefixExpression),
+    String(StringLiteral),
 }
 
 impl fmt::Display for Expression {
@@ -159,7 +166,7 @@ impl fmt::Display for Expression {
                     .join(", "),
             ),
             Self::Identifier(expr) => write!(f, "{}", expr.value),
-            Self::IntegerLiteral(expr) => write!(f, "{}", expr.value),
+            Self::Integer(expr) => write!(f, "{}", expr.value),
             Self::Prefix(expr) => write!(f, "({}{})", expr.operator, expr.right),
             Self::Infix(expr) => write!(f, "({} {} {})", expr.left, expr.operator, expr.right),
             Self::If(expr) => {
@@ -184,6 +191,7 @@ impl fmt::Display for Expression {
                     .join(", "),
                 expr.body,
             ),
+            Self::String(expr) => write!(f, "\"{}\"", expr.value),
         }
     }
 }

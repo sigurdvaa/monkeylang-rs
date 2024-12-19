@@ -20,6 +20,7 @@ pub enum Object {
     Return(Box<Self>),
     Error(String),
     Function(FunctionObject),
+    String(String),
 }
 
 impl Object {
@@ -31,6 +32,7 @@ impl Object {
             Self::Return(_) => "RETURN",
             Self::Error(_) => "ERROR",
             Self::Function(_) => "FUNCTION",
+            Self::String(_) => "STRING",
         }
     }
 
@@ -56,6 +58,7 @@ impl Object {
                 buffer.push_str("\n}");
                 buffer
             }
+            Self::String(value) => value.to_owned(),
         }
     }
 }

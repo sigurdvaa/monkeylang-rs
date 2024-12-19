@@ -7,6 +7,7 @@ enum Literal {
     Bool(bool),
     Ident(&'static str),
     Int(usize),
+    String(String),
 }
 
 #[cfg(test)]
@@ -41,6 +42,13 @@ fn assert_integer_literal(expr: &IntegerLiteral, assert_value: &usize) {
 }
 
 #[cfg(test)]
+fn assert_string_literal(expr: &StringLiteral, assert_value: &str) {
+    assert_eq!(expr.token.kind, TokenKind::String);
+    assert_eq!(expr.token.literal, assert_value);
+    assert_eq!(&expr.value, assert_value);
+}
+
+#[cfg(test)]
 fn assert_boolean_literal(expr: &BooleanLiteral, assert_value: &bool) {
     if *assert_value {
         assert_eq!(expr.token.kind, TokenKind::True);
@@ -58,9 +66,8 @@ fn assert_literal(expression: &Expression, assert_value: &Literal) {
         (Expression::Identifier(expr), Literal::Ident(value)) => {
             assert_identifier_literal(expr, value)
         }
-        (Expression::IntegerLiteral(expr), Literal::Int(value)) => {
-            assert_integer_literal(expr, value)
-        }
+        (Expression::Integer(expr), Literal::Int(value)) => assert_integer_literal(expr, value),
+        (Expression::String(expr), Literal::String(value)) => assert_string_literal(expr, value),
         _ => {
             panic!("mismatched expression and literal value, got {expression} and {assert_value:?}")
         }
@@ -565,5 +572,21 @@ fn test_call_expression_parsing() {
             &Operator::Plus,
             &Literal::Int(5),
         );
+    }
+}
+
+#[test]
+fn test_string_literal_expression() {
+    let (test_input, test_value) = ("\"hello world\";", "hello world");
+    let program = parse_program(test_input, 1);
+    for stmt in &program.statements {
+        match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::String);
+                assert_eq!(stmt.token.literal, test_value);
+                assert_literal(&stmt.value, &Literal::String(test_value.into()));
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        }
     }
 }

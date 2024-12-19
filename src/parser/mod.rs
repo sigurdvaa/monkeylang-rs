@@ -82,6 +82,9 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::Function, Parser::parse_fn_function_literal);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::String, Parser::parse_fn_string_literal);
 
         parser
             .infix_parse_fns
@@ -227,7 +230,7 @@ impl<'a> Parser<'a> {
             Ok(value) => value,
             Err(err) => return Err(ParserError::ParseInt(err.to_string())),
         };
-        Ok(Expression::IntegerLiteral(IntegerLiteral {
+        Ok(Expression::Integer(IntegerLiteral {
             token: parser.curr_token.clone(),
             value,
         }))
@@ -254,6 +257,13 @@ impl<'a> Parser<'a> {
             token,
             parameters,
             body,
+        }))
+    }
+
+    fn parse_fn_string_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
+        Ok(Expression::String(StringLiteral {
+            token: parser.curr_token.clone(),
+            value: parser.curr_token.literal.clone(),
         }))
     }
 

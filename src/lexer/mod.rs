@@ -10,6 +10,7 @@ pub enum TokenKind {
     // Identifiers and literals
     Ident,
     Int,
+    String,
 
     // Operators
     Assign,
@@ -65,7 +66,8 @@ impl fmt::Display for Token {
 pub struct Lexer<'a> {
     input: Peekable<Chars<'a>>,
     file: Option<String>,
-    line: usize,
+    curr_line: usize,
+    next_line: usize,
     curr_col: usize,
     next_col: usize,
 }
@@ -75,7 +77,8 @@ impl<'a> Lexer<'a> {
         Self {
             input,
             file,
-            line: 1,
+            curr_line: 1,
+            next_line: 1,
             curr_col: 1,
             next_col: 1,
         }
@@ -90,9 +93,10 @@ impl<'a> Lexer<'a> {
             kind,
             literal,
             file: self.file.clone(),
-            line: self.line,
+            line: self.curr_line,
             col: self.curr_col,
         };
+        self.curr_line = self.next_line;
         self.curr_col = self.next_col;
         token
     }
@@ -136,6 +140,47 @@ impl<'a> Lexer<'a> {
         self.new_token(TokenKind::Int, literal)
     }
 
+    fn read_string(&mut self) -> Token {
+        let mut buffer = vec![];
+        while let Some(c) = self.input.next() {
+            match c {
+                '\\' => {
+                    match self.input.next() {
+                        Some('n') => buffer.push('\n'),
+                        Some('"') => buffer.push('"'),
+                        Some('\\') => buffer.push('\\'),
+                        Some(c) => {
+                            return self.new_token(
+                                TokenKind::Illegal,
+                                format!("unknown character escape: {c}"),
+                            )
+                        }
+                        None => {
+                            return self.new_token(
+                                TokenKind::Illegal,
+                                format!(
+                                    "unterminated character literal, line {}, col {}",
+                                    self.next_line, self.next_col
+                                ),
+                            )
+                        }
+                    }
+                    self.next_col += 1;
+                }
+                '"' => {
+                    break;
+                }
+                '\n' => {
+                    self.next_line += 1;
+                    buffer.push(c);
+                }
+                _ => buffer.push(c),
+            }
+            self.next_col += 1;
+        }
+        self.new_token(TokenKind::String, buffer.into_iter().collect())
+    }
+
     pub fn next_token(&mut self) -> Token {
         self.next_col += 1;
         match self.input.next() {
@@ -175,11 +220,13 @@ impl<'a> Lexer<'a> {
                 '<' => self.new_token(TokenKind::Lt, c.into()),
                 '>' => self.new_token(TokenKind::Gt, c.into()),
                 '\n' => {
-                    self.line += 1;
+                    self.next_line += 1;
+                    self.curr_line = self.next_line;
                     self.curr_col = 1;
                     self.next_col = 1;
                     self.next_token()
                 }
+                '"' => self.read_string(),
                 c if c.is_whitespace() => {
                     self.curr_col = self.next_col;
                     self.next_token()
@@ -207,7 +254,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_tokens() {
+    fn test_next_tokens() {
         let input = concat!(
             "let five = 5;\n",
             "let ten = 10;\n",
@@ -227,6 +274,12 @@ mod tests {
             "}\n",
             "10 == 10;\n",
             "10 != 9;\n",
+            "\"foobar\";\n",
+            "\"foo bar\";\n",
+            "\"foo\nbar\";\n",
+            "\"foo\\\"bar\";\n",
+            "\"foo\\nbar\";\n",
+            "\"foo\\\\bar\";\n",
         );
 
         let mut lexer = Lexer::new(None, input.chars().peekable());
@@ -304,8 +357,20 @@ mod tests {
             create_token(18, 4, TokenKind::NotEq, "!="),
             create_token(18, 7, TokenKind::Int, "9"),
             create_token(18, 8, TokenKind::Semicolon, ";"),
-            create_token(19, 1, TokenKind::EndOfFile, ""),
-            create_token(19, 1, TokenKind::EndOfFile, ""),
+            create_token(19, 1, TokenKind::String, "foobar"),
+            create_token(19, 8, TokenKind::Semicolon, ";"),
+            create_token(20, 1, TokenKind::String, "foo bar"),
+            create_token(20, 9, TokenKind::Semicolon, ";"),
+            create_token(21, 1, TokenKind::String, "foo\nbar"),
+            create_token(22, 9, TokenKind::Semicolon, ";"),
+            create_token(23, 1, TokenKind::String, "foo\"bar"),
+            create_token(23, 10, TokenKind::Semicolon, ";"),
+            create_token(24, 1, TokenKind::String, "foo\nbar"),
+            create_token(24, 10, TokenKind::Semicolon, ";"),
+            create_token(25, 1, TokenKind::String, "foo\\bar"),
+            create_token(25, 10, TokenKind::Semicolon, ";"),
+            create_token(26, 1, TokenKind::EndOfFile, ""),
+            create_token(26, 1, TokenKind::EndOfFile, ""),
         ];
 
         for token in tests {
