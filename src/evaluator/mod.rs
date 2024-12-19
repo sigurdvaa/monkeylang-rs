@@ -19,6 +19,14 @@ fn extend_function_env(function: &FunctionObject, args: Vec<Object>) -> Env {
 
 fn apply_function(function: Object, args: Vec<Object>) -> Object {
     if let Object::Function(func) = function {
+        if func.parameters.len() != args.len() {
+            return Object::Error(format!(
+                "unmatched number of arguments in function call, expected {}, got {}",
+                func.parameters.len(),
+                args.len(),
+            ));
+        }
+
         let extended_env = extend_function_env(&func, args);
         let eval = eval_block_statement(&func.body, extended_env);
         match eval {
