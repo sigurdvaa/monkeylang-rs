@@ -174,3 +174,16 @@ fn test_function_application() {
         assert_eq!(test_eval(test_input), Object::Integer(*test_value));
     }
 }
+
+#[test]
+fn test_closures() {
+    let input = concat!(
+        "let newAdder = fn(x) {\n",
+        "  fn(y) { x + y };\n",
+        "};\n",
+        "\n",
+        "let addTwo = newAdder(2);\n",
+        "addTwo(2);"
+    );
+    assert_eq!(test_eval(input), Object::Integer(4));
+}
