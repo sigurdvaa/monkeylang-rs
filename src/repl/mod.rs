@@ -1,3 +1,4 @@
+use crate::evaluator::eval_program;
 use crate::lexer::Lexer;
 use crate::parser::{Parser, ParserError};
 use std::io::{BufRead, Write};
@@ -55,6 +56,7 @@ where
             continue;
         }
 
-        writeln!(&mut output, "{program}").expect("writing to output buffer failed")
+        let eval = eval_program(&program);
+        writeln!(&mut output, "{}", eval.inspect()).expect("writing to output buffer failed")
     }
 }

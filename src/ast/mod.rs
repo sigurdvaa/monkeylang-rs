@@ -206,7 +206,7 @@ impl fmt::Display for Expression {
 #[derive(Debug)]
 pub struct LetStatement {
     pub token: Token,
-    pub name: Expression,
+    pub name: Expression, // TODO: change to identifier struct?
     pub value: Expression,
 }
 
