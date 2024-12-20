@@ -2,7 +2,7 @@
 use super::*;
 
 #[cfg(test)]
-fn test_eval(input: &str) -> Object {
+fn test_eval(input: &str) -> Rc<Object> {
     use crate::lexer::Lexer;
     use crate::parser::Parser;
 
@@ -33,7 +33,7 @@ fn test_eval_integer_expression() {
         ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Object::Integer(*test_value));
+        assert_eq!(test_eval(test_input), Rc::new(Object::Integer(*test_value)));
     }
 }
 
@@ -67,7 +67,7 @@ fn test_eval_boolean_expression() {
         ("(\"foo\" == \"foo\") == true", true),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Object::Boolean(*test_value));
+        assert_eq!(test_eval(test_input), Rc::new(Object::Boolean(*test_value)));
     }
 }
 
@@ -82,7 +82,7 @@ fn test_bang_operator() {
         ("!!5", true),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Object::Boolean(*test_value));
+        assert_eq!(test_eval(test_input), Rc::new(Object::Boolean(*test_value)));
     }
 }
 
@@ -97,8 +97,8 @@ fn test_if_else_expression() {
         ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
         ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
     ];
-    for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), *test_value);
+    for (test_input, test_value) in tests {
+        assert_eq!(test_eval(test_input), Rc::new(test_value));
     }
 }
 
@@ -111,8 +111,8 @@ fn test_return_statements() {
         ("9; return 2 * 5; 9;", 10),
         ("if (10 > 1) { return 10; } return 1; }", 10),
     ];
-    for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Object::Integer(*test_value));
+    for (test_input, test_value) in tests {
+        assert_eq!(test_eval(test_input), Rc::new(Object::Integer(test_value)));
     }
 }
 
@@ -135,8 +135,11 @@ fn test_error_handling() {
         ("foobar", "identifier not found: foobar"),
         ("\"Hello\" - \"World\"", "unknown string operator: -"),
     ];
-    for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Object::Error(test_value.to_string()));
+    for (test_input, test_value) in tests {
+        assert_eq!(
+            test_eval(test_input),
+            Rc::new(Object::Error(test_value.to_string()))
+        );
     }
 }
 
@@ -148,8 +151,8 @@ fn test_let_statements() {
         ("let a = 5; let b = a; b;", 5),
         ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
     ];
-    for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Object::Integer(*test_value));
+    for (test_input, test_value) in tests {
+        assert_eq!(test_eval(test_input), Rc::new(Object::Integer(test_value)));
     }
 }
 
@@ -157,7 +160,7 @@ fn test_let_statements() {
 fn test_function_object() {
     let input = "fn(x) { x + 2; };";
     let eval = test_eval(input);
-    match eval {
+    match &*eval {
         Object::Function(func) => {
             assert_eq!(func.parameters.len(), 1);
             assert_eq!(func.parameters[0].value, "x");
@@ -177,8 +180,8 @@ fn test_function_application() {
         ("let add = fn(x, y) { x + y; }; add(5 + 5, add(5, 5));", 20),
         ("fn(x) { x; }(5)", 5),
     ];
-    for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Object::Integer(*test_value));
+    for (test_input, test_value) in tests {
+        assert_eq!(test_eval(test_input), Rc::new(Object::Integer(test_value)));
     }
 }
 
@@ -192,19 +195,25 @@ fn test_closures() {
         "let addTwo = newAdder(2);\n",
         "addTwo(2);"
     );
-    assert_eq!(test_eval(input), Object::Integer(4));
+    assert_eq!(test_eval(input), Rc::new(Object::Integer(4)));
 }
 
 #[test]
 fn test_string_literal() {
     let (test_input, test_value) = ("\"Hello World!\";", "Hello World!");
-    assert_eq!(test_eval(test_input), Object::String(test_value.into()));
+    assert_eq!(
+        test_eval(test_input),
+        Rc::new(Object::String(test_value.into()))
+    );
 }
 
 #[test]
 fn test_string_concatenation() {
     let (test_input, test_value) = ("\"Hello\" + \" \" + \"World!\";", "Hello World!");
-    assert_eq!(test_eval(test_input), Object::String(test_value.into()));
+    assert_eq!(
+        test_eval(test_input),
+        Rc::new(Object::String(test_value.into()))
+    );
 }
 
 #[test]
@@ -222,7 +231,45 @@ fn test_builtin_functions() {
             Object::Error("wrong number of arguments. got=2, want=1".into()),
         ),
     ];
-    for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), *test_value);
+    for (test_input, test_value) in tests {
+        assert_eq!(test_eval(test_input), Rc::new(test_value));
+    }
+}
+
+#[test]
+fn test_array_literals() {
+    let input = "[1, 2 * 2, 3 + 3]";
+    assert_eq!(
+        test_eval(input),
+        Rc::new(Object::Array(vec![
+            Rc::new(Object::Integer(1)),
+            Rc::new(Object::Integer(4)),
+            Rc::new(Object::Integer(6)),
+        ]))
+    );
+}
+
+#[test]
+fn test_array_index_expressions() {
+    let tests = [
+        ("[1, 2, 3][0]", Object::Integer(1)),
+        ("[1, 2, 3][1]", Object::Integer(2)),
+        ("[1, 2, 3][2]", Object::Integer(3)),
+        ("let i = 0; [1][i];", Object::Integer(1)),
+        ("[1, 2, 3][1 + 1];", Object::Integer(3)),
+        ("let myArray = [1, 2, 3]; myArray[2];", Object::Integer(3)),
+        (
+            "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
+            Object::Integer(6),
+        ),
+        (
+            "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
+            Object::Integer(2),
+        ),
+        ("[1, 2, 3][3]", Object::Null),
+        ("[1, 2, 3][-1]", Object::Null),
+    ];
+    for (test_input, test_value) in tests {
+        assert_eq!(test_eval(test_input), Rc::new(test_value));
     }
 }

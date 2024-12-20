@@ -6,62 +6,85 @@ use crate::ast::{
 };
 use crate::object::{
     environment::{Env, Environment},
-    FunctionObject, Integer, Object,
+    Array, FunctionObject, Integer, Object,
 };
+use std::rc::Rc;
 
-fn extend_function_env(function: &FunctionObject, args: Vec<Object>) -> Env {
+fn extend_function_env(function: &FunctionObject, args: &[Rc<Object>]) -> Env {
     let env = Environment::new_enclosed(&function.env);
     for (i, param) in function.parameters.iter().enumerate() {
         env.borrow_mut()
-            .set(param.value.to_owned(), args[i].to_owned());
+            .set(param.value.to_owned(), args[i].clone());
     }
     env
 }
 
-fn apply_function(function: Object, args: Vec<Object>) -> Object {
-    match function {
+fn apply_function(function: &Rc<Object>, args: &[Rc<Object>]) -> Rc<Object> {
+    match &**function {
         Object::Function(func) => {
             if func.parameters.len() != args.len() {
-                return Object::Error(format!(
+                return Rc::new(Object::Error(format!(
                     "unmatched number of arguments in function call, expected {}, got {}",
                     func.parameters.len(),
                     args.len(),
-                ));
+                )));
             }
 
             let extended_env = extend_function_env(&func, args);
             let eval = eval_block_statement(&func.body, extended_env);
-            match eval {
-                Object::Return(value) => *value,
-                value => value,
+            match &*eval {
+                Object::Return(value) => value.clone(),
+                _ => eval,
             }
         }
-        Object::Builtin(func) => func(&args),
-        _ => Object::Error(format!("not a function: {}", function.kind())),
+        Object::Builtin(func) => func(args),
+        _ => Rc::new(Object::Error(format!(
+            "not a function: {}",
+            function.kind()
+        ))),
     }
 }
 
-fn eval_identifier(identifier: &IdentifierLiteral, env: Env) -> Object {
+fn eval_identifier(identifier: &IdentifierLiteral, env: Env) -> Rc<Object> {
     if let Some(value) = env.borrow().get(&identifier.value) {
-        return value.clone();
+        return value;
     }
 
     if let Some(value) = builtins::get(&identifier.value) {
         return value;
     }
 
-    Object::Error(format!("identifier not found: {}", identifier.value))
+    Rc::new(Object::Error(format!(
+        "identifier not found: {}",
+        identifier.value
+    )))
 }
 
-fn eval_minus_prefix_operator_expression(right: Object) -> Object {
-    match right {
+fn eval_array_index_expression(left: &Array, index: &Integer) -> Rc<Object> {
+    left.get(*index as usize)
+        .unwrap_or(&Rc::new(Object::Null))
+        .clone()
+}
+
+fn eval_index_expression(left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
+    match (&*left, &*index) {
+        (Object::Array(left), Object::Integer(index)) => eval_array_index_expression(left, index),
+        _ => Rc::new(Object::Error(format!(
+            "index operator not supported: {}",
+            left.kind()
+        ))),
+    }
+}
+
+fn eval_minus_prefix_operator_expression(right: Rc<Object>) -> Object {
+    match *right {
         Object::Integer(value) => Object::Integer(-value),
         _ => Object::Error(format!("unknown operator: -{}", right.kind())),
     }
 }
 
-fn eval_bang_operator_expression(right: Object) -> Object {
-    match right {
+fn eval_bang_operator_expression(right: Rc<Object>) -> Object {
+    match *right {
         Object::Null => Object::Boolean(true),
         Object::Integer(value) => Object::Boolean(value < 1),
         Object::Boolean(value) => Object::Boolean(!value),
@@ -100,8 +123,8 @@ fn eval_string_infix_expression(operator: &Operator, a: &str, b: &str) -> Object
     }
 }
 
-fn eval_infix_expression(operator: &Operator, left: Object, right: Object) -> Object {
-    match (&left, &right) {
+fn eval_infix_expression(operator: &Operator, left: Rc<Object>, right: Rc<Object>) -> Rc<Object> {
+    Rc::new(match (&*left, &*right) {
         (Object::Integer(a), Object::Integer(b)) => eval_integer_infix_expression(operator, *a, *b),
         (Object::Boolean(a), Object::Boolean(b)) => eval_boolean_infix_expression(operator, *a, *b),
         (Object::String(a), Object::String(b)) => eval_string_infix_expression(operator, a, b),
@@ -115,28 +138,28 @@ fn eval_infix_expression(operator: &Operator, left: Object, right: Object) -> Ob
             left.kind(),
             right.kind(),
         )),
-    }
+    })
 }
 
-fn eval_prefix_expression(operator: &Operator, right: Object) -> Object {
-    match operator {
+fn eval_prefix_expression(operator: &Operator, right: Rc<Object>) -> Rc<Object> {
+    Rc::new(match operator {
         Operator::Bang => eval_bang_operator_expression(right),
         Operator::Minus => eval_minus_prefix_operator_expression(right),
         _ => Object::Error(format!("unknown operator: {operator}{}", right.kind(),)),
-    }
+    })
 }
 
-fn is_truthy(object: Object) -> bool {
-    match object {
+fn is_truthy(object: Rc<Object>) -> bool {
+    match *object {
         Object::Integer(_) => true,
         Object::Boolean(value) => value,
         _ => false,
     }
 }
 
-fn eval_if_expression(expression: &IfExpression, env: Env) -> Object {
+fn eval_if_expression(expression: &IfExpression, env: Env) -> Rc<Object> {
     let condition = eval_expression(&expression.condition, env.clone());
-    if let Object::Error(_) = condition {
+    if let Object::Error(_) = *condition {
         return condition;
     }
 
@@ -144,17 +167,17 @@ fn eval_if_expression(expression: &IfExpression, env: Env) -> Object {
         true => eval_block_statement(&expression.consequence, env),
         false => match &expression.alternative {
             Some(alt) => eval_block_statement(alt, env),
-            None => Object::Null,
+            None => Rc::new(Object::Null),
         },
     }
 }
 
-fn eval_expressions(expressions: &[Expression], env: Env) -> Vec<Object> {
+fn eval_expressions(expressions: &[Expression], env: Env) -> Vec<Rc<Object>> {
     let mut result = vec![];
 
     for expr in expressions {
         let eval = eval_expression(expr, env.clone());
-        match eval {
+        match *eval {
             Object::Error(_) => return vec![eval],
             _ => result.push(eval),
         }
@@ -163,65 +186,85 @@ fn eval_expressions(expressions: &[Expression], env: Env) -> Vec<Object> {
     result
 }
 
-fn eval_expression(expression: &Expression, env: Env) -> Object {
+fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
     match expression {
-        Expression::Boolean(expr) => Object::Boolean(expr.value),
+        Expression::Boolean(expr) => Rc::new(Object::Boolean(expr.value)),
         Expression::Call(expr) => {
             let func = eval_expression(&expr.function, env.clone());
-            if let Object::Error(_) = func {
+            if let Object::Error(_) = *func {
                 return func;
             }
 
             let args = eval_expressions(&expr.arguments, env);
             if args.len() == 1 {
-                if let Object::Error(_) = args[0] {
-                    return args[0].to_owned();
+                if let Object::Error(_) = *args[0] {
+                    return args[0].clone();
                 }
             }
 
-            apply_function(func, args)
+            apply_function(&func, &args)
         }
-        Expression::Function(expr) => Object::Function(FunctionObject {
+        Expression::Function(expr) => Rc::new(Object::Function(FunctionObject {
             parameters: expr.parameters.clone(),
             body: expr.body.clone(),
             env: env.clone(),
-        }),
+        })),
         Expression::Identifier(expr) => eval_identifier(expr, env),
         Expression::If(expr) => eval_if_expression(expr, env),
         Expression::Infix(expr) => {
             let left = eval_expression(&expr.left, env.clone());
-            if let Object::Error(_) = left {
+            if let Object::Error(_) = *left {
                 return left;
             }
 
             let right = eval_expression(&expr.right, env);
-            if let Object::Error(_) = right {
+            if let Object::Error(_) = *right {
                 return right;
             }
 
             eval_infix_expression(&expr.operator, left, right)
         }
-        Expression::Integer(expr) => {
-            Object::Integer(expr.value.try_into().expect("integer too large"))
-        }
+        Expression::Integer(expr) => Rc::new(Object::Integer(
+            expr.value.try_into().expect("integer too large"),
+        )),
         Expression::Prefix(expr) => {
             let right = eval_expression(&expr.right, env);
-            match right {
+            match *right {
                 Object::Error(_) => right,
                 _ => eval_prefix_expression(&expr.operator, right),
             }
         }
-        Expression::String(expr) => Object::String(expr.value.to_owned()),
-        Expression::Array(expr) => todo!(),
-        Expression::Index(expr) => todo!(),
+        Expression::String(expr) => Rc::new(Object::String(expr.value.to_owned())),
+        Expression::Array(expr) => {
+            let array = eval_expressions(&expr.elements, env);
+            if array.len() == 1 {
+                if let Object::Error(_) = *array[0] {
+                    return array[0].clone();
+                }
+            }
+            Rc::new(Object::Array(array))
+        }
+        Expression::Index(expr) => {
+            let left = eval_expression(&expr.left, env.clone());
+            if let Object::Error(_) = *left {
+                return left;
+            }
+
+            let index = eval_expression(&expr.index, env);
+            if let Object::Error(_) = *index {
+                return index;
+            }
+
+            eval_index_expression(left, index)
+        }
     }
 }
 
-fn eval_statement(statement: &Statement, env: Env) -> Object {
+fn eval_statement(statement: &Statement, env: Env) -> Rc<Object> {
     match statement {
         Statement::Let(expr) => {
             let value = eval_expression(&expr.value, env.clone());
-            if let Object::Error(_) = value {
+            if let Object::Error(_) = *value {
                 return value;
             }
             env.borrow_mut().set(expr.name.value.clone(), value.clone());
@@ -229,32 +272,32 @@ fn eval_statement(statement: &Statement, env: Env) -> Object {
         }
         Statement::Return(expr) => {
             let eval = eval_expression(&expr.value, env);
-            match eval {
+            match *eval {
                 Object::Error(_) => eval,
-                _ => Object::Return(Box::new(eval)),
+                _ => Rc::new(Object::Return(eval)),
             }
         }
         Statement::Expression(expr) => eval_expression(&expr.value, env),
     }
 }
 
-fn eval_block_statement(block: &BlockStatement, env: Env) -> Object {
-    let mut result = Object::Null;
+fn eval_block_statement(block: &BlockStatement, env: Env) -> Rc<Object> {
+    let mut result = Rc::new(Object::Null);
     for stmt in &block.statements {
         result = eval_statement(stmt, env.clone());
-        if let Object::Return(_) | Object::Error(_) = result {
+        if let Object::Return(_) | Object::Error(_) = *result {
             return result;
         }
     }
     result
 }
 
-pub fn eval_program(program: &Program, env: Env) -> Object {
-    let mut result = Object::Null;
+pub fn eval_program(program: &Program, env: Env) -> Rc<Object> {
+    let mut result = Rc::new(Object::Null);
     for stmt in &program.statements {
         result = eval_statement(stmt, env.clone());
-        match result {
-            Object::Return(value) => return *value,
+        match &*result {
+            Object::Return(value) => return value.clone(),
             Object::Error(_) => return result,
             _ => (),
         }

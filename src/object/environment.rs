@@ -7,8 +7,8 @@ pub type Env = Rc<RefCell<Environment>>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Environment {
-    store: HashMap<String, Object>,
-    outer: Option<Rc<RefCell<Self>>>,
+    store: HashMap<String, Rc<Object>>,
+    outer: Option<Env>,
 }
 
 impl Environment {
@@ -19,14 +19,14 @@ impl Environment {
         }))
     }
 
-    pub fn new_enclosed(env: &Rc<RefCell<Self>>) -> Rc<RefCell<Self>> {
+    pub fn new_enclosed(env: &Env) -> Env {
         Rc::new(RefCell::new(Self {
             store: HashMap::new(),
-            outer: Some(Rc::clone(env)),
+            outer: Some(env.clone()),
         }))
     }
 
-    pub fn get(&self, name: &str) -> Option<Object> {
+    pub fn get(&self, name: &str) -> Option<Rc<Object>> {
         match self.store.get(name) {
             Some(v) => Some(v.clone()),
             None => match &self.outer {
@@ -36,7 +36,7 @@ impl Environment {
         }
     }
 
-    pub fn set(&mut self, name: String, value: Object) {
+    pub fn set(&mut self, name: String, value: Rc<Object>) {
         self.store.insert(name, value);
     }
 }
