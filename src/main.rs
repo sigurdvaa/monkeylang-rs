@@ -4,6 +4,8 @@ mod lexer;
 mod object;
 mod parser;
 mod repl;
+mod token;
+
 use std::io::{stdin, stdout};
 
 const VERSION: &str = "0.1.0";

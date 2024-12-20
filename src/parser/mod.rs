@@ -1,7 +1,8 @@
 mod tests;
 
 use crate::ast::*;
-use crate::lexer::{Lexer, Token, TokenKind};
+use crate::lexer::Lexer;
+use crate::token::{Token, TokenKind};
 use std::collections::HashMap;
 use std::fmt;
 

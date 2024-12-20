@@ -1,4 +1,4 @@
-use crate::lexer::{Token, TokenKind};
+use crate::token::{Token, TokenKind};
 use std::fmt;
 
 #[derive(PartialEq, PartialOrd, Debug)]

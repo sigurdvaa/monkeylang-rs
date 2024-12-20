@@ -4,6 +4,7 @@ use crate::ast::{BlockStatement, IdentifierLiteral};
 use environment::Env;
 
 pub type Integer = isize;
+pub type BuiltinFunction = fn(&[Object]) -> Object;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionObject {
@@ -21,6 +22,7 @@ pub enum Object {
     Error(String),
     Function(FunctionObject),
     String(String),
+    Builtin(BuiltinFunction),
 }
 
 impl Object {
@@ -33,6 +35,7 @@ impl Object {
             Self::Error(_) => "ERROR",
             Self::Function(_) => "FUNCTION",
             Self::String(_) => "STRING",
+            Self::Builtin(_) => "BUILTIN",
         }
     }
 
@@ -59,6 +62,7 @@ impl Object {
                 buffer
             }
             Self::String(value) => value.to_owned(),
+            Self::Builtin(_) => "builtin function".into(),
         }
     }
 }

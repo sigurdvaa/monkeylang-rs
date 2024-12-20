@@ -206,3 +206,23 @@ fn test_string_concatenation() {
     let (test_input, test_value) = ("\"Hello\" + \" \" + \"World!\";", "Hello World!");
     assert_eq!(test_eval(test_input), Object::String(test_value.into()));
 }
+
+#[test]
+fn test_builtin_functions() {
+    let tests = [
+        ("len(\"\")", Object::Integer(0)),
+        ("len(\"four\")", Object::Integer(4)),
+        ("len(\"hello world\")", Object::Integer(11)),
+        (
+            "len(1)",
+            Object::Error("argument to \"len\" not supported, got INTEGER".into()),
+        ),
+        (
+            "len(\"one\", \"two\")",
+            Object::Error("wrong number of arguments. got=2, want=1".into()),
+        ),
+    ];
+    for (test_input, test_value) in &tests {
+        assert_eq!(test_eval(test_input), *test_value);
+    }
+}

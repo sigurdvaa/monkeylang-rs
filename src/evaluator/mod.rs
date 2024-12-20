@@ -1,3 +1,4 @@
+mod builtins;
 mod tests;
 
 use crate::ast::{
@@ -18,32 +19,38 @@ fn extend_function_env(function: &FunctionObject, args: Vec<Object>) -> Env {
 }
 
 fn apply_function(function: Object, args: Vec<Object>) -> Object {
-    if let Object::Function(func) = function {
-        if func.parameters.len() != args.len() {
-            return Object::Error(format!(
-                "unmatched number of arguments in function call, expected {}, got {}",
-                func.parameters.len(),
-                args.len(),
-            ));
-        }
+    match function {
+        Object::Function(func) => {
+            if func.parameters.len() != args.len() {
+                return Object::Error(format!(
+                    "unmatched number of arguments in function call, expected {}, got {}",
+                    func.parameters.len(),
+                    args.len(),
+                ));
+            }
 
-        let extended_env = extend_function_env(&func, args);
-        let eval = eval_block_statement(&func.body, extended_env);
-        match eval {
-            Object::Return(value) => *value,
-            value => value,
+            let extended_env = extend_function_env(&func, args);
+            let eval = eval_block_statement(&func.body, extended_env);
+            match eval {
+                Object::Return(value) => *value,
+                value => value,
+            }
         }
-    } else {
-        Object::Error(format!("not a function: {}", function.kind()))
+        Object::Builtin(func) => func(&args),
+        _ => Object::Error(format!("not a function: {}", function.kind())),
     }
 }
 
 fn eval_identifier(identifier: &IdentifierLiteral, env: Env) -> Object {
     if let Some(value) = env.borrow().get(&identifier.value) {
-        value.clone()
-    } else {
-        Object::Error(format!("identifier not found: {}", identifier.value))
+        return value.clone();
     }
+
+    if let Some(value) = builtins::get(&identifier.value) {
+        return value;
+    }
+
+    Object::Error(format!("identifier not found: {}", identifier.value))
 }
 
 fn eval_minus_prefix_operator_expression(right: Object) -> Object {
