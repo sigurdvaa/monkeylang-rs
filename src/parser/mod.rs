@@ -40,9 +40,6 @@ impl From<&TokenKind> for Precedence {
 pub enum ParserError {
     Expect(String),
     Expression(String),
-    // TODO: remove or use
-    // InvalidLetStatement(String),
-    // StatementError(String),
     ParseInt(String),
     ParsePrefix(String),
     ParseInfix(String),
@@ -53,9 +50,6 @@ impl fmt::Display for ParserError {
         match self {
             Self::Expect(err) => write!(f, "{}", err),
             Self::Expression(err) => write!(f, "{}", err),
-            // TODO: remove or use
-            // Self::InvalidLetStatement(err) => write!(f, "{}", err),
-            // Self::StatementError(err) => write!(f, "{}", err),
             Self::ParseInt(err) => write!(f, "{}", err),
             Self::ParsePrefix(err) => write!(f, "{}", err),
             Self::ParseInfix(err) => write!(f, "{}", err),
