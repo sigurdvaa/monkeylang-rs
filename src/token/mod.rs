@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Copy, Eq, Hash)]
+#[derive(Debug, Hash, Eq, PartialEq, Clone)]
 pub enum TokenKind {
     Illegal,
     EndOfFile,
@@ -31,6 +31,7 @@ pub enum TokenKind {
     Rbrace,
     Lbracket,
     Rbracket,
+    Colon,
 
     // Keywords
     Function,
@@ -48,7 +49,7 @@ impl fmt::Display for TokenKind {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
     pub literal: String,

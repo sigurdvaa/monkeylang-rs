@@ -257,6 +257,7 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
 
             eval_index_expression(left, index)
         }
+        Expression::Hash(expr) => todo!(),
     }
 }
 

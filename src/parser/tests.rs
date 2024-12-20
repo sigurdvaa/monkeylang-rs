@@ -662,12 +662,42 @@ fn test_parsing_index_expressions() {
             _ => panic!("not a valid index expression, got: {stmt_expr}"),
         };
 
-        assert_literal(&expr.left, &Literal::Ident("myArray".into()));
+        assert_literal(&expr.left, &Literal::Ident("myArray"));
         assert_infix_expression(
             &expr.index,
             &Literal::Int(1),
             &Operator::Plus,
             &Literal::Int(1),
         );
+    }
+}
+
+#[test]
+fn test_parsing_hash_literals_string_keys() {
+    let input = r#"{"one": 1, "two": 2, "three": 3}"#;
+    let program = parse_program(input, 1);
+    for stmt in &program.statements {
+        let stmt_expr = match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::Rbrace);
+                assert_eq!(stmt.token.literal, "{");
+                &stmt.value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let expr = match stmt_expr {
+            Expression::Hash(expr) => expr,
+            _ => panic!("not a valid hash expression, got: {stmt_expr}"),
+        };
+
+        todo!();
+        // assert_literal(&expr.left, &Literal::Ident("myArray"));
+        // assert_infix_expression(
+        //     &expr.index,
+        //     &Literal::Int(1),
+        //     &Operator::Plus,
+        //     &Literal::Int(1),
+        // );
     }
 }

@@ -1,7 +1,8 @@
 use crate::token::Token;
+use std::collections::BTreeMap;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Operator {
     Bang,
     Plus,
@@ -49,38 +50,38 @@ impl TryFrom<&str> for Operator {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct BooleanLiteral {
     pub token: Token,
     pub value: bool,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IdentifierLiteral {
     pub token: Token,
     pub value: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IntegerLiteral {
     pub token: Token,
     pub value: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct StringLiteral {
     pub token: Token,
     pub value: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PrefixExpression {
     pub token: Token,
     pub operator: Operator,
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct InfixExpression {
     pub token: Token,
     pub left: Box<Expression>,
@@ -88,7 +89,7 @@ pub struct InfixExpression {
     pub right: Box<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfExpression {
     pub token: Token,
     pub condition: Box<Expression>,
@@ -96,34 +97,40 @@ pub struct IfExpression {
     pub alternative: Option<BlockStatement>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<IdentifierLiteral>,
     pub body: BlockStatement,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CallExpression {
     pub token: Token,
     pub function: Box<Expression>,
     pub arguments: Vec<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ArrayLiteral {
     pub token: Token,
     pub elements: Vec<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
+pub struct HashLiteral {
+    pub token: Token,
+    pub pairs: BTreeMap<Expression, Expression>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct IndexExpression {
     pub token: Token,
     pub left: Box<Expression>,
     pub index: Box<Expression>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
     Boolean(BooleanLiteral),
     Call(CallExpression),
@@ -136,6 +143,7 @@ pub enum Expression {
     String(StringLiteral),
     Array(ArrayLiteral),
     Index(IndexExpression),
+    Hash(HashLiteral),
 }
 
 impl fmt::Display for Expression {
@@ -191,6 +199,15 @@ impl fmt::Display for Expression {
             Self::Index(expr) => {
                 write!(f, "({}[{}])", expr.left, expr.index)
             }
+            Self::Hash(expr) => {
+                let mut buffer = String::from("{");
+                for (key, value) in expr.pairs.iter() {
+                    buffer.push_str(&key.to_string());
+                    buffer.push(':');
+                    buffer.push_str(&value.to_string());
+                }
+                write!(f, "{{buffer}}")
+            }
         }
     }
 }
@@ -230,7 +247,7 @@ impl fmt::Display for BlockStatement {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
