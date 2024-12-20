@@ -143,6 +143,8 @@ impl<'a> Lexer<'a> {
                 ')' => self.new_token(TokenKind::Rparen, c.into()),
                 '{' => self.new_token(TokenKind::Lbrace, c.into()),
                 '}' => self.new_token(TokenKind::Rbrace, c.into()),
+                '[' => self.new_token(TokenKind::Lbracket, c.into()),
+                ']' => self.new_token(TokenKind::Rbracket, c.into()),
                 ';' => self.new_token(TokenKind::Semicolon, c.into()),
                 ',' => self.new_token(TokenKind::Comma, c.into()),
                 '!' => {
@@ -219,6 +221,7 @@ mod tests {
             "\"foo\\\"bar\";\n",
             "\"foo\\nbar\";\n",
             "\"foo\\\\bar\";\n",
+            "[1, 2];\n",
         );
 
         let mut lexer = Lexer::new(None, input.chars().peekable());
@@ -308,8 +311,14 @@ mod tests {
             create_token(24, 10, TokenKind::Semicolon, ";"),
             create_token(25, 1, TokenKind::String, "foo\\bar"),
             create_token(25, 10, TokenKind::Semicolon, ";"),
-            create_token(26, 1, TokenKind::EndOfFile, ""),
-            create_token(26, 1, TokenKind::EndOfFile, ""),
+            create_token(26, 1, TokenKind::Lbracket, "["),
+            create_token(26, 2, TokenKind::Int, "1"),
+            create_token(26, 3, TokenKind::Comma, ","),
+            create_token(26, 5, TokenKind::Int, "2"),
+            create_token(26, 6, TokenKind::Rbracket, "]"),
+            create_token(26, 7, TokenKind::Semicolon, ";"),
+            create_token(27, 1, TokenKind::EndOfFile, ""),
+            create_token(27, 1, TokenKind::EndOfFile, ""),
         ];
 
         for token in tests {

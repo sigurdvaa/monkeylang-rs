@@ -1,33 +1,5 @@
-use crate::token::{Token, TokenKind};
+use crate::token::Token;
 use std::fmt;
-
-#[derive(PartialEq, PartialOrd, Debug)]
-pub enum Precedence {
-    Lowest,
-    Equals,
-    LessGreater,
-    Sum,
-    Product,
-    Prefix,
-    Call,
-}
-
-impl From<&TokenKind> for Precedence {
-    fn from(value: &TokenKind) -> Self {
-        match value {
-            TokenKind::Eq => Self::Equals,
-            TokenKind::NotEq => Self::Equals,
-            TokenKind::Lt => Self::LessGreater,
-            TokenKind::Gt => Self::LessGreater,
-            TokenKind::Plus => Self::Sum,
-            TokenKind::Minus => Self::Sum,
-            TokenKind::Slash => Self::Product,
-            TokenKind::Asterisk => Self::Product,
-            TokenKind::Lparen => Self::Call,
-            _ => Self::Lowest,
-        }
-    }
-}
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Operator {
@@ -139,6 +111,19 @@ pub struct CallExpression {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ArrayLiteral {
+    pub token: Token,
+    pub elements: Vec<Expression>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct IndexExpression {
+    pub token: Token,
+    pub left: Box<Expression>,
+    pub index: Box<Expression>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Boolean(BooleanLiteral),
     Call(CallExpression),
@@ -149,6 +134,8 @@ pub enum Expression {
     Integer(IntegerLiteral),
     Prefix(PrefixExpression),
     String(StringLiteral),
+    Array(ArrayLiteral),
+    Index(IndexExpression),
 }
 
 impl fmt::Display for Expression {
@@ -192,6 +179,18 @@ impl fmt::Display for Expression {
                 expr.body,
             ),
             Self::String(expr) => write!(f, "\"{}\"", expr.value),
+            Self::Array(expr) => write!(
+                f,
+                "[{}]",
+                expr.elements
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Self::Index(expr) => {
+                write!(f, "({}[{}])", expr.left, expr.index)
+            }
         }
     }
 }

@@ -23,7 +23,11 @@ fn parse_program(input: &str, statements: usize) -> Program {
         panic!("parser errors found: {}", parser.errors.len());
     }
 
-    assert_eq!(program.statements.len(), statements);
+    assert_eq!(
+        program.statements.len(),
+        statements,
+        "unexpected statements"
+    );
     program
 }
 
@@ -69,7 +73,9 @@ fn assert_literal(expression: &Expression, assert_value: &Literal) {
         (Expression::Integer(expr), Literal::Int(value)) => assert_integer_literal(expr, value),
         (Expression::String(expr), Literal::String(value)) => assert_string_literal(expr, value),
         _ => {
-            panic!("mismatched expression and literal value, got {expression} and {assert_value:?}")
+            panic!(
+                "mismatched expression and literal value, got {expression:?} and {assert_value:?}"
+            )
         }
     }
 }
@@ -336,6 +342,16 @@ fn test_operator_precedence_parsing() {
             "add((((a + b) + ((c * d) / f)) + g))",
             1,
         ),
+        (
+            "a * [1, 2, 3, 4][b * c] * d",
+            "((a * ([1, 2, 3, 4][(b * c)])) * d)",
+            1,
+        ),
+        (
+            "add(a * b[2], b[1], 2 * [1, 2][1])",
+            "add((a * (b[2])), (b[1]), (2 * ([1, 2][1])))",
+            1,
+        ),
     ];
 
     for (input_test, value_test, statements_test) in precedence_test {
@@ -588,5 +604,70 @@ fn test_string_literal_expression() {
             }
             _ => panic!("not a valid expression statement, got: {stmt}"),
         }
+    }
+}
+
+#[test]
+fn test_parsing_array_literals() {
+    let input = "[1, 2 * 2, 3 + 3]";
+    let program = parse_program(input, 1);
+    for stmt in &program.statements {
+        let stmt_expr = match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::Lbracket);
+                assert_eq!(stmt.token.literal, "[");
+                &stmt.value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let expr = match stmt_expr {
+            Expression::Array(expr) => expr,
+            _ => panic!("not a valid array expression, got: {stmt_expr}"),
+        };
+
+        assert_eq!(expr.elements.len(), 3);
+        assert_literal(&expr.elements[0], &Literal::Int(1));
+        assert_infix_expression(
+            &expr.elements[1],
+            &Literal::Int(2),
+            &Operator::Asterisk,
+            &Literal::Int(2),
+        );
+        assert_infix_expression(
+            &expr.elements[2],
+            &Literal::Int(3),
+            &Operator::Plus,
+            &Literal::Int(3),
+        );
+    }
+}
+
+#[test]
+fn test_parsing_index_expressions() {
+    let input = "myArray[1 + 1]";
+    let program = parse_program(input, 1);
+    for stmt in &program.statements {
+        let stmt_expr = match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::Ident);
+                assert_eq!(stmt.token.literal, "myArray");
+                &stmt.value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let expr = match stmt_expr {
+            Expression::Index(expr) => expr,
+            _ => panic!("not a valid index expression, got: {stmt_expr}"),
+        };
+
+        assert_literal(&expr.left, &Literal::Ident("myArray".into()));
+        assert_infix_expression(
+            &expr.index,
+            &Literal::Int(1),
+            &Operator::Plus,
+            &Literal::Int(1),
+        );
     }
 }

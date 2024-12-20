@@ -6,6 +6,36 @@ use crate::token::{Token, TokenKind};
 use std::collections::HashMap;
 use std::fmt;
 
+#[derive(PartialEq, PartialOrd, Debug)]
+pub enum Precedence {
+    Lowest,
+    Equals,
+    LessGreater,
+    Sum,
+    Product,
+    Prefix,
+    Call,
+    Index,
+}
+
+impl From<&TokenKind> for Precedence {
+    fn from(value: &TokenKind) -> Self {
+        match value {
+            TokenKind::Eq => Self::Equals,
+            TokenKind::NotEq => Self::Equals,
+            TokenKind::Lt => Self::LessGreater,
+            TokenKind::Gt => Self::LessGreater,
+            TokenKind::Plus => Self::Sum,
+            TokenKind::Minus => Self::Sum,
+            TokenKind::Slash => Self::Product,
+            TokenKind::Asterisk => Self::Product,
+            TokenKind::Lparen => Self::Call,
+            TokenKind::Lbracket => Self::Index,
+            _ => Self::Lowest,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum ParserError {
     Expect(String),
@@ -86,6 +116,9 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::String, Parser::parse_fn_string_literal);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Lbracket, Parser::parse_fn_array_literal);
 
         parser
             .infix_parse_fns
@@ -114,6 +147,9 @@ impl<'a> Parser<'a> {
         parser
             .infix_parse_fns
             .insert(TokenKind::Lparen, Parser::parse_fn_call_expression);
+        parser
+            .infix_parse_fns
+            .insert(TokenKind::Lbracket, Parser::parse_fn_index_expression);
 
         parser
     }
@@ -197,26 +233,26 @@ impl<'a> Parser<'a> {
         Ok(params)
     }
 
-    fn parse_call_arguments(&mut self) -> Result<Vec<Expression>, ParserError> {
-        let mut args = vec![];
+    fn parse_expression_list(&mut self, end: TokenKind) -> Result<Vec<Expression>, ParserError> {
+        let mut list = vec![];
 
-        if self.next_token.kind == TokenKind::Rparen {
+        if self.next_token.kind == end {
             self.next_tokens();
-            return Ok(args);
+            return Ok(list);
         }
 
         self.next_tokens();
-        args.push(self.parse_expression(Precedence::Lowest)?);
+        list.push(self.parse_expression(Precedence::Lowest)?);
 
         while self.next_token.kind == TokenKind::Comma {
             self.next_tokens();
             self.next_tokens();
-            args.push(self.parse_expression(Precedence::Lowest)?);
+            list.push(self.parse_expression(Precedence::Lowest)?);
         }
 
-        self.expect_token(TokenKind::Rparen)?;
+        self.expect_token(end)?;
 
-        Ok(args)
+        Ok(list)
     }
 
     fn parse_fn_identifier_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -259,6 +295,12 @@ impl<'a> Parser<'a> {
             parameters,
             body,
         }))
+    }
+
+    fn parse_fn_array_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+        let elements = parser.parse_expression_list(TokenKind::Rbracket)?;
+        Ok(Expression::Array(ArrayLiteral { token, elements }))
     }
 
     fn parse_fn_string_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -344,12 +386,27 @@ impl<'a> Parser<'a> {
     ) -> Result<Expression, ParserError> {
         let token = parser.curr_token.clone();
         parser.next_tokens();
-        let arguments = parser.parse_call_arguments()?;
+        let arguments = parser.parse_expression_list(TokenKind::Rparen)?;
         Ok(Expression::Call(CallExpression {
             token,
             function,
             arguments,
         }))
+    }
+
+    fn parse_fn_index_expression(
+        parser: &mut Parser,
+        left: Box<Expression>,
+    ) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+        parser.next_tokens();
+
+        parser.next_tokens();
+        let index = Box::new(parser.parse_expression(Precedence::Lowest)?);
+
+        parser.expect_token(TokenKind::Rbracket)?;
+
+        Ok(Expression::Index(IndexExpression { token, left, index }))
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Expression, ParserError> {

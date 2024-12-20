@@ -212,6 +212,8 @@ fn eval_expression(expression: &Expression, env: Env) -> Object {
             }
         }
         Expression::String(expr) => Object::String(expr.value.to_owned()),
+        Expression::Array(expr) => todo!(),
+        Expression::Index(expr) => todo!(),
     }
 }
 
