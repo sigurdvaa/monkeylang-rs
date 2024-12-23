@@ -675,11 +675,12 @@ fn test_parsing_index_expressions() {
 #[test]
 fn test_parsing_hash_literals_string_keys() {
     let input = r#"{"one": 1, "two": 2, "three": 3}"#;
+    let tests = HashMap::from([("one", 1), ("two", 2), ("three", 3)]);
     let program = parse_program(input, 1);
     for stmt in &program.statements {
         let stmt_expr = match stmt {
             Statement::Expression(stmt) => {
-                assert_eq!(stmt.token.kind, TokenKind::Rbrace);
+                assert_eq!(stmt.token.kind, TokenKind::Lbrace);
                 assert_eq!(stmt.token.literal, "{");
                 &stmt.value
             }
@@ -691,13 +692,79 @@ fn test_parsing_hash_literals_string_keys() {
             _ => panic!("not a valid hash expression, got: {stmt_expr}"),
         };
 
-        todo!();
-        // assert_literal(&expr.left, &Literal::Ident("myArray"));
-        // assert_infix_expression(
-        //     &expr.index,
-        //     &Literal::Int(1),
-        //     &Operator::Plus,
-        //     &Literal::Int(1),
-        // );
+        assert_eq!(expr.pairs.len(), 3);
+        for (expr_key, expr_value) in &expr.pairs {
+            if let Expression::String(key) = expr_key {
+                let test_value = tests[key.value.as_str()];
+                assert_literal(expr_value, &Literal::Int(test_value));
+            } else {
+                panic!("not a string expression, got: {expr_key}");
+            }
+        }
+    }
+}
+
+#[test]
+fn test_parsing_empty_hash_literal() {
+    let input = "{}";
+    let program = parse_program(input, 1);
+    for stmt in &program.statements {
+        let stmt_expr = match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::Lbrace);
+                assert_eq!(stmt.token.literal, "{");
+                &stmt.value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let expr = match stmt_expr {
+            Expression::Hash(expr) => expr,
+            _ => panic!("not a valid hash expression, got: {stmt_expr}"),
+        };
+
+        assert_eq!(expr.pairs.len(), 0);
+    }
+}
+
+#[test]
+fn test_parsing_hash_literals_with_expressions() {
+    let input = r#"{"one": 0 + 1, "two": 10 - 8, "three": 15 / 5}"#;
+    let tests = HashMap::from([
+        ("one", (&Literal::Int(0), &Operator::Plus, &Literal::Int(1))),
+        (
+            "two",
+            (&Literal::Int(10), &Operator::Minus, &Literal::Int(8)),
+        ),
+        (
+            "three",
+            (&Literal::Int(15), &Operator::Slash, &Literal::Int(5)),
+        ),
+    ]);
+    let program = parse_program(input, 1);
+    for stmt in &program.statements {
+        let stmt_expr = match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::Lbrace);
+                assert_eq!(stmt.token.literal, "{");
+                &stmt.value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let expr = match stmt_expr {
+            Expression::Hash(expr) => expr,
+            _ => panic!("not a valid hash expression, got: {stmt_expr}"),
+        };
+
+        assert_eq!(expr.pairs.len(), 3);
+        for (expr_key, expr_value) in &expr.pairs {
+            if let Expression::String(key) = expr_key {
+                let (left_test, operator_test, right_test) = tests[key.value.as_str()];
+                assert_infix_expression(expr_value, left_test, operator_test, right_test);
+            } else {
+                panic!("not a string expression, got: {expr_key}");
+            }
+        }
     }
 }

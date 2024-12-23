@@ -3,6 +3,7 @@ mod tests;
 use crate::ast::*;
 use crate::lexer::Lexer;
 use crate::token::{Token, TokenKind};
+use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -113,6 +114,9 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::Lbracket, Parser::parse_fn_array_literal);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Lbrace, Parser::parse_fn_hash_literal);
 
         parser
             .infix_parse_fns
@@ -295,6 +299,32 @@ impl<'a> Parser<'a> {
         let token = parser.curr_token.clone();
         let elements = parser.parse_expression_list(TokenKind::Rbracket)?;
         Ok(Expression::Array(ArrayLiteral { token, elements }))
+    }
+
+    fn parse_fn_hash_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+        let mut pairs = BTreeMap::new();
+
+        while parser.next_token.kind != TokenKind::Rbrace {
+            parser.next_tokens();
+
+            let key = parser.parse_expression(Precedence::Lowest)?;
+
+            parser.expect_token(TokenKind::Colon)?;
+            parser.next_tokens();
+
+            let value = parser.parse_expression(Precedence::Lowest)?;
+
+            pairs.insert(key, value);
+
+            if parser.next_token.kind != TokenKind::Rbrace {
+                parser.expect_token(TokenKind::Comma)?;
+            }
+        }
+
+        parser.expect_token(TokenKind::Rbrace)?;
+
+        Ok(Expression::Hash(HashLiteral { token, pairs }))
     }
 
     fn parse_fn_string_literal(parser: &mut Parser) -> Result<Expression, ParserError> {

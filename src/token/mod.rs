@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, Hash, Eq, PartialEq, Clone)]
+#[derive(Debug, Hash, PartialEq, Clone, Eq, PartialOrd, Ord)]
 pub enum TokenKind {
     Illegal,
     EndOfFile,
@@ -49,7 +49,7 @@ impl fmt::Display for TokenKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Token {
     pub kind: TokenKind,
     pub literal: String,
