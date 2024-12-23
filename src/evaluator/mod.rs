@@ -13,8 +13,7 @@ use std::rc::Rc;
 fn extend_function_env(function: &FunctionObject, args: &[Rc<Object>]) -> Env {
     let env = Environment::new_enclosed(&function.env);
     for (i, param) in function.parameters.iter().enumerate() {
-        env.borrow_mut()
-            .set(param.value.to_owned(), args[i].clone());
+        env.set(param.value.to_owned(), args[i].clone());
     }
     env
 }
@@ -30,7 +29,7 @@ fn apply_function(function: &Rc<Object>, args: &[Rc<Object>]) -> Rc<Object> {
                 )));
             }
 
-            let extended_env = extend_function_env(&func, args);
+            let extended_env = extend_function_env(func, args);
             let eval = eval_block_statement(&func.body, extended_env);
             match &*eval {
                 Object::Return(value) => value.clone(),
@@ -46,7 +45,7 @@ fn apply_function(function: &Rc<Object>, args: &[Rc<Object>]) -> Rc<Object> {
 }
 
 fn eval_identifier(identifier: &IdentifierLiteral, env: Env) -> Rc<Object> {
-    if let Some(value) = env.borrow().get(&identifier.value) {
+    if let Some(value) = env.get(&identifier.value) {
         return value;
     }
 
@@ -268,7 +267,7 @@ fn eval_statement(statement: &Statement, env: Env) -> Rc<Object> {
             if let Object::Error(_) = *value {
                 return value;
             }
-            env.borrow_mut().set(expr.name.value.clone(), value.clone());
+            env.set(expr.name.value.clone(), value.clone());
             value
         }
         Statement::Return(expr) => {
