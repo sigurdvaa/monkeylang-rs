@@ -1,5 +1,7 @@
 #[cfg(test)]
 use super::*;
+#[cfg(test)]
+use std::collections::HashMap;
 
 #[cfg(test)]
 fn test_eval(input: &str) -> Rc<Object> {
@@ -271,5 +273,59 @@ fn test_array_index_expressions() {
     ];
     for (test_input, test_value) in tests {
         assert_eq!(test_eval(test_input), Rc::new(test_value));
+    }
+}
+
+#[test]
+fn test_hash_literals() {
+    let input = concat!(
+        "let two = \"two\";\n",
+        "{\n",
+        "  \"one\": 10 - 9,\n",
+        "  two: 1 + 1,\n",
+        "  \"thr\" + \"ee\": 6 / 2,\n",
+        "  4: 4,\n",
+        "  true: 5,\n",
+        "  false: 6\n",
+        "}\n",
+    );
+    let tests = HashMap::from([
+        (
+            Object::String("one".into()).hash_key().unwrap(),
+            (Object::String("one".into()), Object::Integer(1)),
+        ),
+        (
+            Object::String("two".into()).hash_key().unwrap(),
+            (Object::String("two".into()), Object::Integer(2)),
+        ),
+        (
+            Object::String("three".into()).hash_key().unwrap(),
+            (Object::String("three".into()), Object::Integer(3)),
+        ),
+        (
+            Object::Integer(4).hash_key().unwrap(),
+            (Object::Integer(4), Object::Integer(4)),
+        ),
+        (
+            Object::Boolean(true).hash_key().unwrap(),
+            (Object::Boolean(true), Object::Integer(5)),
+        ),
+        (
+            Object::Boolean(false).hash_key().unwrap(),
+            (Object::Boolean(false), Object::Integer(6)),
+        ),
+    ]);
+
+    let eval = test_eval(input);
+    match &*eval {
+        Object::Hash(hash) => {
+            assert_eq!(hash.len(), 6);
+            for (hash, (key, value)) in hash {
+                let (test_key, test_value) = &tests[hash];
+                assert_eq!(**key, *test_key);
+                assert_eq!(**value, *test_value);
+            }
+        }
+        _ => panic!("object is not Hash, got {eval:?}"),
     }
 }
