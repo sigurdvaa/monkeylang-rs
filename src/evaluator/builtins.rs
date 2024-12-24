@@ -23,8 +23,8 @@ fn len(args: &[Rc<Object>]) -> Rc<Object> {
     }
 
     Rc::new(match &*args[0] {
-        Object::String(value) => Object::Integer(value.len() as isize),
-        Object::Array(value) => Object::Integer(value.len() as isize),
+        Object::String(obj) => Object::new_integer(obj.value.len() as isize),
+        Object::Array(value) => Object::new_integer(value.len() as isize),
         _ => Object::Error(format!(
             "argument to \"len\" not supported, got {}",
             args[0].kind()

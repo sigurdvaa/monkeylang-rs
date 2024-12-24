@@ -6,11 +6,11 @@ use crate::ast::{
 };
 use crate::object::{
     environment::{Env, Environment},
-    Array, FunctionObject, Integer, Object,
+    Array, BooleanObj, FunctionObj, Integer, IntegerObj, Object, StringObj,
 };
 use std::rc::Rc;
 
-fn extend_function_env(function: &FunctionObject, args: &[Rc<Object>]) -> Env {
+fn extend_function_env(function: &FunctionObj, args: &[Rc<Object>]) -> Env {
     let env = Environment::new_enclosed(&function.env);
     for (i, param) in function.parameters.iter().enumerate() {
         env.set(param.value.to_owned(), args[i].clone());
@@ -60,7 +60,7 @@ fn eval_identifier(identifier: &IdentifierLiteral, env: Env) -> Rc<Object> {
 }
 
 fn eval_array_index_expression(left: &Array, index: &Integer) -> Rc<Object> {
-    left.get(*index as usize)
+    left.get(index.value as usize)
         .unwrap_or(&Rc::new(Object::Null))
         .clone()
 }
@@ -76,56 +76,58 @@ fn eval_index_expression(left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
 }
 
 fn eval_minus_prefix_operator_expression(right: Rc<Object>) -> Object {
-    match *right {
-        Object::Integer(value) => Object::Integer(-value),
+    match right.as_ref() {
+        Object::Integer(obj) => Object::new_integer(-obj.value),
         _ => Object::Error(format!("unknown operator: -{}", right.kind())),
     }
 }
 
 fn eval_bang_operator_expression(right: Rc<Object>) -> Object {
-    match *right {
-        Object::Null => Object::Boolean(true),
-        Object::Integer(value) => Object::Boolean(value < 1),
-        Object::Boolean(value) => Object::Boolean(!value),
+    match right.as_ref() {
+        Object::Null => Object::new_boolean(true),
+        Object::Integer(obj) => Object::new_boolean(obj.value < 1),
+        Object::Boolean(obj) => Object::new_boolean(!obj.value),
         _ => Object::Error(format!("unknown operator: !{}", right.kind())),
     }
 }
 
-fn eval_integer_infix_expression(operator: &Operator, a: Integer, b: Integer) -> Object {
+fn eval_integer_infix_expression(operator: &Operator, a: &IntegerObj, b: &IntegerObj) -> Object {
     match operator {
-        Operator::Plus => Object::Integer(a + b),
-        Operator::Minus => Object::Integer(a - b),
-        Operator::Asterisk => Object::Integer(a * b),
-        Operator::Slash => Object::Integer(a / b),
-        Operator::Gt => Object::Boolean(a > b),
-        Operator::Lt => Object::Boolean(a < b),
-        Operator::Eq => Object::Boolean(a == b),
-        Operator::NotEq => Object::Boolean(a != b),
+        Operator::Plus => Object::new_integer(a.value + b.value),
+        Operator::Minus => Object::new_integer(a.value - b.value),
+        Operator::Asterisk => Object::new_integer(a.value * b.value),
+        Operator::Slash => Object::new_integer(a.value / b.value),
+        Operator::Gt => Object::new_boolean(a > b),
+        Operator::Lt => Object::new_boolean(a < b),
+        Operator::Eq => Object::new_boolean(a == b),
+        Operator::NotEq => Object::new_boolean(a != b),
         _ => Object::Error(format!("unknown integer operator: {operator}",)),
     }
 }
 
-fn eval_boolean_infix_expression(operator: &Operator, a: bool, b: bool) -> Object {
+fn eval_boolean_infix_expression(operator: &Operator, a: &BooleanObj, b: &BooleanObj) -> Object {
     match operator {
-        Operator::Eq => Object::Boolean(a == b),
-        Operator::NotEq => Object::Boolean(a != b),
+        Operator::Eq => Object::new_boolean(a.value == b.value),
+        Operator::NotEq => Object::new_boolean(a.value != b.value),
         _ => Object::Error(format!("unknown boolean operator: {operator}",)),
     }
 }
 
-fn eval_string_infix_expression(operator: &Operator, a: &str, b: &str) -> Object {
+fn eval_string_infix_expression(operator: &Operator, a: &StringObj, b: &StringObj) -> Object {
     match operator {
-        Operator::Plus => Object::String(String::from_iter([a, b])),
-        Operator::Eq => Object::Boolean(a == b),
-        Operator::NotEq => Object::Boolean(a != b),
+        Operator::Plus => {
+            Object::new_string(String::from_iter([a.value.as_str(), b.value.as_str()]))
+        }
+        Operator::Eq => Object::new_boolean(a.value == b.value),
+        Operator::NotEq => Object::new_boolean(a.value != b.value),
         _ => Object::Error(format!("unknown string operator: {operator}",)),
     }
 }
 
 fn eval_infix_expression(operator: &Operator, left: Rc<Object>, right: Rc<Object>) -> Rc<Object> {
     Rc::new(match (&*left, &*right) {
-        (Object::Integer(a), Object::Integer(b)) => eval_integer_infix_expression(operator, *a, *b),
-        (Object::Boolean(a), Object::Boolean(b)) => eval_boolean_infix_expression(operator, *a, *b),
+        (Object::Integer(a), Object::Integer(b)) => eval_integer_infix_expression(operator, a, b),
+        (Object::Boolean(a), Object::Boolean(b)) => eval_boolean_infix_expression(operator, a, b),
         (Object::String(a), Object::String(b)) => eval_string_infix_expression(operator, a, b),
         (a, b) if a.kind() != b.kind() => Object::Error(format!(
             "type mismatch: {} {operator} {}",
@@ -149,9 +151,9 @@ fn eval_prefix_expression(operator: &Operator, right: Rc<Object>) -> Rc<Object> 
 }
 
 fn is_truthy(object: Rc<Object>) -> bool {
-    match *object {
+    match object.as_ref() {
         Object::Integer(_) => true,
-        Object::Boolean(value) => value,
+        Object::Boolean(obj) => obj.value,
         _ => false,
     }
 }
@@ -187,7 +189,7 @@ fn eval_expressions(expressions: &[Expression], env: Env) -> Vec<Rc<Object>> {
 
 fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
     match expression {
-        Expression::Boolean(expr) => Rc::new(Object::Boolean(expr.value)),
+        Expression::Boolean(expr) => Rc::new(Object::new_boolean(expr.value)),
         Expression::Call(expr) => {
             let func = eval_expression(&expr.function, env.clone());
             if let Object::Error(_) = *func {
@@ -203,7 +205,7 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
 
             apply_function(&func, &args)
         }
-        Expression::Function(expr) => Rc::new(Object::Function(FunctionObject {
+        Expression::Function(expr) => Rc::new(Object::Function(FunctionObj {
             parameters: expr.parameters.clone(),
             body: expr.body.clone(),
             env: env.clone(),
@@ -223,7 +225,7 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
 
             eval_infix_expression(&expr.operator, left, right)
         }
-        Expression::Integer(expr) => Rc::new(Object::Integer(
+        Expression::Integer(expr) => Rc::new(Object::new_integer(
             expr.value.try_into().expect("integer too large"),
         )),
         Expression::Prefix(expr) => {
@@ -233,7 +235,7 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
                 _ => eval_prefix_expression(&expr.operator, right),
             }
         }
-        Expression::String(expr) => Rc::new(Object::String(expr.value.to_owned())),
+        Expression::String(expr) => Rc::new(Object::new_string(expr.value.to_owned())),
         Expression::Array(expr) => {
             let array = eval_expressions(&expr.elements, env);
             if array.len() == 1 {

@@ -2,23 +2,43 @@ pub mod environment;
 
 use crate::ast::{BlockStatement, IdentifierLiteral};
 use environment::Env;
+use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub type Integer = isize;
+pub type Integer = IntegerObj;
 pub type BuiltinFunction = fn(&[Rc<Object>]) -> Rc<Object>;
 pub type Array = Vec<Rc<Object>>;
-pub type Hash = HashMap<HashKey, (Rc<Object>, Rc<Object>)>;
+pub type HashObj = HashMap<HashKeyData, (Rc<Object>, Rc<Object>)>;
+type HashKey = RefCell<Option<HashKeyData>>;
+
+#[derive(Debug, PartialEq, PartialOrd)]
+pub struct IntegerObj {
+    pub value: isize,
+    hash: HashKey,
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
+pub struct BooleanObj {
+    pub value: bool,
+    hash: HashKey,
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
+pub struct StringObj {
+    pub value: String,
+    hash: HashKey,
+}
 
 #[derive(Debug, PartialEq)]
-pub struct FunctionObject {
+pub struct FunctionObj {
     pub parameters: Vec<IdentifierLiteral>,
     pub body: BlockStatement,
     pub env: Env,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
-pub struct HashKey {
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Clone)]
+pub struct HashKeyData {
     kind: String,
     value: usize,
 }
@@ -26,18 +46,39 @@ pub struct HashKey {
 #[derive(Debug, PartialEq)]
 pub enum Object {
     Null,
-    Integer(Integer),
-    Boolean(bool),
+    Integer(IntegerObj),
+    Boolean(BooleanObj),
     Return(Rc<Self>),
     Error(String),
-    Function(FunctionObject),
-    String(String),
+    Function(FunctionObj),
+    String(StringObj),
     Builtin(BuiltinFunction),
     Array(Array),
-    Hash(Hash),
+    Hash(HashObj),
 }
 
 impl Object {
+    pub fn new_boolean(value: bool) -> Self {
+        Self::Boolean(BooleanObj {
+            value,
+            hash: RefCell::new(None),
+        })
+    }
+
+    pub fn new_integer(value: isize) -> Self {
+        Self::Integer(IntegerObj {
+            value,
+            hash: RefCell::new(None),
+        })
+    }
+
+    pub fn new_string(value: String) -> Self {
+        Self::String(StringObj {
+            value,
+            hash: RefCell::new(None),
+        })
+    }
+
     pub fn kind(&self) -> &str {
         match self {
             Self::Null => "NULL",
@@ -56,8 +97,8 @@ impl Object {
     pub fn inspect(&self) -> String {
         match self {
             Self::Null => "null".into(),
-            Self::Integer(value) => value.to_string(),
-            Self::Boolean(value) => value.to_string(),
+            Self::Integer(obj) => obj.value.to_string(),
+            Self::Boolean(obj) => obj.value.to_string(),
             Self::Return(value) => value.inspect(),
             Self::Error(value) => format!("ERROR: {value}"),
             Self::Function(func) => {
@@ -75,7 +116,7 @@ impl Object {
                 buffer.push_str("\n}");
                 buffer
             }
-            Self::String(value) => value.to_owned(),
+            Self::String(obj) => obj.value.to_owned(),
             Self::Builtin(_) => "builtin function".into(),
             Self::Array(value) => format!(
                 "[{}]",
@@ -95,22 +136,51 @@ impl Object {
         }
     }
 
-    pub fn hash_key(&self) -> Result<HashKey, Object> {
-        // TODO: add cache
+    fn set_hash_key(
+        &self,
+        mut hash: RefMut<Option<HashKeyData>>,
+        kind: String,
+        value: usize,
+    ) -> HashKeyData {
+        let hash_key = HashKeyData { kind, value };
+        *hash = Some(hash_key.clone());
+        hash_key
+    }
+
+    pub fn hash_key(&self) -> Result<HashKeyData, Object> {
         // TODO: avoid collisions
+        // TODO: improve cache
         match self {
-            Self::Boolean(value) => Ok(HashKey {
-                kind: self.kind().into(),
-                value: *value as usize,
-            }),
-            Self::Integer(value) => Ok(HashKey {
-                kind: self.kind().into(),
-                value: *value as usize,
-            }),
-            Self::String(value) => Ok(HashKey {
-                kind: self.kind().into(),
-                value: value.chars().map(|c| c as usize).sum(),
-            }),
+            Self::Boolean(obj) => {
+                if let Some(hash_key) = obj.hash.borrow().as_ref() {
+                    return Ok(hash_key.clone());
+                }
+                Ok(self.set_hash_key(
+                    obj.hash.borrow_mut(),
+                    self.kind().into(),
+                    obj.value as usize,
+                ))
+            }
+            Self::Integer(obj) => {
+                if let Some(hash_key) = obj.hash.borrow().as_ref() {
+                    return Ok(hash_key.clone());
+                }
+                Ok(self.set_hash_key(
+                    obj.hash.borrow_mut(),
+                    self.kind().into(),
+                    obj.value as usize,
+                ))
+            }
+            Self::String(obj) => {
+                if let Some(hash_key) = obj.hash.borrow().as_ref() {
+                    return Ok(hash_key.clone());
+                }
+                Ok(self.set_hash_key(
+                    obj.hash.borrow_mut(),
+                    self.kind().into(),
+                    obj.value.chars().map(|c| c as usize).sum(),
+                ))
+            }
             _ => Err(Object::Error(format!(
                 "Hash not implemented for {}",
                 self.kind()
@@ -123,12 +193,18 @@ impl Object {
 mod tests {
     use super::*;
 
+    fn create_str_obj(value: &str) -> Object {
+        let obj = Object::new_string(value.into());
+        let _ = obj.hash_key();
+        obj
+    }
+
     #[test]
     fn test_string_hash_key() {
-        let hello1 = Object::String("Hello World!".into());
-        let hello2 = Object::String("Hello World!".into());
-        let diff1 = Object::String("My name is sig".into());
-        let diff2 = Object::String("My name is sig".into());
+        let hello1 = create_str_obj("Hello World!");
+        let hello2 = create_str_obj("Hello World!");
+        let diff1 = create_str_obj("My name is sig");
+        let diff2 = create_str_obj("My name is sig");
 
         assert_eq!(hello1.hash_key(), hello2.hash_key());
         assert_eq!(diff1.hash_key(), diff2.hash_key());

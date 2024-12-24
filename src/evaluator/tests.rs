@@ -35,7 +35,10 @@ fn test_eval_integer_expression() {
         ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Rc::new(Object::Integer(*test_value)));
+        assert_eq!(
+            test_eval(test_input),
+            Rc::new(Object::new_integer(*test_value))
+        );
     }
 }
 
@@ -69,7 +72,10 @@ fn test_eval_boolean_expression() {
         ("(\"foo\" == \"foo\") == true", true),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Rc::new(Object::Boolean(*test_value)));
+        assert_eq!(
+            test_eval(test_input),
+            Rc::new(Object::new_boolean(*test_value))
+        );
     }
 }
 
@@ -84,20 +90,23 @@ fn test_bang_operator() {
         ("!!5", true),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(test_eval(test_input), Rc::new(Object::Boolean(*test_value)));
+        assert_eq!(
+            test_eval(test_input),
+            Rc::new(Object::new_boolean(*test_value))
+        );
     }
 }
 
 #[test]
 fn test_if_else_expression() {
     let tests = [
-        ("if (true) { 10 }", Object::Integer(10)),
+        ("if (true) { 10 }", Object::new_integer(10)),
         ("if (false) { 10 }", Object::Null),
-        ("if (1) { 10 }", Object::Integer(10)),
-        ("if (1 < 2) { 10 }", Object::Integer(10)),
+        ("if (1) { 10 }", Object::new_integer(10)),
+        ("if (1 < 2) { 10 }", Object::new_integer(10)),
         ("if (1 > 2) { 10 }", Object::Null),
-        ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
-        ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
+        ("if (1 > 2) { 10 } else { 20 }", Object::new_integer(20)),
+        ("if (1 < 2) { 10 } else { 20 }", Object::new_integer(10)),
     ];
     for (test_input, test_value) in tests {
         assert_eq!(test_eval(test_input), Rc::new(test_value));
@@ -114,7 +123,10 @@ fn test_return_statements() {
         ("if (10 > 1) { return 10; } return 1; }", 10),
     ];
     for (test_input, test_value) in tests {
-        assert_eq!(test_eval(test_input), Rc::new(Object::Integer(test_value)));
+        assert_eq!(
+            test_eval(test_input),
+            Rc::new(Object::new_integer(test_value))
+        );
     }
 }
 
@@ -154,7 +166,10 @@ fn test_let_statements() {
         ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
     ];
     for (test_input, test_value) in tests {
-        assert_eq!(test_eval(test_input), Rc::new(Object::Integer(test_value)));
+        assert_eq!(
+            test_eval(test_input),
+            Rc::new(Object::new_integer(test_value))
+        );
     }
 }
 
@@ -183,7 +198,10 @@ fn test_function_application() {
         ("fn(x) { x; }(5)", 5),
     ];
     for (test_input, test_value) in tests {
-        assert_eq!(test_eval(test_input), Rc::new(Object::Integer(test_value)));
+        assert_eq!(
+            test_eval(test_input),
+            Rc::new(Object::new_integer(test_value))
+        );
     }
 }
 
@@ -197,7 +215,7 @@ fn test_closures() {
         "let addTwo = newAdder(2);\n",
         "addTwo(2);"
     );
-    assert_eq!(test_eval(input), Rc::new(Object::Integer(4)));
+    assert_eq!(test_eval(input), Rc::new(Object::new_integer(4)));
 }
 
 #[test]
@@ -205,7 +223,7 @@ fn test_string_literal() {
     let (test_input, test_value) = ("\"Hello World!\";", "Hello World!");
     assert_eq!(
         test_eval(test_input),
-        Rc::new(Object::String(test_value.into()))
+        Rc::new(Object::new_string(test_value.into()))
     );
 }
 
@@ -214,16 +232,16 @@ fn test_string_concatenation() {
     let (test_input, test_value) = ("\"Hello\" + \" \" + \"World!\";", "Hello World!");
     assert_eq!(
         test_eval(test_input),
-        Rc::new(Object::String(test_value.into()))
+        Rc::new(Object::new_string(test_value.into()))
     );
 }
 
 #[test]
 fn test_builtin_functions() {
     let tests = [
-        ("len(\"\")", Object::Integer(0)),
-        ("len(\"four\")", Object::Integer(4)),
-        ("len(\"hello world\")", Object::Integer(11)),
+        ("len(\"\")", Object::new_integer(0)),
+        ("len(\"four\")", Object::new_integer(4)),
+        ("len(\"hello world\")", Object::new_integer(11)),
         (
             "len(1)",
             Object::Error("argument to \"len\" not supported, got INTEGER".into()),
@@ -244,9 +262,9 @@ fn test_array_literals() {
     assert_eq!(
         test_eval(input),
         Rc::new(Object::Array(vec![
-            Rc::new(Object::Integer(1)),
-            Rc::new(Object::Integer(4)),
-            Rc::new(Object::Integer(6)),
+            Rc::new(Object::new_integer(1)),
+            Rc::new(Object::new_integer(4)),
+            Rc::new(Object::new_integer(6)),
         ]))
     );
 }
@@ -254,19 +272,22 @@ fn test_array_literals() {
 #[test]
 fn test_array_index_expressions() {
     let tests = [
-        ("[1, 2, 3][0]", Object::Integer(1)),
-        ("[1, 2, 3][1]", Object::Integer(2)),
-        ("[1, 2, 3][2]", Object::Integer(3)),
-        ("let i = 0; [1][i];", Object::Integer(1)),
-        ("[1, 2, 3][1 + 1];", Object::Integer(3)),
-        ("let myArray = [1, 2, 3]; myArray[2];", Object::Integer(3)),
+        ("[1, 2, 3][0]", Object::new_integer(1)),
+        ("[1, 2, 3][1]", Object::new_integer(2)),
+        ("[1, 2, 3][2]", Object::new_integer(3)),
+        ("let i = 0; [1][i];", Object::new_integer(1)),
+        ("[1, 2, 3][1 + 1];", Object::new_integer(3)),
+        (
+            "let myArray = [1, 2, 3]; myArray[2];",
+            Object::new_integer(3),
+        ),
         (
             "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
-            Object::Integer(6),
+            Object::new_integer(6),
         ),
         (
             "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
-            Object::Integer(2),
+            Object::new_integer(2),
         ),
         ("[1, 2, 3][3]", Object::Null),
         ("[1, 2, 3][-1]", Object::Null),
@@ -291,28 +312,28 @@ fn test_hash_literals() {
     );
     let tests = HashMap::from([
         (
-            Object::String("one".into()).hash_key().unwrap(),
-            (Object::String("one".into()), Object::Integer(1)),
+            Object::new_string("one".into()).hash_key().unwrap(),
+            (Object::new_string("one".into()), Object::new_integer(1)),
         ),
         (
-            Object::String("two".into()).hash_key().unwrap(),
-            (Object::String("two".into()), Object::Integer(2)),
+            Object::new_string("two".into()).hash_key().unwrap(),
+            (Object::new_string("two".into()), Object::new_integer(2)),
         ),
         (
-            Object::String("three".into()).hash_key().unwrap(),
-            (Object::String("three".into()), Object::Integer(3)),
+            Object::new_string("three".into()).hash_key().unwrap(),
+            (Object::new_string("three".into()), Object::new_integer(3)),
         ),
         (
-            Object::Integer(4).hash_key().unwrap(),
-            (Object::Integer(4), Object::Integer(4)),
+            Object::new_integer(4).hash_key().unwrap(),
+            (Object::new_integer(4), Object::new_integer(4)),
         ),
         (
-            Object::Boolean(true).hash_key().unwrap(),
-            (Object::Boolean(true), Object::Integer(5)),
+            Object::new_boolean(true).hash_key().unwrap(),
+            (Object::new_boolean(true), Object::new_integer(5)),
         ),
         (
-            Object::Boolean(false).hash_key().unwrap(),
-            (Object::Boolean(false), Object::Integer(6)),
+            Object::new_boolean(false).hash_key().unwrap(),
+            (Object::new_boolean(false), Object::new_integer(6)),
         ),
     ]);
 
