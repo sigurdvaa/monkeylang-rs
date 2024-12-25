@@ -137,11 +137,12 @@ fn map(args: &[Rc<Object>]) -> Rc<Object> {
 }
 
 fn puts(args: &[Rc<Object>]) -> Rc<Object> {
-    let mut output = std::io::stdout();
+    let mut output = std::io::stdout().lock();
     for arg in args {
-        output
-            .write_all(arg.inspect().as_bytes())
+        writeln!(output, "{}", arg.inspect())
+            // output
+            //     .write_all(arg.inspect().as_bytes())
             .expect("builtin puts failed writing to stdout");
     }
-    Rc::new(Object::Null)
+    Rc::new(Object::NoOutput)
 }

@@ -1,6 +1,7 @@
 use crate::evaluator::eval_program;
 use crate::lexer::Lexer;
 use crate::object::environment::Environment;
+use crate::object::Object;
 use crate::parser::{Parser, ParserError};
 use std::io::{stdin, stdout, Stdout, Write};
 
@@ -54,8 +55,9 @@ pub fn start_repl() {
         }
 
         let eval = eval_program(&program, env.clone());
-        output
-            .write_all(eval.inspect().as_bytes())
-            .expect("writing to stdout failed")
+        match *eval {
+            Object::NoOutput => (),
+            _ => writeln!(output, "{}", eval.inspect()).expect("writing to stdout failed"),
+        }
     }
 }

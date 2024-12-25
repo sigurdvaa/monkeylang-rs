@@ -46,6 +46,7 @@ pub struct HashKeyData {
 #[derive(Debug, PartialEq)]
 pub enum Object {
     Null,
+    NoOutput,
     Integer(IntegerObj),
     Boolean(BooleanObj),
     Return(Rc<Self>),
@@ -82,6 +83,7 @@ impl Object {
     pub fn kind(&self) -> &str {
         match self {
             Self::Null => "NULL",
+            Self::NoOutput => "NOOUTPUT",
             Self::Integer(_) => "INTEGER",
             Self::Boolean(_) => "BOOLEAN",
             Self::Return(_) => "RETURN",
@@ -97,6 +99,7 @@ impl Object {
     pub fn inspect(&self) -> String {
         match self {
             Self::Null => "null".into(),
+            Self::NoOutput => "".into(),
             Self::Integer(obj) => obj.value.to_string(),
             Self::Boolean(obj) => obj.value.to_string(),
             Self::Return(value) => value.inspect(),
@@ -152,7 +155,6 @@ impl Object {
 
     pub fn hash_key(&self) -> Result<HashKeyData, Rc<Object>> {
         // TODO: avoid collisions
-        // TODO: improve cache
         match self {
             Self::Boolean(obj) => {
                 if let Some(hash_key) = obj.hash.borrow().as_ref() {
