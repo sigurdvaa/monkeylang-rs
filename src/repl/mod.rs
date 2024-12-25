@@ -2,7 +2,7 @@ use crate::evaluator::eval_program;
 use crate::lexer::Lexer;
 use crate::object::environment::Environment;
 use crate::parser::{Parser, ParserError};
-use std::io::{BufRead, Write};
+use std::io::{stdin, stdout, Stdout, Write};
 
 const PROMPT: &str = ">> ";
 const MONKEY_FACE: &str = concat!(
@@ -19,34 +19,29 @@ const MONKEY_FACE: &str = concat!(
     "           '-----'\n",
 );
 
-fn print_parser_errors<O>(output: &mut O, errors: &[ParserError])
-where
-    O: Write,
-{
+fn print_parser_errors(output: &mut Stdout, errors: &[ParserError]) {
     writeln!(
         output,
         "{MONKEY_FACE}Woops! We ran into some monkey business here!\n parser errors:"
     )
-    .expect("writing to output buffer failed");
+    .expect("writing to stdout failed");
     for err in errors {
-        writeln!(output, "\t{err}").expect("writing to output buffer failed")
+        writeln!(output, "\t{err}").expect("writing to stdout failed")
     }
 }
 
-pub fn start_repl<I, O>(mut input: I, mut output: O)
-where
-    I: BufRead,
-    O: Write,
-{
+pub fn start_repl() {
+    let input = stdin();
+    let mut output = stdout();
     let env = Environment::new();
     loop {
         let mut buf = String::new();
+
         output
             .write_all(PROMPT.as_bytes())
-            .expect("failed to write prompt to output buffer");
-        output
-            .flush()
-            .expect("failed to flush prompt to output buffer");
+            .expect("failed to write prompt");
+        output.flush().expect("failed to flush prompt");
+
         input.read_line(&mut buf).expect("invalid input");
 
         let lexer = Lexer::new(None, buf.chars().peekable());
@@ -59,6 +54,8 @@ where
         }
 
         let eval = eval_program(&program, env.clone());
-        writeln!(&mut output, "{}", eval.inspect()).expect("writing to output buffer failed")
+        output
+            .write_all(eval.inspect().as_bytes())
+            .expect("writing to stdout failed")
     }
 }

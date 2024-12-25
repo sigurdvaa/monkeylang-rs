@@ -1,6 +1,6 @@
 use super::apply_function;
 use crate::object::Object;
-use std::rc::Rc;
+use std::{io::Write, rc::Rc};
 
 pub fn get(name: &str) -> Option<Rc<Object>> {
     match name {
@@ -137,9 +137,11 @@ fn map(args: &[Rc<Object>]) -> Rc<Object> {
 }
 
 fn puts(args: &[Rc<Object>]) -> Rc<Object> {
-    // TODO: add output to env?
+    let mut output = std::io::stdout();
     for arg in args {
-        println!("{}", arg.inspect());
+        output
+            .write_all(arg.inspect().as_bytes())
+            .expect("builtin puts failed writing to stdout");
     }
     Rc::new(Object::Null)
 }

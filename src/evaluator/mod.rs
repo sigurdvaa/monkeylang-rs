@@ -312,6 +312,7 @@ fn eval_statement(statement: &Statement, env: Env) -> Rc<Object> {
             }
             env.set(expr.name.value.clone(), value.clone());
             value
+            // TODO: hide output for let?
         }
         Statement::Return(expr) => {
             let eval = eval_expression(&expr.value, env);
