@@ -10,6 +10,7 @@ pub fn get(name: &str) -> Option<Rc<Object>> {
         "rest" => Some(Rc::new(Object::Builtin(rest))),
         "push" => Some(Rc::new(Object::Builtin(push))),
         "map" => Some(Rc::new(Object::Builtin(map))),
+        "puts" => Some(Rc::new(Object::Builtin(puts))),
         _ => None,
     }
 }
@@ -133,4 +134,12 @@ fn map(args: &[Rc<Object>]) -> Rc<Object> {
             args[1].kind()
         )),
     })
+}
+
+fn puts(args: &[Rc<Object>]) -> Rc<Object> {
+    // TODO: add output to env?
+    for arg in args {
+        println!("{}", arg.inspect());
+    }
+    Rc::new(Object::Null)
 }

@@ -206,7 +206,7 @@ impl fmt::Display for Expression {
                     buffer.push(':');
                     buffer.push_str(&value.to_string());
                 }
-                write!(f, "{{buffer}}")
+                write!(f, "{{{buffer}}}")
             }
         }
     }

@@ -116,7 +116,7 @@ impl Object {
                 buffer.push_str("\n}");
                 buffer
             }
-            Self::String(obj) => format!("\"{}\"", obj.value.to_owned()),
+            Self::String(obj) => obj.value.to_owned(),
             Self::Builtin(_) => "builtin function".into(),
             Self::Array(value) => format!(
                 "[{}]",
