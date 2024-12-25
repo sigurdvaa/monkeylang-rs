@@ -35,10 +35,7 @@ fn test_eval_integer_expression() {
         ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(
-            test_eval(test_input),
-            Rc::new(Object::new_integer(*test_value))
-        );
+        assert_eq!(*test_eval(test_input), Object::new_integer(*test_value));
     }
 }
 
@@ -72,10 +69,7 @@ fn test_eval_boolean_expression() {
         ("(\"foo\" == \"foo\") == true", true),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(
-            test_eval(test_input),
-            Rc::new(Object::new_boolean(*test_value))
-        );
+        assert_eq!(*test_eval(test_input), Object::new_boolean(*test_value));
     }
 }
 
@@ -90,10 +84,7 @@ fn test_bang_operator() {
         ("!!5", true),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(
-            test_eval(test_input),
-            Rc::new(Object::new_boolean(*test_value))
-        );
+        assert_eq!(*test_eval(test_input), Object::new_boolean(*test_value));
     }
 }
 
@@ -109,7 +100,7 @@ fn test_if_else_expression() {
         ("if (1 < 2) { 10 } else { 20 }", Object::new_integer(10)),
     ];
     for (test_input, test_value) in tests {
-        assert_eq!(test_eval(test_input), Rc::new(test_value));
+        assert_eq!(*test_eval(test_input), test_value);
     }
 }
 
@@ -151,8 +142,8 @@ fn test_error_handling() {
     ];
     for (test_input, test_value) in tests {
         assert_eq!(
-            test_eval(test_input),
-            Rc::new(Object::Error(test_value.to_string()))
+            *test_eval(test_input),
+            Object::Error(test_value.to_string())
         );
     }
 }
@@ -166,10 +157,7 @@ fn test_let_statements() {
         ("let a = 5; let b = a; let c = a + b + 5; c;", 15),
     ];
     for (test_input, test_value) in tests {
-        assert_eq!(
-            test_eval(test_input),
-            Rc::new(Object::new_integer(test_value))
-        );
+        assert_eq!(*test_eval(test_input), Object::new_integer(test_value));
     }
 }
 
@@ -198,10 +186,7 @@ fn test_function_application() {
         ("fn(x) { x; }(5)", 5),
     ];
     for (test_input, test_value) in tests {
-        assert_eq!(
-            test_eval(test_input),
-            Rc::new(Object::new_integer(test_value))
-        );
+        assert_eq!(*test_eval(test_input), Object::new_integer(test_value));
     }
 }
 
@@ -215,15 +200,15 @@ fn test_closures() {
         "let addTwo = newAdder(2);\n",
         "addTwo(2);"
     );
-    assert_eq!(test_eval(input), Rc::new(Object::new_integer(4)));
+    assert_eq!(*test_eval(input), Object::new_integer(4));
 }
 
 #[test]
 fn test_string_literal() {
     let (test_input, test_value) = ("\"Hello World!\";", "Hello World!");
     assert_eq!(
-        test_eval(test_input),
-        Rc::new(Object::new_string(test_value.into()))
+        *test_eval(test_input),
+        Object::new_string(test_value.into())
     );
 }
 
@@ -231,8 +216,8 @@ fn test_string_literal() {
 fn test_string_concatenation() {
     let (test_input, test_value) = ("\"Hello\" + \" \" + \"World!\";", "Hello World!");
     assert_eq!(
-        test_eval(test_input),
-        Rc::new(Object::new_string(test_value.into()))
+        *test_eval(test_input),
+        Object::new_string(test_value.into())
     );
 }
 
@@ -252,7 +237,7 @@ fn test_builtin_functions() {
         ),
     ];
     for (test_input, test_value) in tests {
-        assert_eq!(test_eval(test_input), Rc::new(test_value));
+        assert_eq!(*test_eval(test_input), test_value);
     }
 }
 
@@ -293,7 +278,7 @@ fn test_array_index_expressions() {
         ("[1, 2, 3][-1]", Object::Null),
     ];
     for (test_input, test_value) in tests {
-        assert_eq!(test_eval(test_input), Rc::new(test_value));
+        assert_eq!(*test_eval(test_input), test_value);
     }
 }
 
@@ -338,15 +323,36 @@ fn test_hash_literals() {
     ]);
 
     let eval = test_eval(input);
-    match &*eval {
+    match eval.as_ref() {
         Object::Hash(hash) => {
             assert_eq!(hash.len(), 6);
             for (hash, (key, value)) in hash {
                 let (test_key, test_value) = &tests[hash];
+                let _ = test_key.hash_key();
                 assert_eq!(**key, *test_key);
                 assert_eq!(**value, *test_value);
             }
         }
         _ => panic!("object is not Hash, got {eval:?}"),
+    }
+}
+
+#[test]
+fn test_hash_index_expression() {
+    let tests = [
+        (r#"{"foo": 5}["foo"]"#, Object::new_integer(5)),
+        (r#"{"foo": 5}["bar"]"#, Object::Null),
+        (
+            r#"let key = "foo"; {"foo": 5}[key]"#,
+            Object::new_integer(5),
+        ),
+        (r#"{}["foo"]"#, Object::Null),
+        (r#"{5: 5}[5]"#, Object::new_integer(5)),
+        (r#"{true: 5}[true]"#, Object::new_integer(5)),
+        (r#"{false: 5}[false]"#, Object::new_integer(5)),
+    ];
+
+    for (test_input, test_value) in tests {
+        assert_eq!(*test_eval(test_input), test_value);
     }
 }

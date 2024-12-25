@@ -2,12 +2,14 @@ mod builtins;
 mod tests;
 
 use crate::ast::{
-    BlockStatement, Expression, IdentifierLiteral, IfExpression, Operator, Program, Statement,
+    BlockStatement, Expression, HashLiteral, IdentifierLiteral, IfExpression, Operator, Program,
+    Statement,
 };
 use crate::object::{
     environment::{Env, Environment},
-    Array, BooleanObj, FunctionObj, Integer, IntegerObj, Object, StringObj,
+    Array, BooleanObj, FunctionObj, HashKeyData, HashObj, Integer, IntegerObj, Object, StringObj,
 };
+use std::collections::HashMap;
 use std::rc::Rc;
 
 fn extend_function_env(function: &FunctionObj, args: &[Rc<Object>]) -> Env {
@@ -65,9 +67,23 @@ fn eval_array_index_expression(left: &Array, index: &Integer) -> Rc<Object> {
         .clone()
 }
 
+fn eval_hash_index_expression(left: &HashObj, index: &HashKeyData) -> Rc<Object> {
+    match left.get(index) {
+        Some((_key, value)) => value.clone(),
+        None => Rc::new(Object::Null),
+    }
+}
+
 fn eval_index_expression(left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
     match (&*left, &*index) {
         (Object::Array(left), Object::Integer(index)) => eval_array_index_expression(left, index),
+        (Object::Hash(left), Object::Integer(_) | Object::Boolean(_) | Object::String(_)) => {
+            let hash_key = match index.hash_key() {
+                Ok(hash_key) => hash_key,
+                Err(err) => return err,
+            };
+            eval_hash_index_expression(left, &hash_key)
+        }
         _ => Rc::new(Object::Error(format!(
             "index operator not supported: {}",
             left.kind()
@@ -122,6 +138,31 @@ fn eval_string_infix_expression(operator: &Operator, a: &StringObj, b: &StringOb
         Operator::NotEq => Object::new_boolean(a.value != b.value),
         _ => Object::Error(format!("unknown string operator: {operator}",)),
     }
+}
+
+fn eval_hash_literal(expr: &HashLiteral, env: Env) -> Rc<Object> {
+    let mut pairs = HashMap::new();
+
+    for (key_expr, value_expr) in &expr.pairs {
+        let key = eval_expression(key_expr, env.clone());
+        if let Object::Error(_) = *key {
+            return key;
+        }
+
+        let hash_key = match key.hash_key() {
+            Ok(hash_key) => hash_key,
+            Err(err) => return err,
+        };
+
+        let value = eval_expression(value_expr, env.clone());
+        if let Object::Error(_) = *value {
+            return value;
+        }
+
+        pairs.insert(hash_key, (key, value));
+    }
+
+    Rc::new(Object::Hash(pairs))
 }
 
 fn eval_infix_expression(operator: &Operator, left: Rc<Object>, right: Rc<Object>) -> Rc<Object> {
@@ -258,7 +299,7 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
 
             eval_index_expression(left, index)
         }
-        Expression::Hash(expr) => todo!(),
+        Expression::Hash(expr) => eval_hash_literal(expr, env),
     }
 }
 

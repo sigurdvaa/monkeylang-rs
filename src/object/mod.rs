@@ -116,7 +116,7 @@ impl Object {
                 buffer.push_str("\n}");
                 buffer
             }
-            Self::String(obj) => obj.value.to_owned(),
+            Self::String(obj) => format!("\"{}\"", obj.value.to_owned()),
             Self::Builtin(_) => "builtin function".into(),
             Self::Array(value) => format!(
                 "[{}]",
@@ -127,11 +127,14 @@ impl Object {
                     .join(", ")
             ),
             Self::Hash(value) => {
-                let mut buffer = String::new();
-                for (key, value) in value.values() {
-                    buffer.push_str(&format!("{}: {}", key.inspect(), value.inspect()));
-                }
-                format!("{{{buffer}}}")
+                format!(
+                    "{{{}}}",
+                    &value
+                        .values()
+                        .map(|(key, value)| format!("{}: {}", key.inspect(), value.inspect()))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                )
             }
         }
     }
@@ -147,7 +150,7 @@ impl Object {
         hash_key
     }
 
-    pub fn hash_key(&self) -> Result<HashKeyData, Object> {
+    pub fn hash_key(&self) -> Result<HashKeyData, Rc<Object>> {
         // TODO: avoid collisions
         // TODO: improve cache
         match self {
@@ -181,10 +184,10 @@ impl Object {
                     obj.value.chars().map(|c| c as usize).sum(),
                 ))
             }
-            _ => Err(Object::Error(format!(
+            _ => Err(Rc::new(Object::Error(format!(
                 "Hash not implemented for {}",
                 self.kind()
-            ))),
+            )))),
         }
     }
 }
