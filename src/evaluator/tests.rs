@@ -141,7 +141,7 @@ fn test_error_handling() {
         ("\"Hello\" - \"World\"", "unknown string operator: -"),
         (
             r#"{"name": "Monkey"}[fn(x) { x }];"#,
-            "FUNCTION is not a valid index operator for HASH",
+            "unusable as hash key: FUNCTION",
         ),
     ];
     for (test_input, test_value) in tests {

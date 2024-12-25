@@ -185,7 +185,7 @@ impl Object {
                 ))
             }
             _ => Err(Rc::new(Object::Error(format!(
-                "Hash not implemented for {}",
+                "unusable as hash key: {}",
                 self.kind()
             )))),
         }

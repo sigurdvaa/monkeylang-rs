@@ -77,7 +77,7 @@ fn eval_hash_index_expression(left: &HashObj, index: &HashKeyData) -> Rc<Object>
 fn eval_index_expression(left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
     match (&*left, &*index) {
         (Object::Array(left), Object::Integer(index)) => eval_array_index_expression(left, index),
-        (Object::Hash(left), Object::Integer(_) | Object::Boolean(_) | Object::String(_)) => {
+        (Object::Hash(left), _) => {
             let hash_key = match index.hash_key() {
                 Ok(hash_key) => hash_key,
                 Err(err) => return err,
@@ -85,8 +85,7 @@ fn eval_index_expression(left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
             eval_hash_index_expression(left, &hash_key)
         }
         _ => Rc::new(Object::Error(format!(
-            "{} is not a valid index operator for {}",
-            index.kind(),
+            "index operator not supported: {}",
             left.kind()
         ))),
     }
