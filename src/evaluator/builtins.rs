@@ -144,5 +144,5 @@ fn puts(args: &[Rc<Object>]) -> Rc<Object> {
             //     .write_all(arg.inspect().as_bytes())
             .expect("builtin puts failed writing to stdout");
     }
-    Rc::new(Object::NoOutput)
+    Rc::new(Object::None)
 }

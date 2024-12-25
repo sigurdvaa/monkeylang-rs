@@ -311,7 +311,7 @@ fn eval_statement(statement: &Statement, env: Env) -> Rc<Object> {
                 return value;
             }
             env.set(expr.name.value.clone(), value);
-            Rc::new(Object::NoOutput)
+            Rc::new(Object::None)
         }
         Statement::Return(expr) => {
             let eval = eval_expression(&expr.value, env);
@@ -336,7 +336,7 @@ fn eval_block_statement(block: &BlockStatement, env: Env) -> Rc<Object> {
 }
 
 pub fn eval_program(program: &Program, env: Env) -> Rc<Object> {
-    let mut result = Rc::new(Object::NoOutput);
+    let mut result = Rc::new(Object::None);
     for stmt in &program.statements {
         result = eval_statement(stmt, env.clone());
         match &*result {

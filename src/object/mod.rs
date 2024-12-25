@@ -46,7 +46,7 @@ pub struct HashKeyData {
 #[derive(Debug, PartialEq)]
 pub enum Object {
     Null,
-    NoOutput,
+    None,
     Integer(IntegerObj),
     Boolean(BooleanObj),
     Return(Rc<Self>),
@@ -83,7 +83,7 @@ impl Object {
     pub fn kind(&self) -> &str {
         match self {
             Self::Null => "NULL",
-            Self::NoOutput => "NOOUTPUT",
+            Self::None => "NONE",
             Self::Integer(_) => "INTEGER",
             Self::Boolean(_) => "BOOLEAN",
             Self::Return(_) => "RETURN",
@@ -99,7 +99,7 @@ impl Object {
     pub fn inspect(&self) -> String {
         match self {
             Self::Null => "null".into(),
-            Self::NoOutput => "".into(),
+            Self::None => "".into(),
             Self::Integer(obj) => obj.value.to_string(),
             Self::Boolean(obj) => obj.value.to_string(),
             Self::Return(value) => value.inspect(),

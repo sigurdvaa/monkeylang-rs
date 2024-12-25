@@ -56,7 +56,7 @@ pub fn start_repl() {
 
         let eval = eval_program(&program, env.clone());
         match *eval {
-            Object::NoOutput => (),
+            Object::None => (),
             _ => writeln!(output, "{}", eval.inspect()).expect("writing to stdout failed"),
         }
     }
