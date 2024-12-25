@@ -85,7 +85,8 @@ fn eval_index_expression(left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
             eval_hash_index_expression(left, &hash_key)
         }
         _ => Rc::new(Object::Error(format!(
-            "index operator not supported: {}",
+            "{} is not a valid index operator for {}",
+            index.kind(),
             left.kind()
         ))),
     }

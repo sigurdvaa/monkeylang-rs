@@ -139,6 +139,10 @@ fn test_error_handling() {
         ),
         ("foobar", "identifier not found: foobar"),
         ("\"Hello\" - \"World\"", "unknown string operator: -"),
+        (
+            r#"{"name": "Monkey"}[fn(x) { x }];"#,
+            "FUNCTION is not a valid index operator for HASH",
+        ),
     ];
     for (test_input, test_value) in tests {
         assert_eq!(
