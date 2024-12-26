@@ -4,6 +4,7 @@ use crate::ast::{BlockStatement, IdentifierLiteral};
 use environment::Env;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
+use std::fmt;
 use std::rc::Rc;
 
 pub type Integer = IntegerObj;
@@ -56,6 +57,15 @@ pub enum Object {
     Builtin(BuiltinFunction),
     Array(Array),
     Hash(HashObj),
+}
+
+impl fmt::Display for Object {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::String(obj) => write!(f, "{}", obj.value),
+            _ => write!(f, "{}", self.inspect()),
+        }
+    }
 }
 
 impl Object {
@@ -119,7 +129,7 @@ impl Object {
                 buffer.push_str("\n}");
                 buffer
             }
-            Self::String(obj) => obj.value.to_owned(),
+            Self::String(obj) => format!("\"{}\"", obj.value.replace("\"", "\\\"")),
             Self::Builtin(_) => "builtin function".into(),
             Self::Array(value) => format!(
                 "[{}]",

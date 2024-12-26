@@ -136,6 +136,7 @@ pub enum Expression {
     Call(CallExpression),
     Function(FunctionLiteral),
     Identifier(IdentifierLiteral),
+    Null(Token),
     If(IfExpression),
     Infix(InfixExpression),
     Integer(IntegerLiteral),
@@ -150,6 +151,7 @@ impl fmt::Display for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Boolean(expr) => write!(f, "{}", expr.value),
+            Self::Null(_token) => write!(f, "null"),
             Self::Call(expr) => write!(
                 f,
                 "{}({})",

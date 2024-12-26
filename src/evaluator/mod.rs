@@ -140,6 +140,14 @@ fn eval_string_infix_expression(operator: &Operator, a: &StringObj, b: &StringOb
     }
 }
 
+fn eval_null_infix_expression(operator: &Operator) -> Object {
+    match operator {
+        Operator::Eq => Object::new_boolean(true),
+        Operator::NotEq => Object::new_boolean(false),
+        _ => Object::Error(format!("unknown string operator: {operator}",)),
+    }
+}
+
 fn eval_hash_literal(expr: &HashLiteral, env: Env) -> Rc<Object> {
     let mut pairs = HashMap::new();
 
@@ -170,6 +178,7 @@ fn eval_infix_expression(operator: &Operator, left: Rc<Object>, right: Rc<Object
         (Object::Integer(a), Object::Integer(b)) => eval_integer_infix_expression(operator, a, b),
         (Object::Boolean(a), Object::Boolean(b)) => eval_boolean_infix_expression(operator, a, b),
         (Object::String(a), Object::String(b)) => eval_string_infix_expression(operator, a, b),
+        (Object::Null, Object::Null) => eval_null_infix_expression(operator),
         (a, b) if a.kind() != b.kind() => Object::Error(format!(
             "type mismatch: {} {operator} {}",
             left.kind(),
@@ -231,6 +240,7 @@ fn eval_expressions(expressions: &[Expression], env: Env) -> Vec<Rc<Object>> {
 fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
     match expression {
         Expression::Boolean(expr) => Rc::new(Object::new_boolean(expr.value)),
+        Expression::Null(_token) => Rc::new(Object::Null),
         Expression::Call(expr) => {
             let func = eval_expression(&expr.function, env.clone());
             if let Object::Error(_) = *func {

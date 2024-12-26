@@ -101,6 +101,9 @@ impl<'a> Parser<'a> {
             .insert(TokenKind::False, Parser::parse_fn_boolean_literal);
         parser
             .prefix_parse_fns
+            .insert(TokenKind::Null, Parser::parse_fn_null_literal);
+        parser
+            .prefix_parse_fns
             .insert(TokenKind::Lparen, Parser::parse_fn_grouped_expression);
         parser
             .prefix_parse_fns
@@ -277,6 +280,10 @@ impl<'a> Parser<'a> {
             token: parser.curr_token.clone(),
             value,
         }))
+    }
+
+    fn parse_fn_null_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
+        Ok(Expression::Null(parser.curr_token.clone()))
     }
 
     fn parse_fn_function_literal(parser: &mut Parser) -> Result<Expression, ParserError> {

@@ -49,6 +49,7 @@ impl<'a> Lexer<'a> {
             "return" => self.new_token(TokenKind::Return, literal),
             "true" => self.new_token(TokenKind::True, literal),
             "false" => self.new_token(TokenKind::False, literal),
+            "null" => self.new_token(TokenKind::Null, literal),
             _ => self.new_token(TokenKind::Ident, literal),
         }
     }

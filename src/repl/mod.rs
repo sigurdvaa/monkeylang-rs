@@ -1,9 +1,11 @@
 use crate::evaluator::eval_program;
 use crate::lexer::Lexer;
-use crate::object::environment::Environment;
+use crate::object::environment::{Env, Environment};
 use crate::object::Object;
 use crate::parser::{Parser, ParserError};
 use std::io::{stdin, stdout, Stdout, Write};
+use std::iter::Peekable;
+use std::str::Chars;
 
 const PROMPT: &str = ">> ";
 const MONKEY_FACE: &str = concat!(
@@ -31,6 +33,29 @@ fn print_parser_errors(output: &mut Stdout, errors: &[ParserError]) {
     }
 }
 
+fn repl(input: Peekable<Chars<'_>>, output: &mut Stdout, env: Env) {
+    let lexer = Lexer::new(None, input);
+    let mut parser = Parser::new(lexer);
+    let program = parser.parse_program();
+
+    if !parser.errors.is_empty() {
+        print_parser_errors(output, &parser.errors);
+        return;
+    }
+
+    let eval = eval_program(&program, env.clone());
+    match *eval {
+        Object::None => (),
+        _ => writeln!(output, "{}", eval.inspect()).expect("writing to stdout failed"),
+    }
+}
+
+pub fn run_repl(input: Peekable<Chars<'_>>) {
+    let env = Environment::new();
+    let mut output = stdout();
+    repl(input, &mut output, env);
+}
+
 pub fn start_repl() {
     let input = stdin();
     let mut output = stdout();
@@ -43,21 +68,8 @@ pub fn start_repl() {
             .expect("failed to write prompt");
         output.flush().expect("failed to flush prompt");
 
-        input.read_line(&mut buf).expect("invalid input");
+        input.read_line(&mut buf).expect("reading input failed");
 
-        let lexer = Lexer::new(None, buf.chars().peekable());
-        let mut parser = Parser::new(lexer);
-        let program = parser.parse_program();
-
-        if !parser.errors.is_empty() {
-            print_parser_errors(&mut output, &parser.errors);
-            continue;
-        }
-
-        let eval = eval_program(&program, env.clone());
-        match *eval {
-            Object::None => (),
-            _ => writeln!(output, "{}", eval.inspect()).expect("writing to stdout failed"),
-        }
+        repl(buf.chars().peekable(), &mut output, env.clone())
     }
 }

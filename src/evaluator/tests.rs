@@ -67,6 +67,8 @@ fn test_eval_boolean_expression() {
         ("(\"foo\" == \"bar\") == false", true),
         ("(\"foo\" != \"bar\") == true", true),
         ("(\"foo\" == \"foo\") == true", true),
+        ("null == null", true),
+        ("null != null", false),
     ];
     for (test_input, test_value) in &tests {
         assert_eq!(*test_eval(test_input), Object::new_boolean(*test_value));
