@@ -1,20 +1,61 @@
 use crate::ast::{Expression, Program, Statement};
 
-pub fn modify_expression(expr: &mut Expression, func: &dyn Fn(&mut Expression)) {
+pub type ModifyFunc = fn(&mut Expression);
+
+pub fn modify_expression(expr: &mut Expression, func: ModifyFunc) {
     match expr {
         Expression::If(expr) => {
             func(&mut expr.condition);
-            modify_statements(&mut expr.consequence.statements, &func);
+            modify_statements(&mut expr.consequence.statements, func);
             if let Some(alt) = &mut expr.alternative {
                 modify_statements(&mut alt.statements, func);
             }
         }
-        Expression::Integer(_) => func(expr),
-        _ => todo!(),
+        Expression::Infix(sub) => {
+            func(&mut sub.left);
+            func(&mut sub.right);
+            func(expr);
+        }
+        Expression::Prefix(sub) => {
+            func(&mut sub.right);
+            func(expr);
+        }
+        Expression::Call(expr) => {
+            modify_expression(&mut expr.function, func);
+            modify_expressions(&mut expr.arguments, func);
+        }
+        Expression::Function(sub) => {
+            modify_statements(&mut sub.body.statements, func);
+            func(expr);
+        }
+        Expression::Array(expr) => {
+            modify_expressions(&mut expr.elements, func);
+        }
+        Expression::Index(expr) => {
+            func(&mut expr.left);
+            func(&mut expr.index);
+        }
+        Expression::Hash(expr) => {
+            // TODO: modify expression for key? will need to create new map
+            for (_key, value) in expr.pairs.iter_mut() {
+                func(value);
+            }
+        }
+        Expression::Null(_)
+        | Expression::Identifier(_)
+        | Expression::Integer(_)
+        | Expression::String(_)
+        | Expression::Boolean(_) => func(expr),
     }
 }
 
-pub fn modify_statement(stmt: &mut Statement, func: &dyn Fn(&mut Expression)) {
+pub fn modify_expressions(exprs: &mut [Expression], func: ModifyFunc) {
+    for expr in exprs {
+        modify_expression(expr, func);
+    }
+}
+
+pub fn modify_statement(stmt: &mut Statement, func: ModifyFunc) {
     match stmt {
         Statement::Let(stmt) => modify_expression(&mut stmt.value, func),
         Statement::Return(stmt) => modify_expression(&mut stmt.value, func),
@@ -22,13 +63,13 @@ pub fn modify_statement(stmt: &mut Statement, func: &dyn Fn(&mut Expression)) {
     }
 }
 
-pub fn modify_statements(stmts: &mut [Statement], func: &dyn Fn(&mut Expression)) {
+pub fn modify_statements(stmts: &mut [Statement], func: ModifyFunc) {
     for stmt in stmts {
-        modify_statement(stmt, &func);
+        modify_statement(stmt, func);
     }
 }
 
-pub fn modify_program(prog: &mut Program, func: &dyn Fn(&mut Expression)) {
+pub fn modify_program(prog: &mut Program, func: ModifyFunc) {
     modify_statements(&mut prog.statements, func);
 }
 
@@ -66,7 +107,7 @@ mod tests {
 
     #[test]
     fn test_modify() {
-        let turn_one_into_two: &dyn Fn(&mut Expression) = &|expr: &mut Expression| {
+        let turn_one_into_two: ModifyFunc = |expr: &mut Expression| {
             let int = match expr {
                 Expression::Integer(int) => int,
                 _ => return,
