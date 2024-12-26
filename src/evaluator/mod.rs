@@ -1,4 +1,6 @@
 mod builtins;
+mod quote_unquote;
+mod quote_unquote_tests;
 mod tests;
 
 use crate::ast::{
@@ -9,6 +11,7 @@ use crate::object::{
     environment::{Env, Environment},
     Array, BooleanObj, FunctionObj, HashKeyData, HashObj, Integer, IntegerObj, Object, StringObj,
 };
+use quote_unquote::quote;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -242,6 +245,11 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
         Expression::Boolean(expr) => Rc::new(Object::new_boolean(expr.value)),
         Expression::Null(_token) => Rc::new(Object::Null),
         Expression::Call(expr) => {
+            // TODO: replace with tokenkind? will have to add TokenKind::Quote
+            if expr.token.literal == "quote" {
+                return quote(expr.arguments[0].clone());
+            }
+
             let func = eval_expression(&expr.function, env.clone());
             if let Object::Error(_) = *func {
                 return func;

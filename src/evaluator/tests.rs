@@ -4,7 +4,7 @@ use super::*;
 use std::collections::HashMap;
 
 #[cfg(test)]
-fn test_eval(input: &str) -> Rc<Object> {
+pub fn test_eval(input: &str) -> Rc<Object> {
     use crate::lexer::Lexer;
     use crate::parser::Parser;
 
@@ -360,5 +360,25 @@ fn test_hash_index_expression() {
 
     for (test_input, test_value) in tests {
         assert_eq!(*test_eval(test_input), test_value);
+    }
+}
+
+#[test]
+fn test_quote() {
+    let tests = [
+        ("quote(5)", "5"),
+        ("quote(5 + 8)", "(5 + 8)"),
+        ("quote(foobar)", "foobar"),
+        ("quote(foobar + barfoo)", "(foobar + barfoo)"),
+    ];
+
+    for (test_input, test_value) in tests {
+        let eval = test_eval(test_input);
+        match eval.as_ref() {
+            Object::Quote(expr) => {
+                assert_eq!(expr.to_string(), test_value);
+            }
+            _ => panic!("object is not Quote, got {eval:?}"),
+        }
     }
 }

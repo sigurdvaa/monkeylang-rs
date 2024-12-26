@@ -61,6 +61,7 @@ pub fn start_repl() {
     let mut output = stdout();
     let env = Environment::new();
     loop {
+        // TODO: add history? will require tty raw mode
         let mut buf = String::new();
 
         output
@@ -69,7 +70,6 @@ pub fn start_repl() {
         output.flush().expect("failed to flush prompt");
 
         input.read_line(&mut buf).expect("reading input failed");
-
         repl(buf.chars().peekable(), &mut output, env.clone())
     }
 }

@@ -1,6 +1,6 @@
 pub mod environment;
 
-use crate::ast::{BlockStatement, IdentifierLiteral};
+use crate::ast::{BlockStatement, Expression, IdentifierLiteral};
 use environment::Env;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
@@ -57,6 +57,7 @@ pub enum Object {
     Builtin(BuiltinFunction),
     Array(Array),
     Hash(HashObj),
+    Quote(Expression),
 }
 
 impl fmt::Display for Object {
@@ -103,6 +104,7 @@ impl Object {
             Self::Builtin(_) => "BUILTIN",
             Self::Array(_) => "ARRAY",
             Self::Hash(_) => "HASH",
+            Self::Quote(_) => "QUOTE",
         }
     }
 
@@ -149,6 +151,7 @@ impl Object {
                         .join(", "),
                 )
             }
+            Self::Quote(expr) => format!("QUOTE({expr})"),
         }
     }
 

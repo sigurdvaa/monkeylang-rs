@@ -22,6 +22,7 @@ fn main() {
         }
         2 => {
             let file_path = args[1].as_str();
+            // TODO: replace with iter of chars in file?
             let input = std::fs::read_to_string(file_path).unwrap_or_else(|err| {
                 println!("Error reading file '{file_path}': {err}");
                 std::process::exit(1);

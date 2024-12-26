@@ -1,3 +1,5 @@
+mod modify;
+
 use crate::token::Token;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -274,6 +276,7 @@ impl fmt::Display for Statement {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Program {
     pub statements: Vec<Statement>,
 }
