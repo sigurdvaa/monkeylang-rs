@@ -1,30 +1,70 @@
-use crate::ast::{Expression, Program, Statement};
-use crate::evaluator::Env;
+use crate::ast::{
+    modify::{modify_program, ModifierFunc},
+    Expression, Program, Statement,
+};
+use crate::evaluator::{eval_block_statement, Env};
 use crate::object::{FunctionObj, Object};
 use std::rc::Rc;
 
+use super::{eval_program, eval_statement};
+
 pub fn define_macros(prog: &mut Program, env: Env) {
     let mut defs = vec![];
+
     for (i, stmt) in prog.statements.iter().enumerate() {
-        match stmt {
-            Statement::Let(stmt) => match &stmt.value {
-                Expression::Macro(expr) => {
-                    let obj = Object::Macro(FunctionObj {
-                        parameters: expr.parameters.clone(),
-                        body: expr.body.clone(),
-                        env: env.clone(),
-                    });
-                    env.set(stmt.name.value.to_owned(), Rc::new(obj));
-                    defs.push(i);
-                }
-                _ => continue,
-            },
+        let stmt = match stmt {
+            Statement::Let(stmt) => stmt,
             _ => continue,
         };
+
+        let expr = match &stmt.value {
+            Expression::Macro(expr) => expr,
+            _ => continue,
+        };
+
+        let obj = Object::Macro(FunctionObj {
+            parameters: expr.parameters.clone(),
+            body: expr.body.clone(),
+            env: env.clone(),
+        });
+
+        env.set(stmt.name.value.to_owned(), Rc::new(obj));
+        defs.push(i);
     }
-    for i in defs.iter().rev() {
-        prog.statements.remove(*i);
+
+    for i in defs.into_iter().rev() {
+        prog.statements.remove(i);
     }
+}
+
+pub fn expand_macros(prog: &mut Program, env: Env) {
+    let expand: ModifierFunc = |expr: &mut Expression, env: &Env| {
+        let call = match expr {
+            Expression::Call(expr) => expr,
+            _ => return,
+        };
+
+        let ident = match call.function.as_ref() {
+            Expression::Identifier(expr) => expr,
+            _ => return,
+        };
+
+        let obj = match env.get(&ident.value) {
+            Some(obj) => obj,
+            _ => return,
+        };
+
+        let mac = match obj.as_ref() {
+            Object::Macro(obj) => obj,
+            _ => return,
+        };
+
+        let args = quote_args(mac);
+        let eval_env = extend_macro_env(mac, args);
+
+        let eval = eval_block_statement(&mac.body, eval_env);
+    };
+    modify_program(prog, expand, &env);
 }
 
 #[cfg(test)]
@@ -82,5 +122,27 @@ mod tests {
         assert_eq!(mac.parameters[0].value, "x");
         assert_eq!(mac.parameters[1].value, "y");
         assert_eq!(mac.body.to_string(), "(x + y)");
+    }
+
+    #[test]
+    fn test_expand_macros() {
+        let tests = [
+            (
+                "let infixExpression = macro() { quote(1 + 2); }; infixExpression();",
+                "(1 + 2)",
+            ),
+            (
+                "let reverse = macro(a, b) { quote(unquote(b) - unquote(a)); }; reverse(2 + 2, 10 - 5);",
+                "(10 - 5) - (2 + 2)",
+            ),
+        ];
+
+        for (test_input, test_value) in tests {
+            let mut program = parse_program(test_input, 2);
+            let env = Environment::new();
+            define_macros(&mut program, env);
+
+            todo!();
+        }
     }
 }
