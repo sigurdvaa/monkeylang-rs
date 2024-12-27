@@ -1,4 +1,4 @@
-mod modify;
+pub mod modify;
 
 use crate::token::Token;
 use std::collections::BTreeMap;
@@ -212,6 +212,26 @@ impl fmt::Display for Expression {
                 }
                 write!(f, "{{{buffer}}}")
             }
+        }
+    }
+}
+
+impl Expression {
+    pub fn get_token(&self) -> &Token {
+        match self {
+            Self::Boolean(expr) => &expr.token,
+            Self::Call(expr) => &expr.token,
+            Self::Function(expr) => &expr.token,
+            Self::Identifier(expr) => &expr.token,
+            Self::Null(token) => &token,
+            Self::If(expr) => &expr.token,
+            Self::Infix(expr) => &expr.token,
+            Self::Integer(expr) => &expr.token,
+            Self::Prefix(expr) => &expr.token,
+            Self::String(expr) => &expr.token,
+            Self::Array(expr) => &expr.token,
+            Self::Index(expr) => &expr.token,
+            Self::Hash(expr) => &expr.token,
         }
     }
 }

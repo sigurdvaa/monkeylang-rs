@@ -247,7 +247,7 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
         Expression::Call(expr) => {
             // TODO: replace with tokenkind? will have to add TokenKind::Quote
             if expr.token.literal == "quote" {
-                return quote(expr.arguments[0].clone());
+                return quote(expr.arguments[0].clone(), &env);
             }
 
             let func = eval_expression(&expr.function, env.clone());

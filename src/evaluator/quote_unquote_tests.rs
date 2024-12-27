@@ -28,6 +28,16 @@ fn test_quote_unquote() {
         ("quote(unquote(4 + 4))", "8"),
         ("quote(8 + unquote(4 + 4))", "(8 + 8)"),
         ("quote(unquote(4 + 4) + 8)", "(8 + 8)"),
+        ("let foobar = 8; quote(foobar)", "foobar"),
+        ("let foobar = 8; quote(unquote(foobar))", "8"),
+        ("quote(unquote(true))", "true"),
+        ("quote(unquote(true == false))", "false"),
+        ("quote(unquote(quote(4 + 4)))", "(4 + 4)"),
+        (
+            "let quotedInfixExpression = quote(4 + 4);
+            quote(unquote(4 + 4) + unquote(quotedInfixExpression))",
+            "(8 + (4 + 4))",
+        ),
     ];
 
     for (test_input, test_value) in tests {
