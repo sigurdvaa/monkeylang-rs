@@ -58,6 +58,7 @@ pub enum Object {
     Array(Array),
     Hash(HashObj),
     Quote(Expression),
+    Macro(FunctionObj),
 }
 
 impl fmt::Display for Object {
@@ -105,6 +106,7 @@ impl Object {
             Self::Array(_) => "ARRAY",
             Self::Hash(_) => "HASH",
             Self::Quote(_) => "QUOTE",
+            Self::Macro(_) => "MACRO",
         }
     }
 
@@ -116,21 +118,26 @@ impl Object {
             Self::Boolean(obj) => obj.value.to_string(),
             Self::Return(value) => value.inspect(),
             Self::Error(value) => format!("ERROR: {value}"),
-            Self::Function(func) => {
-                let mut buffer = String::from("fn(");
-                buffer.push_str(
-                    &func
-                        .parameters
-                        .iter()
-                        .map(|i| i.value.as_str())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                );
-                buffer.push_str(") {\n");
-                buffer.push_str(&func.body.to_string());
-                buffer.push_str("\n}");
-                buffer
-            }
+            Self::Function(func) => format!(
+                "fn({}) {{\n{}\n}}",
+                &func
+                    .parameters
+                    .iter()
+                    .map(|i| i.value.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                &func.body.to_string()
+            ),
+            Self::Macro(func) => format!(
+                "macro({}) {{\n{}\n}}",
+                &func
+                    .parameters
+                    .iter()
+                    .map(|i| i.value.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                &func.body.to_string()
+            ),
             Self::String(obj) => format!("\"{}\"", obj.value.replace("\"", "\\\"")),
             Self::Builtin(_) => "builtin function".into(),
             Self::Array(value) => format!(
