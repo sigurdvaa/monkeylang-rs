@@ -120,6 +120,9 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::Lbrace, Parser::parse_fn_hash_literal);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Macro, Parser::parse_fn_macro_literal);
 
         parser
             .infix_parse_fns
@@ -296,6 +299,22 @@ impl<'a> Parser<'a> {
         let body = parser.parse_block_statement()?;
 
         Ok(Expression::Function(FunctionLiteral {
+            token,
+            parameters,
+            body,
+        }))
+    }
+
+    fn parse_fn_macro_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+
+        parser.expect_token(TokenKind::Lparen)?;
+        let parameters = parser.parse_function_parameters()?;
+
+        parser.expect_token(TokenKind::Lbrace)?;
+        let body = parser.parse_block_statement()?;
+
+        Ok(Expression::Macro(FunctionLiteral {
             token,
             parameters,
             body,

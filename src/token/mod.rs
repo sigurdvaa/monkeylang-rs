@@ -42,6 +42,7 @@ pub enum TokenKind {
     Return,
     True,
     False,
+    Macro,
 }
 
 impl fmt::Display for TokenKind {

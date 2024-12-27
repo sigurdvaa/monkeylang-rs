@@ -758,14 +758,14 @@ fn test_parsing_hash_literals_with_expressions() {
             &stmt.value
         }
         _ => panic!(
-            "not a valid expression statement, got: {}",
+            "not a expression statement, got: {}",
             &program.statements[0]
         ),
     };
 
     let expr = match stmt_expr {
         Expression::Hash(expr) => expr,
-        _ => panic!("not a valid hash expression, got: {stmt_expr}"),
+        _ => panic!("not a hash expression, got: {stmt_expr}"),
     };
 
     assert_eq!(expr.pairs.len(), 3);
@@ -777,4 +777,47 @@ fn test_parsing_hash_literals_with_expressions() {
             panic!("not a string expression, got: {expr_key}");
         }
     }
+}
+
+#[test]
+fn test_macro_literal_parsing() {
+    let input = "macro(x, y) { x + y; }";
+    let program = parse_program(input, 1);
+
+    let stmt_expr = match &program.statements[0] {
+        Statement::Expression(stmt) => {
+            assert_eq!(stmt.token.kind, TokenKind::Macro);
+            assert_eq!(stmt.token.literal, "macro");
+            &stmt.value
+        }
+        _ => panic!(
+            "not an expression statement, got: {}",
+            &program.statements[0]
+        ),
+    };
+
+    let expr = match stmt_expr {
+        Expression::Macro(expr) => expr,
+        _ => panic!("not a macro expression, got: {stmt_expr}"),
+    };
+
+    assert_eq!(expr.parameters.len(), 2);
+    assert_identifier_literal(&expr.parameters[0], "x");
+    assert_identifier_literal(&expr.parameters[1], "y");
+
+    assert_eq!(expr.body.statements.len(), 1);
+    let body_stmt = match &expr.body.statements[0] {
+        Statement::Expression(stmt) => stmt,
+        _ => panic!(
+            "not an expression statement, got: {}",
+            expr.body.statements[0]
+        ),
+    };
+
+    assert_infix_expression(
+        &body_stmt.value,
+        &Literal::Ident("x"),
+        &Operator::Plus,
+        &Literal::Ident("y"),
+    );
 }

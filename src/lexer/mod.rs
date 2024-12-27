@@ -50,6 +50,7 @@ impl<'a> Lexer<'a> {
             "true" => self.new_token(TokenKind::True, literal),
             "false" => self.new_token(TokenKind::False, literal),
             "null" => self.new_token(TokenKind::Null, literal),
+            "macro" => self.new_token(TokenKind::Macro, literal),
             _ => self.new_token(TokenKind::Ident, literal),
         }
     }
@@ -225,6 +226,7 @@ mod tests {
             "\"foo\\\\bar\";\n",
             "[1, 2];\n",
             "{\"foo\": \"bar\"}\n",
+            "macro(x, y) { x + y; };\n",
         );
 
         let mut lexer = Lexer::new(None, input.chars().peekable());
@@ -325,8 +327,21 @@ mod tests {
             create_token(27, 6, TokenKind::Colon, ":"),
             create_token(27, 8, TokenKind::String, "bar"),
             create_token(27, 12, TokenKind::Rbrace, "}"),
-            create_token(28, 1, TokenKind::EndOfFile, ""),
-            create_token(28, 1, TokenKind::EndOfFile, ""),
+            create_token(28, 1, TokenKind::Macro, "macro"),
+            create_token(28, 6, TokenKind::Lparen, "("),
+            create_token(28, 7, TokenKind::Ident, "x"),
+            create_token(28, 8, TokenKind::Comma, ","),
+            create_token(28, 10, TokenKind::Ident, "y"),
+            create_token(28, 11, TokenKind::Rparen, ")"),
+            create_token(28, 13, TokenKind::Lbrace, "{"),
+            create_token(28, 15, TokenKind::Ident, "x"),
+            create_token(28, 17, TokenKind::Plus, "+"),
+            create_token(28, 19, TokenKind::Ident, "y"),
+            create_token(28, 20, TokenKind::Semicolon, ";"),
+            create_token(28, 22, TokenKind::Rbrace, "}"),
+            create_token(28, 23, TokenKind::Semicolon, ";"),
+            create_token(29, 1, TokenKind::EndOfFile, ""),
+            create_token(29, 1, TokenKind::EndOfFile, ""),
         ];
 
         for token in tests {

@@ -269,6 +269,7 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
             body: expr.body.clone(),
             env: env.clone(),
         })),
+        Expression::Macro(expr) => todo!(),
         Expression::Identifier(expr) => eval_identifier(expr, env),
         Expression::If(expr) => eval_if_expression(expr, env),
         Expression::Infix(expr) => {
