@@ -1,6 +1,6 @@
 use crate::evaluator::{
     eval_program,
-    macro_expansion::{define_macros, expand_macros},
+    r#macro::{define_macros, expand_macros},
 };
 use crate::lexer::Lexer;
 use crate::object::environment::{Env, Environment};
