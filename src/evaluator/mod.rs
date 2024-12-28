@@ -1,5 +1,5 @@
 mod builtins;
-mod macro_expansion;
+pub mod macro_expansion;
 mod quote_unquote;
 mod tests;
 

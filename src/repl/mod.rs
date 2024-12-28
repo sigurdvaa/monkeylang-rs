@@ -1,4 +1,7 @@
-use crate::evaluator::eval_program;
+use crate::evaluator::{
+    eval_program,
+    macro_expansion::{define_macros, expand_macros},
+};
 use crate::lexer::Lexer;
 use crate::object::environment::{Env, Environment};
 use crate::object::Object;
@@ -33,15 +36,18 @@ fn print_parser_errors(output: &mut Stdout, errors: &[ParserError]) {
     }
 }
 
-fn repl(input: Peekable<Chars<'_>>, output: &mut Stdout, env: Env) {
+fn repl(input: Peekable<Chars<'_>>, output: &mut Stdout, env: Env, macro_env: Env) {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
-    let program = parser.parse_program();
+    let mut program = parser.parse_program();
 
     if !parser.errors.is_empty() {
         print_parser_errors(output, &parser.errors);
         return;
     }
+
+    define_macros(&mut program, macro_env.clone());
+    expand_macros(&mut program, macro_env);
 
     let eval = eval_program(&program, env.clone());
     match *eval {
@@ -52,14 +58,16 @@ fn repl(input: Peekable<Chars<'_>>, output: &mut Stdout, env: Env) {
 
 pub fn run_repl(input: Peekable<Chars<'_>>) {
     let env = Environment::new();
+    let macro_env = Environment::new();
     let mut output = stdout();
-    repl(input, &mut output, env);
+    repl(input, &mut output, env, macro_env);
 }
 
 pub fn start_repl() {
     let input = stdin();
     let mut output = stdout();
     let env = Environment::new();
+    let macro_env = Environment::new();
     loop {
         // TODO: add history? will require tty raw mode
         let mut buf = String::new();
@@ -70,6 +78,11 @@ pub fn start_repl() {
         output.flush().expect("failed to flush prompt");
 
         input.read_line(&mut buf).expect("reading input failed");
-        repl(buf.chars().peekable(), &mut output, env.clone())
+        repl(
+            buf.chars().peekable(),
+            &mut output,
+            env.clone(),
+            macro_env.clone(),
+        )
     }
 }
