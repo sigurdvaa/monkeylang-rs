@@ -173,16 +173,16 @@ impl fmt::Display for Expression {
                 if let Some(alternative) = &expr.alternative {
                     write!(
                         f,
-                        "if {} {} else {alternative}",
+                        "if ({}) {{ {} }} else {{ {alternative} }}",
                         expr.condition, expr.consequence
                     )
                 } else {
-                    write!(f, "if {} {}", expr.condition, expr.consequence)
+                    write!(f, "if ({}) {{ {} }}", expr.condition, expr.consequence)
                 }
             }
             Self::Function(expr) | Self::Macro(expr) => write!(
                 f,
-                "{}({}) {}",
+                "{}({}) {{ {} }}",
                 expr.token.literal,
                 expr.parameters
                     .iter()

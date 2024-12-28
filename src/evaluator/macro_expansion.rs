@@ -1,12 +1,14 @@
-use crate::ast::{
-    modify::{modify_program, ModifierFunc},
-    Expression, Program, Statement,
-};
+use crate::ast::CallExpression;
 use crate::evaluator::{eval_block_statement, Env};
 use crate::object::{FunctionObj, Object};
+use crate::{
+    ast::{
+        modify::{modify_program, ModifierFunc},
+        Expression, Program, Statement,
+    },
+    object::environment::Environment,
+};
 use std::rc::Rc;
-
-use super::{eval_program, eval_statement};
 
 pub fn define_macros(prog: &mut Program, env: Env) {
     let mut defs = vec![];
@@ -37,6 +39,22 @@ pub fn define_macros(prog: &mut Program, env: Env) {
     }
 }
 
+fn quote_args(call: &CallExpression) -> Vec<Rc<Object>> {
+    let mut args = vec![];
+    for arg in &call.arguments {
+        args.push(Rc::new(Object::Quote(arg.clone())));
+    }
+    args
+}
+
+fn extend_macro_env(macr: &FunctionObj, args: Vec<Rc<Object>>) -> Env {
+    let extended = Environment::new_enclosed(&macr.env);
+    for (i, param) in macr.parameters.iter().enumerate() {
+        extended.set(param.value.to_owned(), args[i].to_owned());
+    }
+    extended
+}
+
 pub fn expand_macros(prog: &mut Program, env: Env) {
     let expand: ModifierFunc = |expr: &mut Expression, env: &Env| {
         let call = match expr {
@@ -54,15 +72,20 @@ pub fn expand_macros(prog: &mut Program, env: Env) {
             _ => return,
         };
 
-        let mac = match obj.as_ref() {
+        let macr = match obj.as_ref() {
             Object::Macro(obj) => obj,
             _ => return,
         };
 
-        let args = quote_args(mac);
-        let eval_env = extend_macro_env(mac, args);
+        let args = quote_args(call);
+        let eval_env = extend_macro_env(macr, args);
 
-        let eval = eval_block_statement(&mac.body, eval_env);
+        let eval = eval_block_statement(&macr.body, eval_env);
+        let new_expr = match eval.as_ref() {
+            Object::Quote(expr) => expr,
+            _ => panic!("returning AST expressions only supported form macros"),
+        };
+        *expr = new_expr.to_owned();
     };
     modify_program(prog, expand, &env);
 }
@@ -127,22 +150,34 @@ mod tests {
     #[test]
     fn test_expand_macros() {
         let tests = [
+            // (
+            //     "let infixExpression = macro() { quote(1 + 2); }; infixExpression();",
+            //     "(1 + 2)",
+            // ),
+            // (
+            //     "let reverse = macro(a, b) { quote(unquote(b) - unquote(a)); }; reverse(2 + 2, 10 - 5);",
+            //     "((10 - 5) - (2 + 2))",
+            // ),
             (
-                "let infixExpression = macro() { quote(1 + 2); }; infixExpression();",
-                "(1 + 2)",
-            ),
-            (
-                "let reverse = macro(a, b) { quote(unquote(b) - unquote(a)); }; reverse(2 + 2, 10 - 5);",
-                "(10 - 5) - (2 + 2)",
+                r#"let unless = macro(condition, consequence, alternative) {
+                    quote(if (!(unquote(condition))) {
+                        unquote(consequence);
+                    } else {
+                        unquote(alternative);
+                    });
+                };
+
+                unless(10 > 5, puts("not greater"), puts("greater"));"#,
+                r#"if (!(10 > 5)) { puts("not greater") } else { puts("greater") }"#,
             ),
         ];
 
         for (test_input, test_value) in tests {
-            let mut program = parse_program(test_input, 2);
+            let mut prog = parse_program(test_input, 2);
             let env = Environment::new();
-            define_macros(&mut program, env);
-
-            todo!();
+            define_macros(&mut prog, env.clone());
+            expand_macros(&mut prog, env);
+            assert_eq!(prog.to_string(), test_value);
         }
     }
 }
