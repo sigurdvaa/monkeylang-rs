@@ -11,7 +11,7 @@ enum Literal {
 }
 
 #[cfg(test)]
-fn parse_program(input: &str, statements: usize) -> Program {
+pub fn parse_program(input: &str, statements: usize) -> Program {
     let lexer = Lexer::new(None, input.chars().peekable());
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();

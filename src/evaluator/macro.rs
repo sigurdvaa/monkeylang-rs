@@ -1,7 +1,7 @@
 use super::{eval_block_statement, eval_expression, Env, Environment};
 use crate::ast::{
     modify::{modify_expression, modify_program, ModifierFunc},
-    *,
+    BooleanLiteral, CallExpression, Expression, IntegerLiteral, Program, Statement, StringLiteral,
 };
 use crate::object::{FunctionObj, Object};
 use std::rc::Rc;
@@ -124,4 +124,123 @@ pub fn expand_macros(prog: &mut Program, env: Env) {
         *expr = new_expr.to_owned();
     };
     modify_program(prog, expand, &env);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::evaluator::tests::test_eval;
+    use crate::parser::tests::parse_program;
+
+    #[test]
+    fn test_quote() {
+        let tests = [
+            ("quote(5)", "5"),
+            ("quote(5 + 8)", "(5 + 8)"),
+            ("quote(foobar)", "foobar"),
+            ("quote(foobar + barfoo)", "(foobar + barfoo)"),
+        ];
+
+        for (test_input, test_value) in tests {
+            let eval = test_eval(test_input);
+            match eval.as_ref() {
+                Object::Quote(expr) => {
+                    assert_eq!(expr.to_string(), test_value);
+                }
+                _ => panic!("object is not Quote, got {eval:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_quote_unquote() {
+        let tests = [
+            ("quote(unquote(4))", "4"),
+            ("quote(unquote(4 + 4))", "8"),
+            ("quote(8 + unquote(4 + 4))", "(8 + 8)"),
+            ("quote(unquote(4 + 4) + 8)", "(8 + 8)"),
+            ("let foobar = 8; quote(foobar)", "foobar"),
+            ("let foobar = 8; quote(unquote(foobar))", "8"),
+            ("quote(unquote(true))", "true"),
+            ("quote(unquote(true == false))", "false"),
+            ("quote(unquote(quote(4 + 4)))", "(4 + 4)"),
+            (
+                "let quotedInfixExpression = quote(4 + 4);
+            quote(unquote(4 + 4) + unquote(quotedInfixExpression))",
+                "(8 + (4 + 4))",
+            ),
+        ];
+
+        for (test_input, test_value) in tests {
+            let eval = test_eval(test_input);
+            match eval.as_ref() {
+                Object::Quote(expr) => {
+                    assert_eq!(expr.to_string(), test_value);
+                }
+                _ => panic!("object is not Quote, got {eval:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_define_macros() {
+        let input = concat!(
+            "let number = 1;\n",
+            "let function = fn(x, y) { x + y };\n",
+            "let mymacro = macro(x, y) { x + y; };\n",
+        );
+        let mut program = parse_program(input, 3);
+
+        let env = Environment::new();
+        define_macros(&mut program, env.clone());
+
+        assert_eq!(program.statements.len(), 2);
+        assert_eq!(env.get("number"), None);
+        assert_eq!(env.get("function"), None);
+
+        let mac = env.get("mymacro").expect("macro not defined in env");
+        let mac = match mac.as_ref() {
+            Object::Macro(obj) => obj,
+            _ => panic!("not a Macro object, got {mac:?}"),
+        };
+
+        assert_eq!(mac.parameters.len(), 2);
+        assert_eq!(mac.parameters[0].value, "x");
+        assert_eq!(mac.parameters[1].value, "y");
+        assert_eq!(mac.body.to_string(), "(x + y)");
+    }
+
+    #[test]
+    fn test_expand_macros() {
+        let tests = [
+            (
+                "let infixExpression = macro() { quote(1 + 2); }; infixExpression();",
+                "(1 + 2)",
+            ),
+            (
+                "let reverse = macro(a, b) { quote(unquote(b) - unquote(a)); }; reverse(2 + 2, 10 - 5);",
+                "((10 - 5) - (2 + 2))",
+            ),
+            (
+                r#"let unless = macro(condition, consequence, alternative) {
+                    quote(if (!(unquote(condition))) {
+                        unquote(consequence);
+                    } else {
+                        unquote(alternative);
+                    });
+                };
+
+                unless(10 > 5, puts("not greater"), puts("greater"));"#,
+                r#"if ((!(10 > 5))) { puts("not greater") } else { puts("greater") }"#,
+            ),
+        ];
+
+        for (test_input, test_value) in tests {
+            let mut prog = parse_program(test_input, 2);
+            let env = Environment::new();
+            define_macros(&mut prog, env.clone());
+            expand_macros(&mut prog, env);
+            assert_eq!(prog.to_string(), test_value);
+        }
+    }
 }

@@ -1,4 +1,4 @@
-mod tests;
+pub mod tests;
 
 use crate::ast::*;
 use crate::lexer::Lexer;

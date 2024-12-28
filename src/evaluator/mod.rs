@@ -1,6 +1,6 @@
 mod builtins;
 pub mod r#macro;
-mod tests;
+pub mod tests;
 
 use crate::ast::{
     BlockStatement, Expression, HashLiteral, IdentifierLiteral, IfExpression, Operator, Program,

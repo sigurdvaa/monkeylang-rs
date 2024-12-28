@@ -2,7 +2,7 @@ use crate::ast::{Expression, Program, Statement};
 use crate::object::environment::Env;
 use std::collections::BTreeMap;
 
-pub type ModifierFunc = fn(&mut Expression, env: &Env);
+pub type ModifierFunc = fn(&mut Expression, &Env);
 
 pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, env: &Env) {
     match expr {
