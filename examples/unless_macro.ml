@@ -5,5 +5,6 @@ let unless = macro(condition, consequence, alternative) {
         unquote(alternative);
     });
 };
-
-unless(10 > 5, puts("not greater"), puts("greater"));
+let a = 10;
+let b = 5;
+unless(a > b, puts(b, " is not greater than ", a), puts(a, " is greater than ", b));

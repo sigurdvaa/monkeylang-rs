@@ -87,7 +87,7 @@ fn eval_index_expression(left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
             eval_hash_index_expression(left, &hash_key)
         }
         _ => Rc::new(Object::Error(format!(
-            "index operator not supported: {}",
+            "index operator not supported for: {}",
             left.kind()
         ))),
     }
@@ -142,11 +142,12 @@ fn eval_string_infix_expression(operator: &Operator, a: &StringObj, b: &StringOb
     }
 }
 
-fn eval_null_infix_expression(operator: &Operator) -> Object {
+fn eval_null_infix_expression(operator: &Operator, other: &Object) -> Object {
+    let truth = matches!(other, Object::Null);
     match operator {
-        Operator::Eq => Object::new_boolean(true),
-        Operator::NotEq => Object::new_boolean(false),
-        _ => Object::Error(format!("unknown string operator: {operator}",)),
+        Operator::Eq => Object::new_boolean(truth),
+        Operator::NotEq => Object::new_boolean(!truth),
+        _ => Object::Error(format!("unknown null operator: {operator}",)),
     }
 }
 
@@ -180,7 +181,9 @@ fn eval_infix_expression(operator: &Operator, left: Rc<Object>, right: Rc<Object
         (Object::Integer(a), Object::Integer(b)) => eval_integer_infix_expression(operator, a, b),
         (Object::Boolean(a), Object::Boolean(b)) => eval_boolean_infix_expression(operator, a, b),
         (Object::String(a), Object::String(b)) => eval_string_infix_expression(operator, a, b),
-        (Object::Null, Object::Null) => eval_null_infix_expression(operator),
+        (Object::Null, other) | (other, Object::Null) => {
+            eval_null_infix_expression(operator, other)
+        }
         (a, b) if a.kind() != b.kind() => Object::Error(format!(
             "type mismatch: {} {operator} {}",
             left.kind(),
@@ -204,7 +207,10 @@ fn eval_prefix_expression(operator: &Operator, right: Rc<Object>) -> Rc<Object> 
 
 fn is_truthy(object: Rc<Object>) -> bool {
     match object.as_ref() {
-        Object::Integer(_) => true,
+        Object::Integer(obj) => obj.value > 0,
+        Object::String(obj) => !obj.value.is_empty(),
+        Object::Array(value) => !value.is_empty(),
+        Object::Hash(value) => !value.is_empty(),
         Object::Boolean(obj) => obj.value,
         _ => false,
     }

@@ -8,6 +8,7 @@ use crate::object::Object;
 use crate::parser::{Parser, ParserError};
 use std::io::{stdin, stdout, Stdout, Write};
 use std::iter::Peekable;
+use std::rc::Rc;
 use std::str::Chars;
 
 const PROMPT: &str = ">> ";
@@ -36,31 +37,27 @@ fn print_parser_errors(output: &mut Stdout, errors: &[ParserError]) {
     }
 }
 
-fn repl(input: Peekable<Chars<'_>>, output: &mut Stdout, env: Env, macro_env: Env) {
+fn repl(input: Peekable<Chars<'_>>, output: &mut Stdout, env: Env, macro_env: Env) -> Rc<Object> {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
 
     if !parser.errors.is_empty() {
         print_parser_errors(output, &parser.errors);
-        return;
+        return Rc::new(Object::None);
     }
 
     define_macros(&mut program, macro_env.clone());
     expand_macros(&mut program, macro_env);
 
-    let eval = eval_program(&program, env.clone());
-    match *eval {
-        Object::None => (),
-        _ => writeln!(output, "{}", eval.inspect()).expect("writing to stdout failed"),
-    }
+    eval_program(&program, env.clone())
 }
 
 pub fn run_repl(input: Peekable<Chars<'_>>) {
     let env = Environment::new();
     let macro_env = Environment::new();
     let mut output = stdout();
-    repl(input, &mut output, env, macro_env);
+    let _ = repl(input, &mut output, env, macro_env);
 }
 
 pub fn start_repl() {
@@ -78,11 +75,16 @@ pub fn start_repl() {
         output.flush().expect("failed to flush prompt");
 
         input.read_line(&mut buf).expect("reading input failed");
-        repl(
+        let eval = repl(
             buf.chars().peekable(),
             &mut output,
             env.clone(),
             macro_env.clone(),
-        )
+        );
+
+        match *eval {
+            Object::None => (),
+            _ => writeln!(output, "{}", eval.inspect()).expect("writing to stdout failed"),
+        }
     }
 }

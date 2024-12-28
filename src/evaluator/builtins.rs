@@ -11,6 +11,7 @@ pub fn get(name: &str) -> Option<Rc<Object>> {
         "push" => Some(Rc::new(Object::Builtin(push))),
         "map" => Some(Rc::new(Object::Builtin(map))),
         "puts" => Some(Rc::new(Object::Builtin(puts))),
+        "string" => Some(Rc::new(Object::Builtin(string))),
         _ => None,
     }
 }
@@ -91,9 +92,9 @@ fn rest(args: &[Rc<Object>]) -> Rc<Object> {
 }
 
 fn push(args: &[Rc<Object>]) -> Rc<Object> {
-    if args.len() != 2 {
+    if args.len() != 2 && args.len() != 3 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments. got={}, want=2",
+            "wrong number of arguments. got={}, want=2 or 3",
             args.len()
         )));
     }
@@ -101,13 +102,24 @@ fn push(args: &[Rc<Object>]) -> Rc<Object> {
     Rc::new(match &*args[0] {
         Object::Array(value) => {
             let mut new = value.clone();
-            new.push(args[1].clone());
+            if args.len() == 3 {
+                match &*args[2] {
+                    Object::Integer(i) => new.insert(i.value as usize, args[1].clone()),
+                    _ => {
+                        return Rc::new(Object::Error(format!(
+                            "3rd argument to \"push\" not supported, got {}, want=INTEGER",
+                            args[2].kind()
+                        )))
+                    }
+                }
+            } else {
+                new.push(args[1].clone());
+            }
             Object::Array(new)
         }
         _ => Object::Error(format!(
-            "argument to \"push\" not supported, got {} and {}",
-            args[0].kind(),
-            args[1].kind()
+            "argument to \"push\" not supported, got {}",
+            args.iter().map(|v| v.kind()).collect::<Vec<_>>().join(", ")
         )),
     })
 }
@@ -141,11 +153,36 @@ fn puts(args: &[Rc<Object>]) -> Rc<Object> {
     for arg in args {
         match arg.as_ref() {
             Object::String(_) => {
-                writeln!(output, "{arg}").expect("builtin \"puts\" failed writing to stdout")
+                write!(output, "{arg}").expect("builtin \"puts\" failed writing to stdout")
             }
-            _ => writeln!(output, "{}", arg.inspect())
+            _ => write!(output, "{}", arg.inspect())
                 .expect("builtin \"puts\" failed writing to stdout"),
         }
     }
     Rc::new(Object::None)
+}
+
+fn string(args: &[Rc<Object>]) -> Rc<Object> {
+    if args.len() != 1 {
+        return Rc::new(Object::Error(format!(
+            "wrong number of arguments. got={}, want=1",
+            args.len()
+        )));
+    }
+
+    Rc::new(match &*args[0] {
+        Object::String(obj) => Object::new_string(obj.value.clone()),
+        Object::Integer(obj) => Object::new_string(obj.value.to_string()),
+        Object::Array(value) => Object::new_string(
+            value
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(", "),
+        ),
+        _ => Object::Error(format!(
+            "argument to \"string\" not supported, got {}",
+            args[0].kind()
+        )),
+    })
 }
