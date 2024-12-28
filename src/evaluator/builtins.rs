@@ -94,7 +94,7 @@ fn rest(args: &[Rc<Object>]) -> Rc<Object> {
 fn push(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 2 && args.len() != 3 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments. got={}, want=2 or 3",
+            "wrong number of arguments, got={}, want=2 or 3",
             args.len()
         )));
     }
@@ -127,7 +127,7 @@ fn push(args: &[Rc<Object>]) -> Rc<Object> {
 fn map(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 2 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments. got={}, want=2",
+            "wrong number of arguments, got={}, want=2",
             args.len()
         )));
     }
@@ -165,7 +165,7 @@ fn puts(args: &[Rc<Object>]) -> Rc<Object> {
 fn string(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments. got={}, want=1",
+            "wrong number of arguments, got={}, want=1",
             args.len()
         )));
     }
