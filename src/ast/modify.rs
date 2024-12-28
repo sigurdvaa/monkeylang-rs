@@ -7,44 +7,56 @@ pub type ModifierFunc = fn(&mut Expression, env: &Env);
 pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, env: &Env) {
     match expr {
         Expression::If(expr) => {
-            func(&mut expr.condition, env);
+            // func(&mut expr.condition, env);
+            modify_expression(&mut expr.condition, func, env);
             modify_statements(&mut expr.consequence.statements, func, env);
             if let Some(alt) = &mut expr.alternative {
                 modify_statements(&mut alt.statements, func, env);
             }
         }
-        Expression::Infix(sub) => {
-            func(&mut sub.left, env);
-            func(&mut sub.right, env);
+        Expression::Infix(expr) => {
+            // func(&mut expr.left, env);
+            // func(&mut expr.right, env);
+            modify_expression(&mut expr.left, func, env);
+            modify_expression(&mut expr.right, func, env);
         }
-        Expression::Prefix(sub) => {
-            func(&mut sub.right, env);
+        Expression::Prefix(expr) => {
+            // TODO: remove
+            // func(&mut sub.right, env);
+            modify_expression(&mut expr.right, func, env);
         }
         Expression::Call(expr) => {
             modify_expression(&mut expr.function, func, env);
             modify_expressions(&mut expr.arguments, func, env);
         }
-        Expression::Function(sub) => {
-            modify_statements(&mut sub.body.statements, func, env);
+        Expression::Function(expr) => {
+            modify_statements(&mut expr.body.statements, func, env);
         }
         Expression::Array(expr) => {
             modify_expressions(&mut expr.elements, func, env);
         }
         Expression::Index(expr) => {
-            func(&mut expr.left, env);
-            func(&mut expr.index, env);
+            // func(&mut expr.left, env);
+            // func(&mut expr.index, env);
+            modify_expression(&mut expr.left, func, env);
+            modify_expression(&mut expr.index, func, env);
         }
         Expression::Hash(expr) => {
             let mut new_pairs = BTreeMap::new();
             for (key, value) in expr.pairs.iter_mut() {
                 let mut key = key.clone();
-                func(&mut key, env);
-                func(value, env);
+                modify_expression(&mut key, func, env);
+                modify_expression(value, func, env);
                 new_pairs.insert(key, value.to_owned());
             }
             expr.pairs = new_pairs;
         }
-        _ => (),
+        Expression::Boolean(_)
+        | Expression::Integer(_)
+        | Expression::String(_)
+        | Expression::Identifier(_)
+        | Expression::Macro(_)
+        | Expression::Null(_) => (),
     }
     func(expr, env);
     // TODO: return Expression?

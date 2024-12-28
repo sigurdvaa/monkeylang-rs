@@ -29,7 +29,6 @@ fn eval_unquote_calls(expr: &mut Expression, env: &Env) {
             Expression::Call(expr) if expr.token.literal == "unquote" => expr,
             _ => return,
         };
-        dbg!(&call);
         if call.arguments.len() != 1 {
             return;
         }

@@ -83,7 +83,7 @@ pub fn expand_macros(prog: &mut Program, env: Env) {
         let eval = eval_block_statement(&macr.body, eval_env);
         let new_expr = match eval.as_ref() {
             Object::Quote(expr) => expr,
-            _ => panic!("returning AST expressions only supported form macros"),
+            _ => panic!("returning AST expressions only supported from macros"),
         };
         *expr = new_expr.to_owned();
     };
@@ -150,14 +150,14 @@ mod tests {
     #[test]
     fn test_expand_macros() {
         let tests = [
-            // (
-            //     "let infixExpression = macro() { quote(1 + 2); }; infixExpression();",
-            //     "(1 + 2)",
-            // ),
-            // (
-            //     "let reverse = macro(a, b) { quote(unquote(b) - unquote(a)); }; reverse(2 + 2, 10 - 5);",
-            //     "((10 - 5) - (2 + 2))",
-            // ),
+            (
+                "let infixExpression = macro() { quote(1 + 2); }; infixExpression();",
+                "(1 + 2)",
+            ),
+            (
+                "let reverse = macro(a, b) { quote(unquote(b) - unquote(a)); }; reverse(2 + 2, 10 - 5);",
+                "((10 - 5) - (2 + 2))",
+            ),
             (
                 r#"let unless = macro(condition, consequence, alternative) {
                     quote(if (!(unquote(condition))) {
@@ -168,7 +168,7 @@ mod tests {
                 };
 
                 unless(10 > 5, puts("not greater"), puts("greater"));"#,
-                r#"if (!(10 > 5)) { puts("not greater") } else { puts("greater") }"#,
+                r#"if ((!(10 > 5))) { puts("not greater") } else { puts("greater") }"#,
             ),
         ];
 
