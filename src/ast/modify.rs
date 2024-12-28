@@ -7,7 +7,6 @@ pub type ModifierFunc = fn(&mut Expression, env: &Env);
 pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, env: &Env) {
     match expr {
         Expression::If(expr) => {
-            // func(&mut expr.condition, env);
             modify_expression(&mut expr.condition, func, env);
             modify_statements(&mut expr.consequence.statements, func, env);
             if let Some(alt) = &mut expr.alternative {
@@ -15,14 +14,10 @@ pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, env: &Env) {
             }
         }
         Expression::Infix(expr) => {
-            // func(&mut expr.left, env);
-            // func(&mut expr.right, env);
             modify_expression(&mut expr.left, func, env);
             modify_expression(&mut expr.right, func, env);
         }
         Expression::Prefix(expr) => {
-            // TODO: remove
-            // func(&mut sub.right, env);
             modify_expression(&mut expr.right, func, env);
         }
         Expression::Call(expr) => {
@@ -36,8 +31,6 @@ pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, env: &Env) {
             modify_expressions(&mut expr.elements, func, env);
         }
         Expression::Index(expr) => {
-            // func(&mut expr.left, env);
-            // func(&mut expr.index, env);
             modify_expression(&mut expr.left, func, env);
             modify_expression(&mut expr.index, func, env);
         }
@@ -59,7 +52,6 @@ pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, env: &Env) {
         | Expression::Null(_) => (),
     }
     func(expr, env);
-    // TODO: return Expression?
 }
 
 pub fn modify_expressions(exprs: &mut [Expression], func: ModifierFunc, env: &Env) {
