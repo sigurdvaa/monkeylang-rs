@@ -148,12 +148,14 @@ fn map(args: &[Rc<Object>]) -> Rc<Object> {
     })
 }
 
+// TODO: rework puts? print first arg, second arg to control flush
 fn puts(args: &[Rc<Object>]) -> Rc<Object> {
     let mut output = std::io::stdout().lock();
     for arg in args {
         match arg.as_ref() {
             Object::String(_) => {
-                write!(output, "{arg}").expect("builtin \"puts\" failed writing to stdout")
+                write!(output, "{arg}").expect("builtin \"puts\" failed writing to stdout");
+                let _ = output.flush();
             }
             _ => write!(output, "{}", arg.inspect())
                 .expect("builtin \"puts\" failed writing to stdout"),

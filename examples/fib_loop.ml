@@ -14,5 +14,9 @@ let fib = fn(n) {
     }
     return loop(2, 1, 1);
 }
+
+let n = 35;
+puts("Fibonacci of " + string(n) + ": " + string(fib(n)), "\n");
+
 let n = 92;
-puts("Fibonacci of " + string(n) + ": " + string(fib(n)));
+puts("Fibonacci of " + string(n) + ": " + string(fib(n)), "\n");

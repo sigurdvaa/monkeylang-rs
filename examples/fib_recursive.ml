@@ -7,5 +7,10 @@ let fib = fn(n) {
     }
     return fib(n-1) + fib(n-2);
 };
-let n = 25;
-puts("Fibonacci of " + string(n) + ": " + string(fib(n)));
+
+let n = 20;
+puts("Fibonacci of " + string(n) + ": " + string(fib(n)), "\n");
+
+let n = 35;
+puts("Fibonacci of " + string(n) + ": ");
+puts(string(fib(n)), "\n");
