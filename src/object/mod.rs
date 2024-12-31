@@ -13,25 +13,25 @@ pub type Array = Vec<Rc<Object>>;
 pub type HashObj = HashMap<HashKeyData, (Rc<Object>, Rc<Object>)>;
 type HashKey = RefCell<Option<HashKeyData>>;
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct IntegerObj {
     pub value: isize,
     hash: HashKey,
 }
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct BooleanObj {
     pub value: bool,
     hash: HashKey,
 }
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct StringObj {
     pub value: String,
     hash: HashKey,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionObj {
     pub parameters: Vec<IdentifierLiteral>,
     pub body: BlockStatement,
@@ -44,7 +44,7 @@ pub struct HashKeyData {
     value: usize,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Object {
     Null,
     None,
