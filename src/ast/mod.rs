@@ -182,7 +182,7 @@ impl fmt::Display for Expression {
             }
             Self::Function(expr) | Self::Macro(expr) => write!(
                 f,
-                "{}({}) {{ {} }}",
+                "{}({}) {{ {}}}",
                 expr.token.literal,
                 expr.parameters
                     .iter()
