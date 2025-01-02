@@ -6,6 +6,7 @@ use crate::ast::{
     BlockStatement, Expression, HashLiteral, IdentifierLiteral, IfExpression, Operator, Program,
     Statement,
 };
+use crate::object::TRUE;
 use crate::object::{
     environment::{Env, Environment},
     Array, BooleanObj, FunctionObj, HashKeyData, HashObj, Integer, IntegerObj, Object, StringObj,
@@ -233,7 +234,6 @@ fn eval_if_expression(expression: &IfExpression, env: Env) -> Rc<Object> {
 
 fn eval_expressions(expressions: &[Expression], env: Env) -> Vec<Rc<Object>> {
     let mut result = vec![];
-
     for expr in expressions {
         let eval = eval_expression(expr, env.clone());
         match *eval {
@@ -241,7 +241,6 @@ fn eval_expressions(expressions: &[Expression], env: Env) -> Vec<Rc<Object>> {
             _ => result.push(eval),
         }
     }
-
     result
 }
 

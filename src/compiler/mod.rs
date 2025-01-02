@@ -40,28 +40,28 @@ impl Compiler {
     }
 
     fn compile_expression(&mut self, expr: &Expression) -> Result<(), CompilerError> {
-        match expr {
+        let _ = match expr {
+            Expression::Boolean(expr) => match expr.value {
+                true => self.emit(Opcode::True, &[]),
+                false => self.emit(Opcode::False, &[]),
+            },
             Expression::Integer(expr) => {
                 let obj = Object::new_integer(expr.value as isize);
                 let operands = &[self.add_constant(obj)];
-                self.emit(Opcode::Constant, operands);
+                self.emit(Opcode::Constant, operands)
             }
             Expression::Infix(expr) => {
                 self.compile_expression(&expr.left)?;
                 self.compile_expression(&expr.right)?;
                 match expr.operator {
-                    Operator::Plus => {
-                        let _ = self.emit(Opcode::Add, &[]);
-                    }
-                    Operator::Minus => {
-                        let _ = self.emit(Opcode::Sub, &[]);
-                    }
-                    Operator::Asterisk => {
-                        let _ = self.emit(Opcode::Mul, &[]);
-                    }
-                    Operator::Slash => {
-                        let _ = self.emit(Opcode::Div, &[]);
-                    }
+                    Operator::Plus => self.emit(Opcode::Add, &[]),
+                    Operator::Minus => self.emit(Opcode::Sub, &[]),
+                    Operator::Asterisk => self.emit(Opcode::Mul, &[]),
+                    Operator::Slash => self.emit(Opcode::Div, &[]),
+                    Operator::Gt => self.emit(Opcode::Gt, &[]),
+                    Operator::Lt => self.emit(Opcode::Lt, &[]),
+                    Operator::Eq => self.emit(Opcode::Eq, &[]),
+                    Operator::NotEq => self.emit(Opcode::NotEq, &[]),
                     _ => {
                         return Err(CompilerError::UnknownOperator(format!(
                             "unknown infix operator: {}",
@@ -70,8 +70,21 @@ impl Compiler {
                     }
                 }
             }
+            Expression::Prefix(expr) => {
+                self.compile_expression(&expr.right)?;
+                match expr.operator {
+                    Operator::Bang => self.emit(Opcode::Bang, &[]),
+                    Operator::Minus => self.emit(Opcode::Minus, &[]),
+                    _ => {
+                        return Err(CompilerError::UnknownOperator(format!(
+                            "unknown prefix operator: {}",
+                            expr.operator
+                        )))
+                    }
+                }
+            }
             _ => todo!("{expr:?}"),
-        }
+        };
         Ok(())
     }
 
@@ -140,6 +153,24 @@ mod tests {
         }
     }
 
+    fn run_compiler_tests(tests: &[TestCase]) {
+        for test in tests {
+            let program = parse_program(test.input, test.statements);
+            let mut compiler = Compiler::new();
+
+            let _ = compiler
+                .compile_program(&program)
+                .map_err(|e| panic!("compile error: {e:?}"));
+
+            let bytecode = compiler.bytecode();
+            assert_eq!(bytecode.constants, test.constants);
+            assert_eq!(
+                bytecode.instructions.to_string(),
+                test.instructions.to_string()
+            );
+        }
+    }
+
     #[test]
     fn test_integer_arithmetic() {
         let tests = [
@@ -198,22 +229,112 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
+            TestCase::new(
+                "-1",
+                1,
+                vec![1],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Minus, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
         ];
+        run_compiler_tests(&tests);
+    }
 
-        for test in tests {
-            let program = parse_program(test.input, test.statements);
-            let mut compiler = Compiler::new();
-
-            let _ = compiler
-                .compile_program(&program)
-                .map_err(|e| panic!("compile error: {e:?}"));
-
-            let bytecode = compiler.bytecode();
-            assert_eq!(bytecode.constants, test.constants);
-            assert_eq!(
-                bytecode.instructions.to_string(),
-                test.instructions.to_string()
-            );
-        }
+    #[test]
+    fn test_boolean_expressions() {
+        let tests = [
+            TestCase::new(
+                "true",
+                1,
+                vec![],
+                vec![make_ins(Opcode::True, &[0]), make_ins(Opcode::Pop, &[])],
+            ),
+            TestCase::new(
+                "false",
+                1,
+                vec![],
+                vec![make_ins(Opcode::False, &[0]), make_ins(Opcode::Pop, &[])],
+            ),
+            TestCase::new(
+                "1 > 2",
+                1,
+                vec![1, 2],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Gt, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new(
+                "1 < 2",
+                1,
+                vec![1, 2],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Lt, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new(
+                "1 == 2",
+                1,
+                vec![1, 2],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Eq, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new(
+                "1 != 2",
+                1,
+                vec![1, 2],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::NotEq, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new(
+                "true == false",
+                1,
+                vec![],
+                vec![
+                    make_ins(Opcode::True, &[]),
+                    make_ins(Opcode::False, &[]),
+                    make_ins(Opcode::Eq, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new(
+                "true != false",
+                1,
+                vec![],
+                vec![
+                    make_ins(Opcode::True, &[]),
+                    make_ins(Opcode::False, &[]),
+                    make_ins(Opcode::NotEq, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new(
+                "!true",
+                1,
+                vec![],
+                vec![
+                    make_ins(Opcode::True, &[]),
+                    make_ins(Opcode::Bang, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+        ];
+        run_compiler_tests(&tests);
     }
 }

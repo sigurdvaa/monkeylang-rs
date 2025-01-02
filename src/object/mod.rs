@@ -13,6 +13,22 @@ pub type Array = Vec<Rc<Object>>;
 pub type HashObj = HashMap<HashKeyData, (Rc<Object>, Rc<Object>)>;
 type HashKey = RefCell<Option<HashKeyData>>;
 
+pub const TRUE: Object = Object::Boolean(BooleanObj {
+    value: true,
+    hash: RefCell::new(Some(HashKeyData {
+        kind: "BOOLEAN",
+        value: 1,
+    })),
+});
+
+pub const FALSE: Object = Object::Boolean(BooleanObj {
+    value: false,
+    hash: RefCell::new(Some(HashKeyData {
+        kind: "BOOLEAN",
+        value: 0,
+    })),
+});
+
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct IntegerObj {
     pub value: isize,
@@ -22,7 +38,7 @@ pub struct IntegerObj {
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct BooleanObj {
     pub value: bool,
-    hash: HashKey,
+    pub hash: HashKey,
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -40,8 +56,8 @@ pub struct FunctionObj {
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Clone)]
 pub struct HashKeyData {
-    kind: String,
-    value: usize,
+    pub kind: &'static str,
+    pub value: usize,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -72,10 +88,10 @@ impl fmt::Display for Object {
 
 impl Object {
     pub fn new_boolean(value: bool) -> Self {
-        Self::Boolean(BooleanObj {
-            value,
-            hash: RefCell::new(None),
-        })
+        match value {
+            true => TRUE,
+            false => FALSE,
+        }
     }
 
     pub fn new_integer(value: isize) -> Self {
@@ -92,7 +108,7 @@ impl Object {
         })
     }
 
-    pub fn kind(&self) -> &str {
+    pub fn kind(&self) -> &'static str {
         match self {
             Self::Null => "NULL",
             Self::None => "NONE",
@@ -165,7 +181,7 @@ impl Object {
     fn set_hash_key(
         &self,
         mut hash: RefMut<Option<HashKeyData>>,
-        kind: String,
+        kind: &'static str,
         value: usize,
     ) -> HashKeyData {
         let hash_key = HashKeyData { kind, value };
@@ -180,21 +196,13 @@ impl Object {
                 if let Some(hash_key) = obj.hash.borrow().as_ref() {
                     return Ok(hash_key.clone());
                 }
-                Ok(self.set_hash_key(
-                    obj.hash.borrow_mut(),
-                    self.kind().into(),
-                    obj.value as usize,
-                ))
+                Ok(self.set_hash_key(obj.hash.borrow_mut(), self.kind(), obj.value as usize))
             }
             Self::Integer(obj) => {
                 if let Some(hash_key) = obj.hash.borrow().as_ref() {
                     return Ok(hash_key.clone());
                 }
-                Ok(self.set_hash_key(
-                    obj.hash.borrow_mut(),
-                    self.kind().into(),
-                    obj.value as usize,
-                ))
+                Ok(self.set_hash_key(obj.hash.borrow_mut(), self.kind(), obj.value as usize))
             }
             Self::String(obj) => {
                 if let Some(hash_key) = obj.hash.borrow().as_ref() {
@@ -202,7 +210,7 @@ impl Object {
                 }
                 Ok(self.set_hash_key(
                     obj.hash.borrow_mut(),
-                    self.kind().into(),
+                    self.kind(),
                     obj.value.chars().map(|c| c as usize).sum(),
                 ))
             }

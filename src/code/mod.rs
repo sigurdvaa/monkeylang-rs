@@ -45,6 +45,14 @@ pub enum Opcode {
     Sub,
     Mul,
     Div,
+    True,
+    False,
+    Eq,
+    NotEq,
+    Gt,
+    Lt,
+    Minus,
+    Bang,
     EnumLength,
 }
 
@@ -59,6 +67,14 @@ impl TryFrom<u8> for Opcode {
             3 if 3 == Self::Sub as u8 => Ok(Self::Sub),
             4 if 4 == Self::Mul as u8 => Ok(Self::Mul),
             5 if 5 == Self::Div as u8 => Ok(Self::Div),
+            6 if 6 == Self::True as u8 => Ok(Self::True),
+            7 if 7 == Self::False as u8 => Ok(Self::False),
+            8 if 8 == Self::Eq as u8 => Ok(Self::Eq),
+            9 if 9 == Self::NotEq as u8 => Ok(Self::NotEq),
+            10 if 10 == Self::Gt as u8 => Ok(Self::Gt),
+            11 if 11 == Self::Lt as u8 => Ok(Self::Lt),
+            12 if 12 == Self::Minus as u8 => Ok(Self::Minus),
+            13 if 13 == Self::Bang as u8 => Ok(Self::Bang),
             _ => Err(format!("invalid opcode byte: {op:?}")),
         }
     }
@@ -89,6 +105,38 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
         opcode: Opcode::Div,
         operand_widths: [0, 0],
     },
+    &Definition {
+        opcode: Opcode::True,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        opcode: Opcode::False,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        opcode: Opcode::Eq,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        opcode: Opcode::NotEq,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        opcode: Opcode::Gt,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        opcode: Opcode::Lt,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        opcode: Opcode::Minus,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        opcode: Opcode::Bang,
+        operand_widths: [0, 0],
+    },
 ];
 
 pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
@@ -101,6 +149,7 @@ pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
         let witdh = def.operand_widths[i];
         match witdh {
             2 => ins.extend((*operand as u16).to_be_bytes()),
+            0 => (),
             _ => todo!(),
         }
     }
