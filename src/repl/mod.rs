@@ -1,3 +1,4 @@
+use crate::compiler::Compiler;
 use crate::evaluator::{
     eval_program,
     r#macro::{define_macros, expand_macros},
@@ -6,6 +7,7 @@ use crate::lexer::Lexer;
 use crate::object::environment::{Env, Environment};
 use crate::object::Object;
 use crate::parser::{Parser, ParserError};
+use crate::vm::Vm;
 use std::io::{stdin, stdout, Stdout, Write};
 use std::iter::Peekable;
 use std::rc::Rc;
@@ -37,7 +39,12 @@ fn print_parser_errors(output: &mut Stdout, errors: &[ParserError]) {
     }
 }
 
-fn repl(input: Peekable<Chars<'_>>, output: &mut Stdout, env: Env, macro_env: Env) -> Rc<Object> {
+fn repl_eval(
+    input: Peekable<Chars<'_>>,
+    output: &mut Stdout,
+    env: Env,
+    macro_env: Env,
+) -> Rc<Object> {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
@@ -53,14 +60,14 @@ fn repl(input: Peekable<Chars<'_>>, output: &mut Stdout, env: Env, macro_env: En
     eval_program(&program, env.clone())
 }
 
-pub fn run_repl(input: Peekable<Chars<'_>>) {
+pub fn run_repl_eval(input: Peekable<Chars<'_>>) {
     let env = Environment::new();
     let macro_env = Environment::new();
     let mut output = stdout();
-    let _ = repl(input, &mut output, env, macro_env);
+    let _ = repl_eval(input, &mut output, env, macro_env);
 }
 
-pub fn start_repl() {
+pub fn start_repl_eval() {
     let input = stdin();
     let mut output = stdout();
     let env = Environment::new();
@@ -75,7 +82,7 @@ pub fn start_repl() {
         output.flush().expect("failed to flush prompt");
 
         input.read_line(&mut buf).expect("reading input failed");
-        let eval = repl(
+        let eval = repl_eval(
             buf.chars().peekable(),
             &mut output,
             env.clone(),
@@ -85,6 +92,58 @@ pub fn start_repl() {
         match *eval {
             Object::None => (),
             _ => writeln!(output, "{}", eval.inspect()).expect("writing to stdout failed"),
+        }
+    }
+}
+
+fn repl_vm(input: Peekable<Chars<'_>>, output: &mut Stdout) -> Option<Object> {
+    let lexer = Lexer::new(None, input);
+    let mut parser = Parser::new(lexer);
+    let mut program = parser.parse_program();
+
+    if !parser.errors.is_empty() {
+        print_parser_errors(output, &parser.errors);
+        return Some(Object::None);
+    }
+
+    let macro_env = Environment::new();
+    define_macros(&mut program, macro_env.clone());
+    expand_macros(&mut program, macro_env);
+
+    let mut compiler = Compiler::new();
+    if let Err(e) = compiler.compile_program(&program) {
+        println!("Whoops! Compilation failed:\n {e:?}");
+        return None;
+    }
+
+    let mut vm = Vm::new(compiler.bytecode());
+    if let Err(e) = vm.run() {
+        println!("Whoops! Executing bytecode failed:\n {e:?}");
+        return None;
+    }
+    vm.stack_top().cloned()
+}
+
+pub fn start_repl_vm() {
+    let input = stdin();
+    let mut output = stdout();
+    loop {
+        // TODO: add history? will require tty raw mode
+        let mut buf = String::new();
+
+        output
+            .write_all(PROMPT.as_bytes())
+            .expect("failed to write prompt");
+        output.flush().expect("failed to flush prompt");
+
+        input.read_line(&mut buf).expect("reading input failed");
+        let result = repl_vm(buf.chars().peekable(), &mut output);
+
+        match result {
+            Some(Object::None) | None => (),
+            Some(result) => {
+                writeln!(output, "{}", result.inspect()).expect("writing to stdout failed")
+            }
         }
     }
 }
