@@ -13,22 +13,6 @@ pub type Array = Vec<Rc<Object>>;
 pub type HashObj = HashMap<HashKeyData, (Rc<Object>, Rc<Object>)>;
 type HashKey = RefCell<Option<HashKeyData>>;
 
-pub const TRUE: Object = Object::Boolean(BooleanObj {
-    value: true,
-    hash: RefCell::new(Some(HashKeyData {
-        kind: "BOOLEAN",
-        value: 1,
-    })),
-});
-
-pub const FALSE: Object = Object::Boolean(BooleanObj {
-    value: false,
-    hash: RefCell::new(Some(HashKeyData {
-        kind: "BOOLEAN",
-        value: 0,
-    })),
-});
-
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct IntegerObj {
     pub value: isize,
@@ -87,10 +71,35 @@ impl fmt::Display for Object {
 }
 
 impl Object {
+    pub fn new_null() -> Self {
+        const { Object::Null }
+    }
+
     pub fn new_boolean(value: bool) -> Self {
         match value {
-            true => TRUE,
-            false => FALSE,
+            true => {
+                const {
+                    Object::Boolean(BooleanObj {
+                        value: true,
+                        hash: RefCell::new(Some(HashKeyData {
+                            kind: "BOOLEAN",
+                            value: 1,
+                        })),
+                    })
+                }
+            }
+
+            false => {
+                const {
+                    Object::Boolean(BooleanObj {
+                        value: false,
+                        hash: RefCell::new(Some(HashKeyData {
+                            kind: "BOOLEAN",
+                            value: 0,
+                        })),
+                    })
+                }
+            }
         }
     }
 
@@ -126,6 +135,16 @@ impl Object {
         }
     }
 
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Self::Integer(obj) => obj.value > 0,
+            Self::String(obj) => !obj.value.is_empty(),
+            Self::Array(value) => !value.is_empty(),
+            Self::Hash(value) => !value.is_empty(),
+            Self::Boolean(obj) => obj.value,
+            _ => false,
+        }
+    }
     pub fn inspect(&self) -> String {
         match self {
             Self::Null => "null".into(),

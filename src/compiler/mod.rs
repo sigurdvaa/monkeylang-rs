@@ -12,10 +12,17 @@ pub struct Bytecode {
     pub constants: Vec<Object>,
 }
 
+struct EmittedIns {
+    op: Opcode,
+    pos: usize,
+}
+
 #[derive(Default)]
 pub struct Compiler {
     instructions: Vec<Instruction>,
     constants: Vec<Object>,
+    first_prev_ins: Option<EmittedIns>,
+    second_prev_ins: Option<EmittedIns>,
 }
 
 impl Compiler {
@@ -35,8 +42,38 @@ impl Compiler {
     }
 
     fn emit(&mut self, op: Opcode, operands: &[usize]) -> usize {
-        let ins = make_ins(op, operands);
-        self.add_instruction(ins)
+        let ins = make_ins(op.clone(), operands);
+        let pos = self.add_instruction(ins);
+
+        std::mem::swap(&mut self.first_prev_ins, &mut self.second_prev_ins);
+        self.first_prev_ins = Some(EmittedIns { op, pos });
+
+        pos
+    }
+
+    fn remove_last_pop(&mut self) {
+        if let Some(EmittedIns {
+            op: Opcode::Pop,
+            pos,
+        }) = self.first_prev_ins
+        {
+            self.instructions.remove(pos);
+            std::mem::swap(&mut self.first_prev_ins, &mut self.second_prev_ins);
+        }
+    }
+
+    fn replace_ins(&mut self, pos: usize, new_ins: Vec<Instruction>) {
+        for (i, ins) in new_ins.into_iter().enumerate() {
+            self.instructions[pos + i] = ins;
+        }
+    }
+
+    fn change_operand(&mut self, pos: usize, operand: usize) {
+        let op = Opcode::try_from(self.instructions[pos]).unwrap_or_else(|e| {
+            panic!("can't replace operand, unknown opcode at position {pos}: {e}",)
+        });
+        let new_ins = make_ins(op, &[operand]);
+        self.replace_ins(pos, new_ins);
     }
 
     fn compile_expression(&mut self, expr: &Expression) -> Result<(), CompilerError> {
@@ -83,7 +120,38 @@ impl Compiler {
                     }
                 }
             }
-            _ => todo!("{expr:?}"),
+            Expression::If(expr) => {
+                self.compile_expression(&expr.condition)?;
+                let jumpnottrue_pos = self.emit(Opcode::JumpNotTrue, &[0]); // tmp bogus value
+
+                self.compile_statements(&expr.consequence.statements)?;
+                self.remove_last_pop();
+
+                let jump_pos = self.emit(Opcode::Jump, &[0]); // tmp bogus value
+                let after_consequence_pos = self.instructions.len();
+                self.change_operand(jumpnottrue_pos, after_consequence_pos);
+
+                if let Some(alt) = &expr.alternative {
+                    self.compile_statements(&alt.statements)?;
+                    self.remove_last_pop();
+                } else {
+                    let _ = self.emit(Opcode::Null, &[]);
+                }
+
+                let after_alternative_pos = self.instructions.len();
+                self.change_operand(jump_pos, after_alternative_pos);
+
+                after_alternative_pos
+            }
+            Expression::Call(expr) => todo!("{expr:?}"),
+            Expression::Function(expr) => todo!("{expr:?}"),
+            Expression::Identifier(expr) => todo!("{expr:?}"),
+            Expression::String(expr) => todo!("{expr:?}"),
+            Expression::Array(expr) => todo!("{expr:?}"),
+            Expression::Hash(expr) => todo!("{expr:?}"),
+            Expression::Null(expr) => todo!("{expr:?}"),
+            Expression::Index(expr) => todo!("{expr:?}"),
+            Expression::Macro(expr) => todo!("{expr:?}"),
         };
         Ok(())
     }
@@ -331,6 +399,43 @@ mod tests {
                 vec![
                     make_ins(Opcode::True, &[]),
                     make_ins(Opcode::Bang, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+        ];
+        run_compiler_tests(&tests);
+    }
+
+    #[test]
+    fn test_conditionals() {
+        let tests = [
+            TestCase::new(
+                "if (true) { 10 }; 3333;",
+                2,
+                vec![10, 3333],
+                vec![
+                    make_ins(Opcode::True, &[]),
+                    make_ins(Opcode::JumpNotTrue, &[10]),
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Jump, &[11]),
+                    make_ins(Opcode::Null, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new(
+                "if (true) { 10 } else { 20 }; 3333;",
+                2,
+                vec![10, 20, 3333],
+                vec![
+                    make_ins(Opcode::True, &[]),
+                    make_ins(Opcode::JumpNotTrue, &[10]),
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Jump, &[13]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Pop, &[]),
+                    make_ins(Opcode::Constant, &[2]),
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),

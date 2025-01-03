@@ -117,11 +117,13 @@ fn repl_vm(input: Peekable<Chars<'_>>, output: &mut Stdout) -> Option<Object> {
     }
 
     let mut vm = Vm::new(compiler.bytecode());
-    if let Err(e) = vm.run() {
-        println!("Whoops! Executing bytecode failed:\n {e:?}");
-        return None;
+    match vm.run() {
+        Err(e) => {
+            println!("Whoops! Executing bytecode failed:\n {e:?}");
+            None
+        }
+        Ok(v) => Some(v),
     }
-    vm.stack_top().cloned()
 }
 
 pub fn start_repl_vm() {
@@ -138,7 +140,6 @@ pub fn start_repl_vm() {
 
         input.read_line(&mut buf).expect("reading input failed");
         let result = repl_vm(buf.chars().peekable(), &mut output);
-
         match result {
             Some(Object::None) | None => (),
             Some(result) => {

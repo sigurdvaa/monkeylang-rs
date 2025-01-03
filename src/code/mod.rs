@@ -53,6 +53,9 @@ pub enum Opcode {
     Lt,
     Minus,
     Bang,
+    Jump,
+    JumpNotTrue,
+    Null,
     EnumLength,
 }
 
@@ -75,6 +78,9 @@ impl TryFrom<u8> for Opcode {
             11 if 11 == Self::Lt as u8 => Ok(Self::Lt),
             12 if 12 == Self::Minus as u8 => Ok(Self::Minus),
             13 if 13 == Self::Bang as u8 => Ok(Self::Bang),
+            14 if 14 == Self::Jump as u8 => Ok(Self::Jump),
+            15 if 15 == Self::JumpNotTrue as u8 => Ok(Self::JumpNotTrue),
+            16 if 16 == Self::Null as u8 => Ok(Self::Null),
             _ => Err(format!("invalid opcode byte: {op:?}")),
         }
     }
@@ -135,6 +141,18 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
     },
     &Definition {
         opcode: Opcode::Bang,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        opcode: Opcode::Jump,
+        operand_widths: [2, 0],
+    },
+    &Definition {
+        opcode: Opcode::JumpNotTrue,
+        operand_widths: [2, 0],
+    },
+    &Definition {
+        opcode: Opcode::Null,
         operand_widths: [0, 0],
     },
 ];

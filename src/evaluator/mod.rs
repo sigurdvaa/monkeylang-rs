@@ -6,7 +6,6 @@ use crate::ast::{
     BlockStatement, Expression, HashLiteral, IdentifierLiteral, IfExpression, Operator, Program,
     Statement,
 };
-use crate::object::TRUE;
 use crate::object::{
     environment::{Env, Environment},
     Array, BooleanObj, FunctionObj, HashKeyData, HashObj, Integer, IntegerObj, Object, StringObj,
@@ -206,24 +205,13 @@ fn eval_prefix_expression(operator: &Operator, right: Rc<Object>) -> Rc<Object> 
     })
 }
 
-fn is_truthy(object: Rc<Object>) -> bool {
-    match object.as_ref() {
-        Object::Integer(obj) => obj.value > 0,
-        Object::String(obj) => !obj.value.is_empty(),
-        Object::Array(value) => !value.is_empty(),
-        Object::Hash(value) => !value.is_empty(),
-        Object::Boolean(obj) => obj.value,
-        _ => false,
-    }
-}
-
 fn eval_if_expression(expression: &IfExpression, env: Env) -> Rc<Object> {
     let condition = eval_expression(&expression.condition, env.clone());
     if let Object::Error(_) = *condition {
         return condition;
     }
 
-    match is_truthy(condition) {
+    match condition.is_truthy() {
         true => eval_block_statement(&expression.consequence, env),
         false => match &expression.alternative {
             Some(alt) => eval_block_statement(alt, env),

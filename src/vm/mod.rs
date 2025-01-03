@@ -1,6 +1,6 @@
 use crate::code::{read_u16_as_usize, Instruction, Opcode};
 use crate::compiler::Bytecode;
-use crate::object::{self, Object};
+use crate::object::Object;
 
 const STACK_SIZE: usize = 2048;
 
@@ -27,13 +27,6 @@ impl Vm {
             instructions: bytecode.instructions,
             stack: [const { None }; STACK_SIZE],
             sp: 0,
-        }
-    }
-
-    pub fn stack_top(&self) -> Option<&Object> {
-        match self.sp {
-            0 => None,
-            _ => self.stack[self.sp - 1].as_ref(),
         }
     }
 
@@ -157,15 +150,17 @@ impl Vm {
 
     fn execute_bang_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop()?;
-        match &operand {
-            Object::Null => self.push(Object::new_boolean(true)),
-            Object::Integer(obj) => self.push(Object::new_boolean(obj.value < 1)),
-            Object::Boolean(obj) => self.push(Object::new_boolean(!obj.value)),
-            _ => Err(VmError::InvalidType(format!(
-                "unsupported type for bang prefix operator: {}",
-                operand.kind()
-            ))),
-        }
+        self.push(Object::new_boolean(!operand.is_truthy()))
+        // TODO: keep obj truthiness or use only Object::Boolean?
+        // match &operand {
+        //     Object::Null => self.push(Object::new_boolean(true)),
+        //     Object::Integer(obj) => self.push(Object::new_boolean(obj.value < 1)),
+        //     Object::Boolean(obj) => self.push(Object::new_boolean(!obj.value)),
+        //     _ => Err(VmError::InvalidType(format!(
+        //         "unsupported type for bang prefix operator: {}",
+        //         operand.kind()
+        //     ))),
+        // }
     }
 
     fn execute_minus_operator(&mut self) -> Result<(), VmError> {
@@ -188,26 +183,39 @@ impl Vm {
                 Opcode::try_from(self.instructions[ip]).map_err(VmError::InvalidInstruction)?;
 
             match op {
-                Opcode::Constant => {
-                    // TODO: use def and width to read and increment ip?
-                    let idx = read_u16_as_usize(&self.instructions[ip + 1..]);
-                    ip += 2;
-                    self.push(self.constants[idx].clone())?;
-                }
+                Opcode::Bang => self.execute_bang_operator()?,
+                Opcode::Minus => self.execute_minus_operator()?,
+                Opcode::True => self.push(Object::new_boolean(true))?,
+                Opcode::False => self.push(Object::new_boolean(false))?,
+                Opcode::Null => self.push(Object::new_null())?,
                 Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
                     self.execute_binary_operation(op)?
                 }
                 Opcode::Eq | Opcode::NotEq | Opcode::Gt | Opcode::Lt => {
                     self.execute_comparison(op)?
                 }
-                Opcode::Bang => self.execute_bang_operator()?,
-                Opcode::Minus => self.execute_minus_operator()?,
-                Opcode::True => self.push(object::TRUE)?,
-                Opcode::False => self.push(object::FALSE)?,
                 Opcode::Pop => {
                     last_pop = self.pop()?;
                 }
-                _ => todo!("{op:?}"),
+                Opcode::Jump => {
+                    let pos = read_u16_as_usize(&self.instructions[ip + 1..]);
+                    ip = pos - 1;
+                }
+                Opcode::JumpNotTrue => {
+                    let pos = read_u16_as_usize(&self.instructions[ip + 1..]);
+                    ip += 2;
+                    let condition = self.pop()?;
+                    if !condition.is_truthy() {
+                        ip = pos - 1;
+                    }
+                }
+                Opcode::Constant => {
+                    // TODO: use def and width to read and increment ip?
+                    let idx = read_u16_as_usize(&self.instructions[ip + 1..]);
+                    ip += 2;
+                    self.push(self.constants[idx].clone())?;
+                }
+                Opcode::EnumLength => unreachable!(),
             }
 
             ip += 1;
@@ -257,7 +265,6 @@ mod tests {
             ("-50 + 100 + -50", 0),
             ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
         ];
-
         for (test_input, test_value) in tests {
             run_vm_test(test_input, 1, Object::new_integer(test_value));
         }
@@ -291,10 +298,32 @@ mod tests {
             ("!!true", true),
             ("!!false", false),
             ("!!5", true),
+            ("!(if (false) { 5; })", true),
         ];
-
         for (test_input, test_value) in tests {
             run_vm_test(test_input, 1, Object::new_boolean(test_value));
+        }
+    }
+
+    #[test]
+    fn test_conditionals() {
+        let tests = [
+            ("if (true) { 10 }", Object::new_integer(10)),
+            ("if (true) { 10 } else { 20 }", Object::new_integer(10)),
+            ("if (false) { 10 } else { 20 } ", Object::new_integer(20)),
+            ("if (1) { 10 }", Object::new_integer(10)),
+            ("if (1 < 2) { 10 }", Object::new_integer(10)),
+            ("if (1 < 2) { 10 } else { 20 }", Object::new_integer(10)),
+            ("if (1 > 2) { 10 } else { 20 }", Object::new_integer(20)),
+            ("if (1 > 2) { 10 }", Object::new_null()),
+            ("if (false) { 10 }", Object::new_null()),
+            (
+                "if ((if (false) { 10 })) { 10 } else { 20 }",
+                Object::new_integer(20),
+            ),
+        ];
+        for (test_input, test_value) in tests {
+            run_vm_test(test_input, 1, test_value);
         }
     }
 }
