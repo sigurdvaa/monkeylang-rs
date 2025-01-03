@@ -96,7 +96,12 @@ pub fn start_repl_eval() {
     }
 }
 
-fn repl_vm(input: Peekable<Chars<'_>>, output: &mut Stdout) -> Option<Object> {
+fn repl_vm(
+    input: Peekable<Chars<'_>>,
+    output: &mut Stdout,
+    compiler: &mut Compiler,
+    vm: &mut Vm,
+) -> Option<Object> {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
@@ -110,13 +115,13 @@ fn repl_vm(input: Peekable<Chars<'_>>, output: &mut Stdout) -> Option<Object> {
     define_macros(&mut program, macro_env.clone());
     expand_macros(&mut program, macro_env);
 
-    let mut compiler = Compiler::new();
+    compiler.soft_reset();
     if let Err(e) = compiler.compile_program(&program) {
         println!("Whoops! Compilation failed:\n {e:?}");
         return None;
     }
 
-    let mut vm = Vm::new(compiler.bytecode());
+    vm.soft_reset(compiler.bytecode());
     match vm.run() {
         Err(e) => {
             println!("Whoops! Executing bytecode failed:\n {e:?}");
@@ -129,6 +134,8 @@ fn repl_vm(input: Peekable<Chars<'_>>, output: &mut Stdout) -> Option<Object> {
 pub fn start_repl_vm() {
     let input = stdin();
     let mut output = stdout();
+    let mut compiler = Compiler::new();
+    let mut vm = Vm::new(None);
     loop {
         // TODO: add history? will require tty raw mode
         let mut buf = String::new();
@@ -139,7 +146,7 @@ pub fn start_repl_vm() {
         output.flush().expect("failed to flush prompt");
 
         input.read_line(&mut buf).expect("reading input failed");
-        let result = repl_vm(buf.chars().peekable(), &mut output);
+        let result = repl_vm(buf.chars().peekable(), &mut output, &mut compiler, &mut vm);
         match result {
             Some(Object::None) | None => (),
             Some(result) => {

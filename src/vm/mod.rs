@@ -3,6 +3,7 @@ use crate::compiler::Bytecode;
 use crate::object::Object;
 
 const STACK_SIZE: usize = 2048;
+const GLOBALS_SIZE: usize = 65536;
 
 #[derive(Debug)]
 pub enum VmError {
@@ -11,6 +12,7 @@ pub enum VmError {
     InvalidStackAccess(String),
     InvalidType(String),
     InvalidOperator(String),
+    UndefinedGlobalsIndex(usize),
 }
 
 pub struct Vm {
@@ -18,16 +20,29 @@ pub struct Vm {
     instructions: Vec<Instruction>,
     stack: [Option<Object>; STACK_SIZE],
     sp: usize,
+    globals: Vec<Option<Object>>,
 }
 
 impl Vm {
-    pub fn new(bytecode: Bytecode) -> Self {
+    pub fn new(bytecode: Option<Bytecode>) -> Self {
+        let (constants, instructions) = match bytecode {
+            Some(bytecode) => (bytecode.constants.clone(), bytecode.instructions.clone()),
+            None => (vec![], vec![]),
+        };
         Self {
-            constants: bytecode.constants,
-            instructions: bytecode.instructions,
+            constants,
+            instructions,
             stack: [const { None }; STACK_SIZE],
             sp: 0,
+            globals: vec![None; GLOBALS_SIZE],
         }
+    }
+
+    pub fn soft_reset(&mut self, bytecode: Bytecode) {
+        self.constants = bytecode.constants.clone();
+        self.instructions = bytecode.instructions.clone();
+        self.stack = [const { None }; STACK_SIZE];
+        self.sp = 0;
     }
 
     fn push(&mut self, obj: Object) -> Result<(), VmError> {
@@ -215,6 +230,20 @@ impl Vm {
                     ip += 2;
                     self.push(self.constants[idx].clone())?;
                 }
+                Opcode::GetGlobal => {
+                    let idx = read_u16_as_usize(&self.instructions[ip + 1..]);
+                    ip += 2;
+                    match &self.globals[idx] {
+                        Some(obj) => self.push(obj.clone())?,
+                        None => return Err(VmError::UndefinedGlobalsIndex(idx)),
+                    }
+                }
+                Opcode::SetGlobal => {
+                    let idx = read_u16_as_usize(&self.instructions[ip + 1..]);
+                    ip += 2;
+                    let obj = self.pop()?;
+                    self.globals[idx] = Some(obj);
+                }
                 Opcode::EnumLength => unreachable!(),
             }
 
@@ -237,7 +266,7 @@ mod tests {
         let _ = compiler
             .compile_program(&prog)
             .map_err(|e| panic!("compiler error: {e:?}"));
-        let mut vm = Vm::new(compiler.bytecode());
+        let mut vm = Vm::new(Some(compiler.bytecode()));
         let result = vm.run().unwrap_or_else(|e| panic!("vm error: {e:?}"));
         assert_eq!(
             result, value,
@@ -324,6 +353,18 @@ mod tests {
         ];
         for (test_input, test_value) in tests {
             run_vm_test(test_input, 1, test_value);
+        }
+    }
+
+    #[test]
+    fn test_global_let_statements() {
+        let tests = [
+            ("let one = 1; one", 2, 1),
+            ("let one = 1; let two = 2; one + two", 3, 3),
+            ("let one = 1; let two = one + one; one + two", 3, 3),
+        ];
+        for (test_input, test_stmts, test_value) in tests {
+            run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
         }
     }
 }

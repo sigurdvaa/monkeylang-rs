@@ -1,10 +1,14 @@
+mod symbol;
+
 use crate::ast::{Expression, Operator, Program, Statement};
 use crate::code::{make_ins, Instruction, Opcode};
 use crate::object::Object;
+pub use symbol::SymbolTable;
 
 #[derive(Debug)]
 pub enum CompilerError {
     UnknownOperator(String),
+    UndefinedVariable(String),
 }
 
 pub struct Bytecode {
@@ -17,17 +21,29 @@ struct EmittedIns {
     pos: usize,
 }
 
-#[derive(Default)]
 pub struct Compiler {
     instructions: Vec<Instruction>,
     constants: Vec<Object>,
     first_prev_ins: Option<EmittedIns>,
     second_prev_ins: Option<EmittedIns>,
+    symbols: SymbolTable,
 }
 
 impl Compiler {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            instructions: vec![],
+            constants: vec![],
+            first_prev_ins: None,
+            second_prev_ins: None,
+            symbols: SymbolTable::new(),
+        }
+    }
+
+    pub fn soft_reset(&mut self) {
+        self.instructions.clear();
+        self.first_prev_ins = None;
+        self.second_prev_ins = None;
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {
@@ -145,7 +161,13 @@ impl Compiler {
             }
             Expression::Call(expr) => todo!("{expr:?}"),
             Expression::Function(expr) => todo!("{expr:?}"),
-            Expression::Identifier(expr) => todo!("{expr:?}"),
+            Expression::Identifier(expr) => match self.symbols.resolve(&expr.value) {
+                Some(sym) => {
+                    let index = sym.index;
+                    self.emit(Opcode::GetGlobal, &[index])
+                }
+                None => return Err(CompilerError::UndefinedVariable(expr.value.clone())),
+            },
             Expression::String(expr) => todo!("{expr:?}"),
             Expression::Array(expr) => todo!("{expr:?}"),
             Expression::Hash(expr) => todo!("{expr:?}"),
@@ -158,13 +180,17 @@ impl Compiler {
 
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompilerError> {
         match stmt {
-            // Statement::Let(expr) => self.compile_expression(&expr.value)?,
-            // Statement::Return(expr) => self.compile_expression(&expr.value)?,
+            Statement::Let(expr) => {
+                self.compile_expression(&expr.value)?;
+                let sym = self.symbols.define(expr.name.value.clone());
+                let index = sym.index;
+                self.emit(Opcode::SetGlobal, &[index]);
+            }
+            Statement::Return(expr) => todo!(),
             Statement::Expression(expr) => {
                 self.compile_expression(&expr.value)?;
                 self.emit(Opcode::Pop, &[]);
             }
-            _ => todo!(),
         }
         Ok(())
     }
@@ -436,6 +462,48 @@ mod tests {
                     make_ins(Opcode::Constant, &[1]),
                     make_ins(Opcode::Pop, &[]),
                     make_ins(Opcode::Constant, &[2]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+        ];
+        run_compiler_tests(&tests);
+    }
+
+    #[test]
+    fn test_global_let_statements() {
+        let tests = [
+            TestCase::new(
+                "let one = 1; let two = 2;",
+                2,
+                vec![1, 2],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::SetGlobal, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::SetGlobal, &[1]),
+                ],
+            ),
+            TestCase::new(
+                "let one = 1; one",
+                2,
+                vec![1],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::SetGlobal, &[0]),
+                    make_ins(Opcode::GetGlobal, &[0]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new(
+                "let one = 1; let two = one; two",
+                3,
+                vec![1],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::SetGlobal, &[0]),
+                    make_ins(Opcode::GetGlobal, &[0]),
+                    make_ins(Opcode::SetGlobal, &[1]),
+                    make_ins(Opcode::GetGlobal, &[1]),
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),

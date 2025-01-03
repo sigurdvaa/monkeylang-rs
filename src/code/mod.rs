@@ -33,7 +33,9 @@ impl Instructions for [Instruction] {
 }
 
 pub struct Definition {
+    // TODO: remove unused field?
     opcode: Opcode,
+    // TODO: rework def to vec?
     operand_widths: [u32; 2],
 }
 
@@ -56,6 +58,8 @@ pub enum Opcode {
     Jump,
     JumpNotTrue,
     Null,
+    GetGlobal,
+    SetGlobal,
     EnumLength,
 }
 
@@ -81,6 +85,8 @@ impl TryFrom<u8> for Opcode {
             14 if 14 == Self::Jump as u8 => Ok(Self::Jump),
             15 if 15 == Self::JumpNotTrue as u8 => Ok(Self::JumpNotTrue),
             16 if 16 == Self::Null as u8 => Ok(Self::Null),
+            17 if 17 == Self::GetGlobal as u8 => Ok(Self::GetGlobal),
+            18 if 18 == Self::SetGlobal as u8 => Ok(Self::SetGlobal),
             _ => Err(format!("invalid opcode byte: {op:?}")),
         }
     }
@@ -154,6 +160,14 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
     &Definition {
         opcode: Opcode::Null,
         operand_widths: [0, 0],
+    },
+    &Definition {
+        opcode: Opcode::GetGlobal,
+        operand_widths: [2, 0],
+    },
+    &Definition {
+        opcode: Opcode::SetGlobal,
+        operand_widths: [2, 0],
     },
 ];
 
