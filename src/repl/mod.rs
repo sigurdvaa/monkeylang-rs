@@ -67,7 +67,8 @@ pub fn run_repl_eval(input: Peekable<Chars<'_>>) {
     let _ = repl_eval(input, &mut output, env, macro_env);
 }
 
-pub fn start_repl_eval() {
+// TODO: add engine args to main
+pub fn _start_repl_eval() {
     let input = stdin();
     let mut output = stdout();
     let env = Environment::new();

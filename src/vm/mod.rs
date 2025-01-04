@@ -1,18 +1,56 @@
 use crate::code::{read_u16_as_usize, Instruction, Opcode};
 use crate::compiler::Bytecode;
 use crate::object::Object;
+use std::fmt::Display;
+use std::rc::Rc;
 
 const STACK_SIZE: usize = 2048;
 const GLOBALS_SIZE: usize = 65536;
 
 #[derive(Debug)]
 pub enum VmError {
-    InvalidInstruction(String),
-    StackOverflow(String),
-    InvalidStackAccess(String),
-    InvalidType(String),
-    InvalidOperator(String),
-    UndefinedGlobalsIndex(usize),
+    InvalidInstruction(u8),
+    StackOverflow(Object),
+    InvalidStackAccess(usize),
+    InvalidGlobalsIndex(usize),
+    InvalidBooleanOperator(Opcode),
+    InvalidStringOperator(Opcode),
+    InvalidIntegerOperator(Opcode),
+    InvalidBinaryTypes(&'static str, &'static str),
+    InvalidComparisonTypes(&'static str, &'static str),
+    InvalidPrefixType(&'static str),
+}
+
+impl std::error::Error for VmError {}
+
+impl Display for VmError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidInstruction(byte) => write!(f, "invalid instruction byte: {byte:#x}"),
+            Self::StackOverflow(obj) => write!(f, "stack overflow, can't push object: {obj:?}"),
+            Self::InvalidGlobalsIndex(idx) => {
+                write!(f, "invalid globals access, no object at index {idx}")
+            }
+            Self::InvalidStackAccess(idx) => {
+                write!(f, "invalid stack access, no object at index {idx}")
+            }
+            Self::InvalidBooleanOperator(op) => write!(f, "invalid boolean operator: {op:?}"),
+            Self::InvalidStringOperator(op) => write!(f, "invalid string operator: {op:?}"),
+            Self::InvalidIntegerOperator(op) => write!(f, "invalid integer operator: {op:?}"),
+            Self::InvalidBinaryTypes(left, right) => {
+                write!(f, "unsupported types for binary operation: {left} {right}")
+            }
+            Self::InvalidComparisonTypes(left, right) => {
+                write!(
+                    f,
+                    "unsupported types for comparison operation: {left} {right}"
+                )
+            }
+            Self::InvalidPrefixType(operand) => {
+                write!(f, "unsupported type for minus prefix operator: {operand}",)
+            }
+        }
+    }
 }
 
 pub struct Vm {
@@ -47,9 +85,7 @@ impl Vm {
 
     fn push(&mut self, obj: Object) -> Result<(), VmError> {
         if self.sp >= STACK_SIZE {
-            return Err(VmError::StackOverflow(format!(
-                "failed to push object on the stack: {obj:?}"
-            )));
+            return Err(VmError::StackOverflow(obj));
         }
 
         self.stack[self.sp].replace(obj);
@@ -62,10 +98,7 @@ impl Vm {
         self.sp -= 1;
         match self.stack[self.sp].take() {
             Some(obj) => Ok(obj),
-            None => Err(VmError::InvalidStackAccess(format!(
-                "No object found when popping the stack at sp: {}",
-                self.sp
-            ))),
+            None => Err(VmError::InvalidStackAccess(self.sp)),
         }
     }
 
@@ -80,13 +113,23 @@ impl Vm {
             Opcode::Sub => left - right,
             Opcode::Mul => left * right,
             Opcode::Div => left / right,
-            _ => {
-                return Err(VmError::InvalidOperator(format!(
-                    "unknown integer operator: {op:?}",
-                )))
-            }
+            _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
         self.push(Object::new_integer(value))?;
+        Ok(())
+    }
+
+    fn execute_binary_string_operation(
+        &mut self,
+        op: Opcode,
+        left: &str,
+        right: &str,
+    ) -> Result<(), VmError> {
+        let value = match op {
+            Opcode::Add => String::from_iter([left, right]),
+            _ => return Err(VmError::InvalidStringOperator(op)),
+        };
+        self.push(Object::new_string(value))?;
         Ok(())
     }
 
@@ -97,11 +140,10 @@ impl Vm {
             (Object::Integer(left), Object::Integer(right)) => {
                 self.execute_binary_integer_operation(op, left.value, right.value)
             }
-            _ => Err(VmError::InvalidType(format!(
-                "unsupported types for binary operation: {} {}",
-                left.kind(),
-                right.kind()
-            ))),
+            (Object::String(left), Object::String(right)) => {
+                self.execute_binary_string_operation(op, &left.value, &right.value)
+            }
+            _ => Err(VmError::InvalidBinaryTypes(left.kind(), right.kind())),
         }
     }
 
@@ -116,11 +158,7 @@ impl Vm {
             Opcode::NotEq => left != right,
             Opcode::Gt => left > right,
             Opcode::Lt => left < right,
-            _ => {
-                return Err(VmError::InvalidOperator(format!(
-                    "unknown integer comparison: {op:?}",
-                )))
-            }
+            _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
         self.push(Object::new_boolean(value))?;
         Ok(())
@@ -135,11 +173,7 @@ impl Vm {
         let value = match op {
             Opcode::Eq => left == right,
             Opcode::NotEq => left != right,
-            _ => {
-                return Err(VmError::InvalidOperator(format!(
-                    "unknown boolean comparison: {op:?}",
-                )))
-            }
+            _ => return Err(VmError::InvalidBooleanOperator(op)),
         };
         self.push(Object::new_boolean(value))?;
         Ok(())
@@ -155,38 +189,33 @@ impl Vm {
             (Object::Boolean(left), Object::Boolean(right)) => {
                 self.execute_boolean_comparison(op, left.value, right.value)
             }
-            _ => Err(VmError::InvalidType(format!(
-                "unknown operator: {op:?} ({} {})",
-                left.kind(),
-                right.kind()
-            ))),
+            _ => Err(VmError::InvalidComparisonTypes(left.kind(), right.kind())),
         }
     }
 
     fn execute_bang_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop()?;
         self.push(Object::new_boolean(!operand.is_truthy()))
-        // TODO: keep obj truthiness or use only Object::Boolean?
-        // match &operand {
-        //     Object::Null => self.push(Object::new_boolean(true)),
-        //     Object::Integer(obj) => self.push(Object::new_boolean(obj.value < 1)),
-        //     Object::Boolean(obj) => self.push(Object::new_boolean(!obj.value)),
-        //     _ => Err(VmError::InvalidType(format!(
-        //         "unsupported type for bang prefix operator: {}",
-        //         operand.kind()
-        //     ))),
-        // }
     }
 
     fn execute_minus_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop()?;
         match &operand {
             Object::Integer(obj) => self.push(Object::new_integer(-obj.value)),
-            _ => Err(VmError::InvalidType(format!(
-                "unsupported type for minus prefix operator: {}",
-                operand.kind()
-            ))),
+            _ => Err(VmError::InvalidPrefixType(operand.kind())),
         }
+    }
+
+    fn build_array(&mut self, start_idx: usize, end_idx: usize) -> Result<Object, VmError> {
+        // TODO: can we remove Rc from array?
+        let mut array = Vec::with_capacity(end_idx - start_idx);
+        for i in start_idx..end_idx {
+            match self.stack[i].take() {
+                Some(obj) => array.push(Rc::new(obj)),
+                None => return Err(VmError::InvalidStackAccess(i)),
+            }
+        }
+        Ok(Object::Array(array))
     }
 
     pub fn run(&mut self) -> Result<Object, VmError> {
@@ -194,8 +223,8 @@ impl Vm {
         let mut last_pop = Object::None;
 
         while ip < self.instructions.len() {
-            let op =
-                Opcode::try_from(self.instructions[ip]).map_err(VmError::InvalidInstruction)?;
+            let op = Opcode::try_from(self.instructions[ip])
+                .map_err(|_| VmError::InvalidInstruction(self.instructions[ip]))?;
 
             match op {
                 Opcode::Bang => self.execute_bang_operator()?,
@@ -235,7 +264,7 @@ impl Vm {
                     ip += 2;
                     match &self.globals[idx] {
                         Some(obj) => self.push(obj.clone())?,
-                        None => return Err(VmError::UndefinedGlobalsIndex(idx)),
+                        _ => return Err(VmError::InvalidGlobalsIndex(idx)),
                     }
                 }
                 Opcode::SetGlobal => {
@@ -243,6 +272,13 @@ impl Vm {
                     ip += 2;
                     let obj = self.pop()?;
                     self.globals[idx] = Some(obj);
+                }
+                Opcode::Array => {
+                    let len = read_u16_as_usize(&self.instructions[ip + 1..]);
+                    ip += 2;
+                    let array = self.build_array(self.sp - len, self.sp)?;
+                    self.sp -= len;
+                    self.push(array)?;
                 }
                 Opcode::EnumLength => unreachable!(),
             }
@@ -267,7 +303,7 @@ mod tests {
             .compile_program(&prog)
             .map_err(|e| panic!("compiler error: {e:?}"));
         let mut vm = Vm::new(Some(compiler.bytecode()));
-        let result = vm.run().unwrap_or_else(|e| panic!("vm error: {e:?}"));
+        let result = vm.run().unwrap_or_else(|e| panic!("vm error:\n {e}"));
         assert_eq!(
             result, value,
             "unexpected result, got {result:?}, want {value:?}"
@@ -365,6 +401,34 @@ mod tests {
         ];
         for (test_input, test_stmts, test_value) in tests {
             run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+        }
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        let tests = [
+            (r#""monkey""#, "monkey"),
+            (r#""mon" + "key""#, "monkey"),
+            (r#""mon" + "key" + "banana""#, "monkeybanana"),
+        ];
+        for (test_input, test_value) in tests {
+            run_vm_test(test_input, 1, Object::new_string(test_value.into()));
+        }
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let tests = [
+            ("[]", vec![]),
+            ("[1, 2, 3]", vec![1, 2, 3]),
+            ("[1 + 2, 3 * 4, 5 + 6]", vec![3, 12, 11]),
+        ];
+        for (test_input, test_value) in tests {
+            let mut test_array = vec![];
+            for v in test_value {
+                test_array.push(Rc::new(Object::new_integer(v)));
+            }
+            run_vm_test(test_input, 1, Object::Array(test_array));
         }
     }
 }

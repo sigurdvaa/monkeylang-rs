@@ -1,5 +1,7 @@
 mod symbol;
 
+use std::fmt::Display;
+
 use crate::ast::{Expression, Operator, Program, Statement};
 use crate::code::{make_ins, Instruction, Opcode};
 use crate::object::Object;
@@ -7,8 +9,21 @@ pub use symbol::SymbolTable;
 
 #[derive(Debug)]
 pub enum CompilerError {
-    UnknownOperator(String),
+    UnknownPrefixOperator(Operator),
+    UnknownInfixOperator(Operator),
     UndefinedVariable(String),
+}
+
+impl std::error::Error for CompilerError {}
+
+impl Display for CompilerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnknownPrefixOperator(op) => write!(f, "unknown prefix operator: {op:?}"),
+            Self::UnknownInfixOperator(op) => write!(f, "unknown infix operator: {op:?}"),
+            Self::UndefinedVariable(name) => write!(f, "undefined variable: {name}"),
+        }
+    }
 }
 
 pub struct Bytecode {
@@ -85,8 +100,11 @@ impl Compiler {
     }
 
     fn change_operand(&mut self, pos: usize, operand: usize) {
-        let op = Opcode::try_from(self.instructions[pos]).unwrap_or_else(|e| {
-            panic!("can't replace operand, unknown opcode at position {pos}: {e}",)
+        let op = Opcode::try_from(self.instructions[pos]).unwrap_or_else(|_| {
+            panic!(
+                "can't replace operand, unknown opcode at position {pos}: {}",
+                self.instructions[pos]
+            )
         });
         let new_ins = make_ins(op, &[operand]);
         self.replace_ins(pos, new_ins);
@@ -103,6 +121,19 @@ impl Compiler {
                 let operands = &[self.add_constant(obj)];
                 self.emit(Opcode::Constant, operands)
             }
+            Expression::String(expr) => {
+                let obj = Object::new_string(expr.value.clone());
+                let operands = &[self.add_constant(obj)];
+                self.emit(Opcode::Constant, operands)
+            }
+            Expression::Array(expr) => {
+                for element in &expr.elements {
+                    self.compile_expression(element)?;
+                }
+                self.emit(Opcode::Array, &[expr.elements.len()])
+            }
+            Expression::Hash(expr) => todo!("{expr:?}"),
+            Expression::Null(expr) => todo!("{expr:?}"),
             Expression::Infix(expr) => {
                 self.compile_expression(&expr.left)?;
                 self.compile_expression(&expr.right)?;
@@ -115,12 +146,7 @@ impl Compiler {
                     Operator::Lt => self.emit(Opcode::Lt, &[]),
                     Operator::Eq => self.emit(Opcode::Eq, &[]),
                     Operator::NotEq => self.emit(Opcode::NotEq, &[]),
-                    _ => {
-                        return Err(CompilerError::UnknownOperator(format!(
-                            "unknown infix operator: {}",
-                            expr.operator
-                        )))
-                    }
+                    _ => return Err(CompilerError::UnknownInfixOperator(expr.operator.clone())),
                 }
             }
             Expression::Prefix(expr) => {
@@ -128,12 +154,7 @@ impl Compiler {
                 match expr.operator {
                     Operator::Bang => self.emit(Opcode::Bang, &[]),
                     Operator::Minus => self.emit(Opcode::Minus, &[]),
-                    _ => {
-                        return Err(CompilerError::UnknownOperator(format!(
-                            "unknown prefix operator: {}",
-                            expr.operator
-                        )))
-                    }
+                    _ => return Err(CompilerError::UnknownPrefixOperator(expr.operator.clone())),
                 }
             }
             Expression::If(expr) => {
@@ -168,10 +189,6 @@ impl Compiler {
                 }
                 None => return Err(CompilerError::UndefinedVariable(expr.value.clone())),
             },
-            Expression::String(expr) => todo!("{expr:?}"),
-            Expression::Array(expr) => todo!("{expr:?}"),
-            Expression::Hash(expr) => todo!("{expr:?}"),
-            Expression::Null(expr) => todo!("{expr:?}"),
             Expression::Index(expr) => todo!("{expr:?}"),
             Expression::Macro(expr) => todo!("{expr:?}"),
         };
@@ -186,7 +203,7 @@ impl Compiler {
                 let index = sym.index;
                 self.emit(Opcode::SetGlobal, &[index]);
             }
-            Statement::Return(expr) => todo!(),
+            Statement::Return(_expr) => todo!(),
             Statement::Expression(expr) => {
                 self.compile_expression(&expr.value)?;
                 self.emit(Opcode::Pop, &[]);
@@ -229,7 +246,7 @@ mod tests {
     }
 
     impl TestCase {
-        fn new(
+        fn new_integer(
             input: &'static str,
             statements: usize,
             constants: Vec<usize>,
@@ -241,6 +258,23 @@ mod tests {
                 constants: constants
                     .into_iter()
                     .map(|i| Object::new_integer(i as isize))
+                    .collect(),
+                instructions: instructions.into_iter().flatten().collect(),
+            }
+        }
+
+        fn new_string(
+            input: &'static str,
+            statements: usize,
+            constants: Vec<&'static str>,
+            instructions: Vec<Vec<Instruction>>,
+        ) -> Self {
+            Self {
+                input,
+                statements,
+                constants: constants
+                    .into_iter()
+                    .map(|i| Object::new_string(i.into()))
                     .collect(),
                 instructions: instructions.into_iter().flatten().collect(),
             }
@@ -268,7 +302,7 @@ mod tests {
     #[test]
     fn test_integer_arithmetic() {
         let tests = [
-            TestCase::new(
+            TestCase::new_integer(
                 "1 + 2",
                 1,
                 vec![1, 2],
@@ -279,7 +313,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "1; 2",
                 2,
                 vec![1, 2],
@@ -290,7 +324,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "1 - 2",
                 1,
                 vec![1, 2],
@@ -301,7 +335,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "1 * 2",
                 1,
                 vec![1, 2],
@@ -312,7 +346,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "2 / 1",
                 1,
                 vec![2, 1],
@@ -323,7 +357,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "-1",
                 1,
                 vec![1],
@@ -340,19 +374,19 @@ mod tests {
     #[test]
     fn test_boolean_expressions() {
         let tests = [
-            TestCase::new(
+            TestCase::new_integer(
                 "true",
                 1,
                 vec![],
                 vec![make_ins(Opcode::True, &[0]), make_ins(Opcode::Pop, &[])],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "false",
                 1,
                 vec![],
                 vec![make_ins(Opcode::False, &[0]), make_ins(Opcode::Pop, &[])],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "1 > 2",
                 1,
                 vec![1, 2],
@@ -363,7 +397,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "1 < 2",
                 1,
                 vec![1, 2],
@@ -374,7 +408,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "1 == 2",
                 1,
                 vec![1, 2],
@@ -385,7 +419,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "1 != 2",
                 1,
                 vec![1, 2],
@@ -396,7 +430,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "true == false",
                 1,
                 vec![],
@@ -407,7 +441,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "true != false",
                 1,
                 vec![],
@@ -418,7 +452,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "!true",
                 1,
                 vec![],
@@ -435,7 +469,7 @@ mod tests {
     #[test]
     fn test_conditionals() {
         let tests = [
-            TestCase::new(
+            TestCase::new_integer(
                 "if (true) { 10 }; 3333;",
                 2,
                 vec![10, 3333],
@@ -450,7 +484,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "if (true) { 10 } else { 20 }; 3333;",
                 2,
                 vec![10, 20, 3333],
@@ -472,7 +506,7 @@ mod tests {
     #[test]
     fn test_global_let_statements() {
         let tests = [
-            TestCase::new(
+            TestCase::new_integer(
                 "let one = 1; let two = 2;",
                 2,
                 vec![1, 2],
@@ -483,7 +517,7 @@ mod tests {
                     make_ins(Opcode::SetGlobal, &[1]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "let one = 1; one",
                 2,
                 vec![1],
@@ -494,7 +528,7 @@ mod tests {
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),
-            TestCase::new(
+            TestCase::new_integer(
                 "let one = 1; let two = one; two",
                 3,
                 vec![1],
@@ -504,6 +538,73 @@ mod tests {
                     make_ins(Opcode::GetGlobal, &[0]),
                     make_ins(Opcode::SetGlobal, &[1]),
                     make_ins(Opcode::GetGlobal, &[1]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+        ];
+        run_compiler_tests(&tests);
+    }
+
+    #[test]
+    fn test_string_expressions() {
+        let tests = [
+            TestCase::new_string(
+                r#""monkey""#,
+                1,
+                vec!["monkey"],
+                vec![make_ins(Opcode::Constant, &[0]), make_ins(Opcode::Pop, &[])],
+            ),
+            TestCase::new_string(
+                r#""mon" + "key""#,
+                1,
+                vec!["mon", "key"],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Add, &[]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+        ];
+        run_compiler_tests(&tests);
+    }
+
+    #[test]
+    fn test_array_literals() {
+        let tests = [
+            TestCase::new_integer(
+                "[]",
+                1,
+                vec![],
+                vec![make_ins(Opcode::Array, &[0]), make_ins(Opcode::Pop, &[])],
+            ),
+            TestCase::new_integer(
+                "[1, 2, 3]",
+                1,
+                vec![1, 2, 3],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Constant, &[2]),
+                    make_ins(Opcode::Array, &[3]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new_integer(
+                "[1 + 2, 3 - 4, 5 * 6]",
+                1,
+                vec![1, 2, 3, 4, 5, 6],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Add, &[]),
+                    make_ins(Opcode::Constant, &[2]),
+                    make_ins(Opcode::Constant, &[3]),
+                    make_ins(Opcode::Sub, &[]),
+                    make_ins(Opcode::Constant, &[4]),
+                    make_ins(Opcode::Constant, &[5]),
+                    make_ins(Opcode::Mul, &[]),
+                    make_ins(Opcode::Array, &[3]),
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),

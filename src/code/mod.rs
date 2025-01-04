@@ -34,10 +34,13 @@ impl Instructions for [Instruction] {
 
 pub struct Definition {
     // TODO: remove unused field?
-    opcode: Opcode,
+    _opcode: Opcode,
     // TODO: rework def to vec?
     operand_widths: [u32; 2],
 }
+
+#[derive(Debug)]
+pub struct OpcodeError {}
 
 #[derive(Debug, Clone)]
 pub enum Opcode {
@@ -60,11 +63,12 @@ pub enum Opcode {
     Null,
     GetGlobal,
     SetGlobal,
+    Array,
     EnumLength,
 }
 
 impl TryFrom<u8> for Opcode {
-    type Error = String;
+    type Error = OpcodeError;
 
     fn try_from(op: u8) -> Result<Self, Self::Error> {
         match op {
@@ -87,86 +91,91 @@ impl TryFrom<u8> for Opcode {
             16 if 16 == Self::Null as u8 => Ok(Self::Null),
             17 if 17 == Self::GetGlobal as u8 => Ok(Self::GetGlobal),
             18 if 18 == Self::SetGlobal as u8 => Ok(Self::SetGlobal),
-            _ => Err(format!("invalid opcode byte: {op:?}")),
+            19 if 19 == Self::Array as u8 => Ok(Self::Array),
+            _ => Err(OpcodeError {}),
         }
     }
 }
 
 const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
     &Definition {
-        opcode: Opcode::Constant,
+        _opcode: Opcode::Constant,
         operand_widths: [2, 0],
     },
     &Definition {
-        opcode: Opcode::Add,
+        _opcode: Opcode::Add,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Pop,
+        _opcode: Opcode::Pop,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Sub,
+        _opcode: Opcode::Sub,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Mul,
+        _opcode: Opcode::Mul,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Div,
+        _opcode: Opcode::Div,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::True,
+        _opcode: Opcode::True,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::False,
+        _opcode: Opcode::False,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Eq,
+        _opcode: Opcode::Eq,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::NotEq,
+        _opcode: Opcode::NotEq,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Gt,
+        _opcode: Opcode::Gt,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Lt,
+        _opcode: Opcode::Lt,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Minus,
+        _opcode: Opcode::Minus,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Bang,
+        _opcode: Opcode::Bang,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::Jump,
+        _opcode: Opcode::Jump,
         operand_widths: [2, 0],
     },
     &Definition {
-        opcode: Opcode::JumpNotTrue,
+        _opcode: Opcode::JumpNotTrue,
         operand_widths: [2, 0],
     },
     &Definition {
-        opcode: Opcode::Null,
+        _opcode: Opcode::Null,
         operand_widths: [0, 0],
     },
     &Definition {
-        opcode: Opcode::GetGlobal,
+        _opcode: Opcode::GetGlobal,
         operand_widths: [2, 0],
     },
     &Definition {
-        opcode: Opcode::SetGlobal,
+        _opcode: Opcode::SetGlobal,
+        operand_widths: [2, 0],
+    },
+    &Definition {
+        _opcode: Opcode::Array,
         operand_widths: [2, 0],
     },
 ];

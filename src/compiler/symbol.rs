@@ -9,7 +9,7 @@ pub enum SymbolScope {
 }
 
 impl SymbolScope {
-    pub fn value(&self) -> &'static str {
+    pub fn _value(&self) -> &'static str {
         match self {
             Self::Global => "GLOBAL",
         }
