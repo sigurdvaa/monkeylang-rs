@@ -1,6 +1,7 @@
-use crate::code::{read_u16_as_usize, Instruction, Opcode};
+use crate::code::{read_u16_as_usize, Instruction, Opcode, OpcodeError};
 use crate::compiler::Bytecode;
-use crate::object::Object;
+use crate::object::{HashKeyError, Object};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
 
@@ -9,7 +10,8 @@ const GLOBALS_SIZE: usize = 65536;
 
 #[derive(Debug)]
 pub enum VmError {
-    InvalidInstruction(u8),
+    InvalidInstruction(OpcodeError),
+    InvalidHashKey(HashKeyError),
     StackOverflow(Object),
     InvalidStackAccess(usize),
     InvalidGlobalsIndex(usize),
@@ -26,7 +28,8 @@ impl std::error::Error for VmError {}
 impl Display for VmError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InvalidInstruction(byte) => write!(f, "invalid instruction byte: {byte:#x}"),
+            Self::InvalidInstruction(operr) => write!(f, "invalid instruction: {operr}"),
+            Self::InvalidHashKey(keyerr) => write!(f, "invalid hash key: {keyerr}"),
             Self::StackOverflow(obj) => write!(f, "stack overflow, can't push object: {obj:?}"),
             Self::InvalidGlobalsIndex(idx) => {
                 write!(f, "invalid globals access, no object at index {idx}")
@@ -218,13 +221,32 @@ impl Vm {
         Ok(Object::Array(array))
     }
 
+    fn build_hash(&mut self, start_idx: usize, end_idx: usize) -> Result<Object, VmError> {
+        // TODO: can we remove Rc from hash?
+        let mut hash = HashMap::with_capacity(end_idx - start_idx);
+        for i in (start_idx..end_idx).step_by(2) {
+            let key = match self.stack[i].take() {
+                Some(obj) => obj,
+                None => return Err(VmError::InvalidStackAccess(i)),
+            };
+            let value = match self.stack[i + 1].take() {
+                Some(obj) => obj,
+                None => return Err(VmError::InvalidStackAccess(i)),
+            };
+            let hash_key = key.hash_key().map_err(VmError::InvalidHashKey)?;
+            let pair = (Rc::new(key), Rc::new(value));
+            hash.insert(hash_key, pair);
+        }
+        Ok(Object::Hash(hash))
+    }
+
     pub fn run(&mut self) -> Result<Object, VmError> {
         let mut ip = 0;
         let mut last_pop = Object::None;
 
         while ip < self.instructions.len() {
-            let op = Opcode::try_from(self.instructions[ip])
-                .map_err(|_| VmError::InvalidInstruction(self.instructions[ip]))?;
+            let op =
+                Opcode::try_from(self.instructions[ip]).map_err(VmError::InvalidInstruction)?;
 
             match op {
                 Opcode::Bang => self.execute_bang_operator()?,
@@ -279,6 +301,13 @@ impl Vm {
                     let array = self.build_array(self.sp - len, self.sp)?;
                     self.sp -= len;
                     self.push(array)?;
+                }
+                Opcode::Hash => {
+                    let len = read_u16_as_usize(&self.instructions[ip + 1..]);
+                    ip += 2;
+                    let hash = self.build_hash(self.sp - len, self.sp)?;
+                    self.sp -= len;
+                    self.push(hash)?;
                 }
                 Opcode::EnumLength => unreachable!(),
             }
@@ -429,6 +458,26 @@ mod tests {
                 test_array.push(Rc::new(Object::new_integer(v)));
             }
             run_vm_test(test_input, 1, Object::Array(test_array));
+        }
+    }
+
+    #[test]
+    fn test_hash_literals() {
+        let tests = [
+            ("{}", vec![]),
+            ("{1: 2, 2:3}", vec![(1, 2), (2, 3)]),
+            ("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", vec![(2, 4), (6, 16)]),
+        ];
+        for (test_input, test_value) in tests {
+            let mut test_hash = HashMap::new();
+            for (k, v) in test_value {
+                let key = Object::new_integer(k);
+                let value = Object::new_integer(v);
+                let hash = key.hash_key().expect("couldn't generate hash key");
+                let pair = (Rc::new(key), Rc::new(value));
+                test_hash.insert(hash, pair);
+            }
+            run_vm_test(test_input, 1, Object::Hash(test_hash));
         }
     }
 }

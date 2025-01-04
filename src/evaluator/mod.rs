@@ -82,7 +82,7 @@ fn eval_index_expression(left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
         (Object::Hash(left), _) => {
             let hash_key = match index.hash_key() {
                 Ok(hash_key) => hash_key,
-                Err(err) => return err,
+                Err(err) => return Rc::new(Object::Error(err.to_string())),
             };
             eval_hash_index_expression(left, &hash_key)
         }
@@ -162,7 +162,7 @@ fn eval_hash_literal(expr: &HashLiteral, env: Env) -> Rc<Object> {
 
         let hash_key = match key.hash_key() {
             Ok(hash_key) => hash_key,
-            Err(err) => return err,
+            Err(err) => return Rc::new(Object::Error(err.to_string())),
         };
 
         let value = eval_expression(value_expr, env.clone());

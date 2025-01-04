@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 pub type Instruction = u8;
 
 pub trait Instructions {
@@ -40,7 +42,15 @@ pub struct Definition {
 }
 
 #[derive(Debug)]
-pub struct OpcodeError {}
+pub struct OpcodeError(u8);
+
+impl std::error::Error for OpcodeError {}
+
+impl Display for OpcodeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unknown opcode byte: {:#x}", self.0)
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Opcode {
@@ -64,6 +74,7 @@ pub enum Opcode {
     GetGlobal,
     SetGlobal,
     Array,
+    Hash,
     EnumLength,
 }
 
@@ -92,7 +103,8 @@ impl TryFrom<u8> for Opcode {
             17 if 17 == Self::GetGlobal as u8 => Ok(Self::GetGlobal),
             18 if 18 == Self::SetGlobal as u8 => Ok(Self::SetGlobal),
             19 if 19 == Self::Array as u8 => Ok(Self::Array),
-            _ => Err(OpcodeError {}),
+            20 if 20 == Self::Hash as u8 => Ok(Self::Hash),
+            _ => Err(OpcodeError(op)),
         }
     }
 }
@@ -176,6 +188,10 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
     },
     &Definition {
         _opcode: Opcode::Array,
+        operand_widths: [2, 0],
+    },
+    &Definition {
+        _opcode: Opcode::Hash,
         operand_widths: [2, 0],
     },
 ];

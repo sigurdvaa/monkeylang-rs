@@ -4,7 +4,7 @@ use crate::ast::{BlockStatement, Expression, IdentifierLiteral};
 use environment::Env;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
-use std::fmt;
+use std::fmt::{self, Display};
 use std::rc::Rc;
 
 pub type Integer = IntegerObj;
@@ -12,6 +12,17 @@ pub type BuiltinFunction = fn(&[Rc<Object>]) -> Rc<Object>;
 pub type Array = Vec<Rc<Object>>;
 pub type HashObj = HashMap<HashKeyData, (Rc<Object>, Rc<Object>)>;
 type HashKey = RefCell<Option<HashKeyData>>;
+
+#[derive(Debug, PartialEq)]
+pub struct HashKeyError(&'static str);
+
+impl std::error::Error for HashKeyError {}
+
+impl Display for HashKeyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "type not supported as hash key: {}", self.0)
+    }
+}
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct IntegerObj {
@@ -208,7 +219,7 @@ impl Object {
         hash_key
     }
 
-    pub fn hash_key(&self) -> Result<HashKeyData, Rc<Object>> {
+    pub fn hash_key(&self) -> Result<HashKeyData, HashKeyError> {
         // TODO: avoid collisions
         match self {
             Self::Boolean(obj) => {
@@ -233,10 +244,7 @@ impl Object {
                     obj.value.chars().map(|c| c as usize).sum(),
                 ))
             }
-            _ => Err(Rc::new(Object::Error(format!(
-                "unusable as hash key: {}",
-                self.kind()
-            )))),
+            _ => Err(HashKeyError(self.kind())),
         }
     }
 }

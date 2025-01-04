@@ -132,7 +132,13 @@ impl Compiler {
                 }
                 self.emit(Opcode::Array, &[expr.elements.len()])
             }
-            Expression::Hash(expr) => todo!("{expr:?}"),
+            Expression::Hash(expr) => {
+                for (key, value) in &expr.pairs {
+                    self.compile_expression(key)?;
+                    self.compile_expression(value)?;
+                }
+                self.emit(Opcode::Hash, &[expr.pairs.len() * 2])
+            }
             Expression::Null(expr) => todo!("{expr:?}"),
             Expression::Infix(expr) => {
                 self.compile_expression(&expr.left)?;
@@ -605,6 +611,51 @@ mod tests {
                     make_ins(Opcode::Constant, &[5]),
                     make_ins(Opcode::Mul, &[]),
                     make_ins(Opcode::Array, &[3]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+        ];
+        run_compiler_tests(&tests);
+    }
+
+    #[test]
+    fn test_hash_literal() {
+        let tests = [
+            TestCase::new_integer(
+                "{}",
+                1,
+                vec![],
+                vec![make_ins(Opcode::Hash, &[0]), make_ins(Opcode::Pop, &[])],
+            ),
+            TestCase::new_integer(
+                "{1: 2, 3: 4, 5: 6}",
+                1,
+                vec![1, 2, 3, 4, 5, 6],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Constant, &[2]),
+                    make_ins(Opcode::Constant, &[3]),
+                    make_ins(Opcode::Constant, &[4]),
+                    make_ins(Opcode::Constant, &[5]),
+                    make_ins(Opcode::Hash, &[6]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new_integer(
+                "{1: 2 + 3, 4: 5 * 6}",
+                1,
+                vec![1, 2, 3, 4, 5, 6],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Constant, &[2]),
+                    make_ins(Opcode::Add, &[]),
+                    make_ins(Opcode::Constant, &[3]),
+                    make_ins(Opcode::Constant, &[4]),
+                    make_ins(Opcode::Constant, &[5]),
+                    make_ins(Opcode::Mul, &[]),
+                    make_ins(Opcode::Hash, &[4]),
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),

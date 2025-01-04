@@ -141,7 +141,7 @@ fn test_error_handling() {
         ("\"Hello\" - \"World\"", "unknown string operator: -"),
         (
             r#"{"name": "Monkey"}[fn(x) { x }];"#,
-            "unusable as hash key: FUNCTION",
+            "type not supported as hash key: FUNCTION",
         ),
     ];
     for (test_input, test_value) in tests {
