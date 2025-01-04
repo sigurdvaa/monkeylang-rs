@@ -196,3 +196,55 @@ fn test_calling_functions_without_arguments() {
         run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
     }
 }
+
+#[test]
+fn test_functions_with_return_statement() {
+    let tests = [
+        (
+            "let earlyExit = fn() { return 99; 100; }; earlyExit();",
+            2,
+            99,
+        ),
+        (
+            "let earlyExit = fn() { return 99; return 100; }; earlyExit();",
+            2,
+            99,
+        ),
+    ];
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+    }
+}
+
+#[test]
+fn test_functions_without_return_value() {
+    let tests = [
+        (
+            " let noReturn = fn() { }; noReturn();",
+            2,
+        ),
+        (
+            "let noReturn = fn() { }; let noReturnTwo = fn() { noReturn(); }; noReturn(); noReturnTwo();",
+            4,
+        ),
+    ];
+    for (test_input, test_stmts) in tests {
+        run_vm_test(test_input, test_stmts, Object::new_null());
+    }
+}
+
+#[test]
+fn test_first_class_functions() {
+    let tests = [(
+        concat!(
+            "let returnsOne = fn() { 1; };\n",
+            "let returnsOneReturner = fn() { returnsOne; };\n",
+            "returnsOneReturner()();"
+        ),
+        3,
+        1,
+    )];
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+    }
+}

@@ -443,6 +443,7 @@ impl Vm {
                 Opcode::Return => {
                     self.pop_frame()?;
                     self.pop()?;
+                    self.push(Object::new_null())?;
                 }
                 Opcode::ReturnValue => {
                     let value = self.pop()?;
