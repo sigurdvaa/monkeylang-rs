@@ -1,5 +1,6 @@
 mod builtins;
 pub mod r#macro;
+#[cfg(test)]
 pub mod tests;
 
 use crate::ast::{

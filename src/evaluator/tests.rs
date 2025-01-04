@@ -1,11 +1,8 @@
-#[cfg(test)]
 use super::*;
+use crate::lexer::Lexer;
+use crate::parser::Parser;
 
-#[cfg(test)]
 pub fn test_eval(input: &str) -> Rc<Object> {
-    use crate::lexer::Lexer;
-    use crate::parser::Parser;
-
     let env = Environment::new();
     let lexer = Lexer::new(None, input.chars().peekable());
     let mut parser = Parser::new(lexer);

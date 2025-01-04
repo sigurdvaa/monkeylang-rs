@@ -1,7 +1,5 @@
-#[cfg(test)]
 use super::*;
 
-#[cfg(test)]
 #[derive(Debug)]
 enum Literal {
     Bool(bool),
@@ -10,7 +8,6 @@ enum Literal {
     String(String),
 }
 
-#[cfg(test)]
 pub fn parse_program(input: &str, statements: usize) -> Program {
     let lexer = Lexer::new(None, input.chars().peekable());
     let mut parser = Parser::new(lexer);
@@ -31,28 +28,24 @@ pub fn parse_program(input: &str, statements: usize) -> Program {
     program
 }
 
-#[cfg(test)]
 fn assert_identifier_literal(expr: &IdentifierLiteral, assert_value: &str) {
     assert_eq!(expr.token.kind, TokenKind::Ident);
     assert_eq!(expr.token.literal, assert_value);
     assert_eq!(expr.value, assert_value);
 }
 
-#[cfg(test)]
 fn assert_integer_literal(expr: &IntegerLiteral, assert_value: &usize) {
     assert_eq!(expr.token.kind, TokenKind::Int);
     assert_eq!(expr.token.literal, assert_value.to_string());
     assert_eq!(&expr.value, assert_value);
 }
 
-#[cfg(test)]
 fn assert_string_literal(expr: &StringLiteral, assert_value: &str) {
     assert_eq!(expr.token.kind, TokenKind::String);
     assert_eq!(expr.token.literal, assert_value);
     assert_eq!(&expr.value, assert_value);
 }
 
-#[cfg(test)]
 fn assert_boolean_literal(expr: &BooleanLiteral, assert_value: &bool) {
     if *assert_value {
         assert_eq!(expr.token.kind, TokenKind::True);
@@ -63,7 +56,6 @@ fn assert_boolean_literal(expr: &BooleanLiteral, assert_value: &bool) {
     assert_eq!(&expr.value, assert_value);
 }
 
-#[cfg(test)]
 fn assert_literal(expression: &Expression, assert_value: &Literal) {
     match (&expression, &assert_value) {
         (Expression::Boolean(expr), Literal::Bool(value)) => assert_boolean_literal(expr, value),
@@ -80,7 +72,6 @@ fn assert_literal(expression: &Expression, assert_value: &Literal) {
     }
 }
 
-#[cfg(test)]
 fn assert_infix_expression(
     expression: &Expression,
     left_test: &Literal,
@@ -97,7 +88,6 @@ fn assert_infix_expression(
     assert_literal(&expr.right, right_test);
 }
 
-#[cfg(test)]
 fn assert_prefix_expression(
     expression: &Expression,
     operator_test: &Operator,
