@@ -31,34 +31,45 @@ pub struct Bytecode {
     pub constants: Vec<Object>,
 }
 
+#[derive(Default)]
+struct CompilationScope {
+    instructions: Vec<Instruction>,
+    first_prev_ins: Option<EmittedIns>,
+    second_prev_ins: Option<EmittedIns>,
+}
+
+impl CompilationScope {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[derive(Debug, PartialEq)]
 struct EmittedIns {
     op: Opcode,
     pos: usize,
 }
 
 pub struct Compiler {
-    instructions: Vec<Instruction>,
     constants: Vec<Object>,
-    first_prev_ins: Option<EmittedIns>,
-    second_prev_ins: Option<EmittedIns>,
     symbols: SymbolTable,
+    scopes: Vec<CompilationScope>,
+    scope_idx: usize,
 }
 
 impl Compiler {
     pub fn new() -> Self {
         Self {
-            instructions: vec![],
             constants: vec![],
-            first_prev_ins: None,
-            second_prev_ins: None,
             symbols: SymbolTable::new(),
+            scopes: vec![CompilationScope::new()],
+            scope_idx: 0,
         }
     }
 
     pub fn soft_reset(&mut self) {
-        self.instructions.clear();
-        self.first_prev_ins = None;
-        self.second_prev_ins = None;
+        self.scopes.clear();
+        self.scope_idx = 0;
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {
@@ -67,43 +78,71 @@ impl Compiler {
     }
 
     fn add_instruction(&mut self, ins: Vec<Instruction>) -> usize {
-        let pos = self.instructions.len();
-        self.instructions.extend(ins);
+        let curr_ins = &mut self.scopes[self.scope_idx].instructions;
+        let pos = curr_ins.len();
+        curr_ins.extend(ins);
         pos
+    }
+
+    fn curr_scope_ins_len(&self) -> usize {
+        self.scopes[self.scope_idx].instructions.len()
+    }
+
+    fn enter_scope(&mut self) {
+        let scope = CompilationScope::new();
+        self.scopes.push(scope);
+        self.scope_idx += 1;
+    }
+    fn leave_scope(&mut self) -> Vec<Instruction> {
+        let ins = self.scopes.pop().expect("can't leave last scope");
+        self.scope_idx -= 1;
+        ins.instructions
+    }
+
+    fn set_prev_ins(&mut self, op: Opcode, pos: usize) {
+        let curr_scope = &mut self.scopes[self.scope_idx];
+        std::mem::swap(
+            &mut curr_scope.first_prev_ins,
+            &mut curr_scope.second_prev_ins,
+        );
+        curr_scope.first_prev_ins = Some(EmittedIns { op, pos });
     }
 
     fn emit(&mut self, op: Opcode, operands: &[usize]) -> usize {
         let ins = make_ins(op.clone(), operands);
         let pos = self.add_instruction(ins);
-
-        std::mem::swap(&mut self.first_prev_ins, &mut self.second_prev_ins);
-        self.first_prev_ins = Some(EmittedIns { op, pos });
-
+        self.set_prev_ins(op, pos);
         pos
     }
 
     fn remove_last_pop(&mut self) {
+        let curr_scope = &mut self.scopes[self.scope_idx];
         if let Some(EmittedIns {
             op: Opcode::Pop,
             pos,
-        }) = self.first_prev_ins
+        }) = curr_scope.first_prev_ins
         {
-            self.instructions.remove(pos);
-            std::mem::swap(&mut self.first_prev_ins, &mut self.second_prev_ins);
+            curr_scope.instructions.remove(pos);
+            std::mem::swap(
+                &mut curr_scope.first_prev_ins,
+                &mut curr_scope.second_prev_ins,
+            );
         }
     }
 
     fn replace_ins(&mut self, pos: usize, new_ins: Vec<Instruction>) {
+        let curr_scope = &mut self.scopes[self.scope_idx];
         for (i, ins) in new_ins.into_iter().enumerate() {
-            self.instructions[pos + i] = ins;
+            curr_scope.instructions[pos + i] = ins;
         }
     }
 
     fn change_operand(&mut self, pos: usize, operand: usize) {
-        let op = Opcode::try_from(self.instructions[pos]).unwrap_or_else(|_| {
+        let curr_scope = &mut self.scopes[self.scope_idx];
+        let op = Opcode::try_from(curr_scope.instructions[pos]).unwrap_or_else(|_| {
             panic!(
                 "can't replace operand, unknown opcode at position {pos}: {}",
-                self.instructions[pos]
+                curr_scope.instructions[pos]
             )
         });
         let new_ins = make_ins(op, &[operand]);
@@ -123,6 +162,14 @@ impl Compiler {
             }
             Expression::String(expr) => {
                 let obj = Object::new_string(expr.value.clone());
+                let operands = &[self.add_constant(obj)];
+                self.emit(Opcode::Constant, operands)
+            }
+            Expression::Function(expr) => {
+                self.enter_scope();
+                self.compile_statements(&expr.body.statements)?;
+                let ins = self.leave_scope();
+                let obj = Object::CompiledFunction(ins);
                 let operands = &[self.add_constant(obj)];
                 self.emit(Opcode::Constant, operands)
             }
@@ -171,7 +218,7 @@ impl Compiler {
                 self.remove_last_pop();
 
                 let jump_pos = self.emit(Opcode::Jump, &[0]); // tmp bogus value
-                let after_consequence_pos = self.instructions.len();
+                let after_consequence_pos = self.curr_scope_ins_len();
                 self.change_operand(jumpnottrue_pos, after_consequence_pos);
 
                 if let Some(alt) = &expr.alternative {
@@ -181,13 +228,12 @@ impl Compiler {
                     let _ = self.emit(Opcode::Null, &[]);
                 }
 
-                let after_alternative_pos = self.instructions.len();
+                let after_alternative_pos = self.curr_scope_ins_len();
                 self.change_operand(jump_pos, after_alternative_pos);
 
                 after_alternative_pos
             }
             Expression::Call(expr) => todo!("{expr:?}"),
-            Expression::Function(expr) => todo!("{expr:?}"),
             Expression::Identifier(expr) => match self.symbols.resolve(&expr.value) {
                 Some(sym) => {
                     let index = sym.index;
@@ -215,7 +261,10 @@ impl Compiler {
                 let index = sym.index;
                 self.emit(Opcode::SetGlobal, &[index]);
             }
-            Statement::Return(_expr) => todo!(),
+            Statement::Return(expr) => {
+                self.compile_expression(&expr.value)?;
+                self.emit(Opcode::ReturnValue, &[]);
+            }
             Statement::Expression(expr) => {
                 self.compile_expression(&expr.value)?;
                 self.emit(Opcode::Pop, &[]);
@@ -238,7 +287,7 @@ impl Compiler {
 
     pub fn bytecode(&self) -> Bytecode {
         Bytecode {
-            instructions: self.instructions.clone(),
+            instructions: self.scopes[self.scope_idx].instructions.clone(),
             constants: self.constants.clone(),
         }
     }
@@ -258,6 +307,19 @@ mod tests {
     }
 
     impl TestCase {
+        fn new(
+            input: &'static str,
+            statements: usize,
+            constants: Vec<Object>,
+            instructions: Vec<Vec<Instruction>>,
+        ) -> Self {
+            Self {
+                input,
+                statements,
+                constants,
+                instructions: instructions.into_iter().flatten().collect(),
+            }
+        }
         fn new_integer(
             input: &'static str,
             statements: usize,
@@ -705,5 +767,71 @@ mod tests {
             ),
         ];
         run_compiler_tests(&tests);
+    }
+
+    #[test]
+    fn test_functions() {
+        let tests = [TestCase::new(
+            "fn() { return 5 + 10 }",
+            1,
+            vec![
+                Object::new_integer(5),
+                Object::new_integer(10),
+                Object::CompiledFunction(
+                    vec![
+                        make_ins(Opcode::Constant, &[0]),
+                        make_ins(Opcode::Constant, &[1]),
+                        make_ins(Opcode::Add, &[]),
+                        make_ins(Opcode::ReturnValue, &[]),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
+                ),
+            ],
+            vec![make_ins(Opcode::Constant, &[2]), make_ins(Opcode::Pop, &[])],
+        )];
+        run_compiler_tests(&tests);
+    }
+
+    #[test]
+    fn test_compiler_scopes() {
+        let mut compiler = Compiler::new();
+        assert_eq!(compiler.scope_idx, 0);
+
+        compiler.emit(Opcode::Mul, &[]);
+
+        compiler.enter_scope();
+        assert_eq!(compiler.scope_idx, 1);
+
+        compiler.emit(Opcode::Sub, &[]);
+        assert_eq!(compiler.curr_scope_ins_len(), 1);
+        assert_eq!(
+            compiler.scopes[compiler.scope_idx].first_prev_ins,
+            Some(EmittedIns {
+                op: Opcode::Sub,
+                pos: 0
+            })
+        );
+
+        compiler.leave_scope();
+        assert_eq!(compiler.scope_idx, 0);
+
+        compiler.emit(Opcode::Add, &[]);
+        assert_eq!(compiler.curr_scope_ins_len(), 2);
+        assert_eq!(
+            compiler.scopes[compiler.scope_idx].first_prev_ins,
+            Some(EmittedIns {
+                op: Opcode::Add,
+                pos: 1
+            })
+        );
+        assert_eq!(
+            compiler.scopes[compiler.scope_idx].second_prev_ins,
+            Some(EmittedIns {
+                op: Opcode::Mul,
+                pos: 0
+            })
+        );
     }
 }

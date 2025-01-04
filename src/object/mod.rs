@@ -50,11 +50,6 @@ pub struct FunctionObj {
     pub env: Env,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct CompiledFunctionObj {
-    pub intructions: Vec<Instruction>,
-}
-
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Clone)]
 pub struct HashKeyData {
     pub kind: &'static str,
@@ -70,7 +65,7 @@ pub enum Object {
     Return(Rc<Self>),
     Error(String),
     Function(FunctionObj),
-    CompiledFunction(CompiledFunctionObj),
+    CompiledFunction(Vec<Instruction>),
     String(StringObj),
     Builtin(BuiltinFunction),
     Array(Array),

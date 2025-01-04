@@ -20,7 +20,7 @@ impl Display for OpcodeError {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Opcode {
     Constant,
     Add,

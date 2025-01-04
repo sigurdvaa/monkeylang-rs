@@ -342,6 +342,9 @@ impl Vm {
                     self.push(hash)?;
                 }
                 Opcode::Index => self.execute_index_expression()?,
+                Opcode::Call => todo!(),
+                Opcode::Return => todo!(),
+                Opcode::ReturnValue => todo!(),
                 Opcode::EnumLength => unreachable!(),
             }
 
