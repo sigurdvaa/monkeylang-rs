@@ -590,3 +590,54 @@ fn test_compiler_scopes() {
         })
     );
 }
+
+#[test]
+fn test_function_calls() {
+    let tests = [
+        TestCase::new(
+            "fn() { 24 }();",
+            1,
+            vec![
+                Object::new_integer(24),
+                Object::CompiledFunction(
+                    vec![
+                        make_ins(Opcode::Constant, &[0]),
+                        make_ins(Opcode::ReturnValue, &[]),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
+                ),
+            ],
+            vec![
+                make_ins(Opcode::Constant, &[1]),
+                make_ins(Opcode::Call, &[]),
+                make_ins(Opcode::Pop, &[]),
+            ],
+        ),
+        TestCase::new(
+            "let noArg = fn() { 24 }; noArg();",
+            2,
+            vec![
+                Object::new_integer(24),
+                Object::CompiledFunction(
+                    vec![
+                        make_ins(Opcode::Constant, &[0]),
+                        make_ins(Opcode::ReturnValue, &[]),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect(),
+                ),
+            ],
+            vec![
+                make_ins(Opcode::Constant, &[1]),
+                make_ins(Opcode::SetGlobal, &[0]),
+                make_ins(Opcode::GetGlobal, &[0]),
+                make_ins(Opcode::Call, &[]),
+                make_ins(Opcode::Pop, &[]),
+            ],
+        ),
+    ];
+    run_compiler_tests(&tests);
+}

@@ -1,19 +1,27 @@
+mod frame;
+#[cfg(test)]
+mod tests;
+
 use crate::code::{read_u16_as_usize, Instruction, Opcode, OpcodeError};
 use crate::compiler::Bytecode;
 use crate::object::{Array, HashKeyData, HashKeyError, HashObj, Integer, Object};
+use frame::Frame;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
 
 const STACK_SIZE: usize = 2048;
 const GLOBALS_SIZE: usize = 65536;
+const FRAMES_SIZE: usize = 1024;
 
 #[derive(Debug)]
 pub enum VmError {
     InvalidInstruction(OpcodeError),
     InvalidHashKey(HashKeyError),
     StackOverflow(Object),
+    FramesOverflow(Frame),
     InvalidStackAccess(usize),
+    InvalidFramesAccess(usize),
     InvalidGlobalsIndex(usize),
     InvalidBooleanOperator(Opcode),
     InvalidStringOperator(Opcode),
@@ -22,6 +30,7 @@ pub enum VmError {
     InvalidComparisonTypes(&'static str, &'static str),
     InvalidIndexTypes(&'static str, &'static str),
     InvalidPrefixType(&'static str),
+    InvalidFunctionCall(usize, Object),
 }
 
 impl std::error::Error for VmError {}
@@ -32,11 +41,17 @@ impl Display for VmError {
             Self::InvalidInstruction(operr) => write!(f, "invalid instruction: {operr}"),
             Self::InvalidHashKey(keyerr) => write!(f, "invalid hash key: {keyerr}"),
             Self::StackOverflow(obj) => write!(f, "stack overflow, can't push object: {obj:?}"),
+            Self::FramesOverflow(frame) => {
+                write!(f, "frames overflow, can't push frame: {frame:?}")
+            }
             Self::InvalidGlobalsIndex(idx) => {
                 write!(f, "invalid globals access, no object at index {idx}")
             }
             Self::InvalidStackAccess(idx) => {
                 write!(f, "invalid stack access, no object at index {idx}")
+            }
+            Self::InvalidFramesAccess(idx) => {
+                write!(f, "invalid frames access, no frame at index {idx}")
             }
             Self::InvalidBooleanOperator(op) => write!(f, "invalid boolean operator: {op:?}"),
             Self::InvalidStringOperator(op) => write!(f, "invalid string operator: {op:?}"),
@@ -56,16 +71,23 @@ impl Display for VmError {
             Self::InvalidPrefixType(operand) => {
                 write!(f, "unsupported type for minus prefix operator: {operand}",)
             }
+            Self::InvalidFunctionCall(sp, obj) => {
+                write!(
+                    f,
+                    "invalid function call at stack pointer {sp}, of non-function object: {obj:?}",
+                )
+            }
         }
     }
 }
 
 pub struct Vm {
     constants: Vec<Object>,
-    instructions: Vec<Instruction>,
     stack: [Option<Object>; STACK_SIZE],
     sp: usize,
     globals: Vec<Option<Object>>,
+    frames: [Option<Frame>; FRAMES_SIZE],
+    fp: usize,
 }
 
 impl Vm {
@@ -74,20 +96,29 @@ impl Vm {
             Some(bytecode) => (bytecode.constants.clone(), bytecode.instructions.clone()),
             None => (vec![], vec![]),
         };
-        Self {
+        let mut new = Self {
             constants,
-            instructions,
             stack: [const { None }; STACK_SIZE],
             sp: 0,
             globals: vec![None; GLOBALS_SIZE],
-        }
+            frames: [const { None }; FRAMES_SIZE],
+            fp: 1,
+        };
+        let frame = Frame::new(instructions);
+        new.frames[0].replace(frame);
+        new
     }
 
     pub fn soft_reset(&mut self, bytecode: Bytecode) {
         self.constants = bytecode.constants.clone();
-        self.instructions = bytecode.instructions.clone();
         self.stack = [const { None }; STACK_SIZE];
         self.sp = 0;
+        self.frames = [const { None }; FRAMES_SIZE];
+        self.fp = 1;
+
+        // TODO: is clone needed?
+        let frame = Frame::new(bytecode.instructions.clone());
+        self.frames[0].replace(frame);
     }
 
     fn push(&mut self, obj: Object) -> Result<(), VmError> {
@@ -106,6 +137,39 @@ impl Vm {
         match self.stack[self.sp].take() {
             Some(obj) => Ok(obj),
             None => Err(VmError::InvalidStackAccess(self.sp)),
+        }
+    }
+
+    fn curr_frame_running(&mut self) -> bool {
+        match &mut self.frames[self.fp - 1] {
+            Some(frame) => frame.ip < frame.instructions.len(),
+            None => panic!("main frame missing"),
+        }
+    }
+
+    fn curr_frame(&mut self) -> &mut Frame {
+        match &mut self.frames[self.fp - 1] {
+            Some(frame) => frame,
+            None => panic!("main frame missing"),
+        }
+    }
+
+    fn push_frame(&mut self, frame: Frame) -> Result<(), VmError> {
+        if self.fp >= FRAMES_SIZE {
+            return Err(VmError::FramesOverflow(frame));
+        }
+
+        self.frames[self.fp].replace(frame);
+        self.fp += 1;
+
+        Ok(())
+    }
+
+    fn pop_frame(&mut self) -> Result<Frame, VmError> {
+        self.fp -= 1;
+        match self.frames[self.fp].take() {
+            Some(frame) => Ok(frame),
+            None => Err(VmError::InvalidFramesAccess(self.fp)),
         }
     }
 
@@ -273,266 +337,123 @@ impl Vm {
     }
 
     pub fn run(&mut self) -> Result<Object, VmError> {
-        let mut ip = 0;
+        let mut ins;
+        let mut ip;
         let mut last_pop = Object::None;
 
-        while ip < self.instructions.len() {
-            let op =
-                Opcode::try_from(self.instructions[ip]).map_err(VmError::InvalidInstruction)?;
+        while self.curr_frame_running() {
+            let frame = self.curr_frame();
+            ip = frame.ip;
+            ins = &frame.instructions;
+            let op = Opcode::try_from(ins[ip]).map_err(VmError::InvalidInstruction)?;
 
             match op {
-                Opcode::Bang => self.execute_bang_operator()?,
-                Opcode::Minus => self.execute_minus_operator()?,
-                Opcode::True => self.push(Object::new_boolean(true))?,
-                Opcode::False => self.push(Object::new_boolean(false))?,
-                Opcode::Null => self.push(Object::new_null())?,
+                Opcode::Bang => {
+                    self.execute_bang_operator()?;
+                    self.curr_frame().ip += 1;
+                }
+                Opcode::Minus => {
+                    self.execute_minus_operator()?;
+                    self.curr_frame().ip += 1;
+                }
+                Opcode::True => {
+                    self.push(Object::new_boolean(true))?;
+                    self.curr_frame().ip += 1;
+                }
+                Opcode::False => {
+                    self.push(Object::new_boolean(false))?;
+                    self.curr_frame().ip += 1;
+                }
+                Opcode::Null => {
+                    self.push(Object::new_null())?;
+                    self.curr_frame().ip += 1;
+                }
                 Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
-                    self.execute_binary_operation(op)?
+                    self.execute_binary_operation(op)?;
+                    self.curr_frame().ip += 1;
                 }
                 Opcode::Eq | Opcode::NotEq | Opcode::Gt | Opcode::Lt => {
-                    self.execute_comparison(op)?
+                    self.execute_comparison(op)?;
+                    self.curr_frame().ip += 1;
                 }
                 Opcode::Pop => {
                     last_pop = self.pop()?;
+                    self.curr_frame().ip += 1;
                 }
                 Opcode::Jump => {
-                    let pos = read_u16_as_usize(&self.instructions[ip + 1..]);
-                    ip = pos - 1;
+                    let pos = read_u16_as_usize(&ins[ip + 1..]);
+                    self.curr_frame().ip = pos;
                 }
                 Opcode::JumpNotTrue => {
-                    let pos = read_u16_as_usize(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let pos = read_u16_as_usize(&ins[ip + 1..]);
+                    self.curr_frame().ip += 3;
                     let condition = self.pop()?;
                     if !condition.is_truthy() {
-                        ip = pos - 1;
+                        self.curr_frame().ip = pos;
                     }
                 }
                 Opcode::Constant => {
                     // TODO: use def and width to read and increment ip?
-                    let idx = read_u16_as_usize(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let idx = read_u16_as_usize(&ins[ip + 1..]);
+                    self.curr_frame().ip += 3;
                     self.push(self.constants[idx].clone())?;
                 }
                 Opcode::GetGlobal => {
-                    let idx = read_u16_as_usize(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let idx = read_u16_as_usize(&ins[ip + 1..]);
+                    self.curr_frame().ip += 3;
                     match &self.globals[idx] {
                         Some(obj) => self.push(obj.clone())?,
                         _ => return Err(VmError::InvalidGlobalsIndex(idx)),
                     }
                 }
                 Opcode::SetGlobal => {
-                    let idx = read_u16_as_usize(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let idx = read_u16_as_usize(&ins[ip + 1..]);
+                    self.curr_frame().ip += 3;
                     let obj = self.pop()?;
                     self.globals[idx] = Some(obj);
                 }
                 Opcode::Array => {
-                    let len = read_u16_as_usize(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let len = read_u16_as_usize(&ins[ip + 1..]);
+                    self.curr_frame().ip += 3;
                     let array = self.build_array(self.sp - len, self.sp)?;
                     self.sp -= len;
                     self.push(array)?;
                 }
                 Opcode::Hash => {
-                    let len = read_u16_as_usize(&self.instructions[ip + 1..]);
-                    ip += 2;
+                    let len = read_u16_as_usize(&ins[ip + 1..]);
+                    self.curr_frame().ip += 3;
                     let hash = self.build_hash(self.sp - len, self.sp)?;
                     self.sp -= len;
                     self.push(hash)?;
                 }
-                Opcode::Index => self.execute_index_expression()?,
-                Opcode::Call => todo!(),
-                Opcode::Return => todo!(),
-                Opcode::ReturnValue => todo!(),
+                Opcode::Index => {
+                    self.execute_index_expression()?;
+                    self.curr_frame().ip += 1;
+                }
+                Opcode::Call => match &self.stack[self.sp - 1] {
+                    Some(Object::CompiledFunction(ins)) => {
+                        // TODO: make frame use ref to ins?
+                        let frame = Frame::new(ins.clone());
+                        self.curr_frame().ip += 1;
+                        self.push_frame(frame)?;
+                    }
+                    Some(obj) => return Err(VmError::InvalidFunctionCall(self.sp, obj.clone())),
+                    None => return Err(VmError::InvalidStackAccess(self.sp)),
+                },
+                Opcode::Return => {
+                    self.pop_frame()?;
+                    self.pop()?;
+                }
+                Opcode::ReturnValue => {
+                    let value = self.pop()?;
+                    self.pop_frame()?;
+                    self.pop()?;
+                    self.push(value)?;
+                }
                 Opcode::EnumLength => unreachable!(),
             }
-
-            ip += 1;
         }
 
         Ok(last_pop)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::compiler::Compiler;
-    use crate::parser::tests::parse_program;
-
-    fn run_vm_test(input: &str, statements: usize, value: Object) {
-        let prog = parse_program(input, statements);
-        let mut compiler = Compiler::new();
-        let _ = compiler
-            .compile_program(&prog)
-            .map_err(|e| panic!("compiler error: {e:?}"));
-        let mut vm = Vm::new(Some(compiler.bytecode()));
-        let result = vm.run().unwrap_or_else(|e| panic!("vm error:\n {e}"));
-        assert_eq!(
-            result, value,
-            "unexpected result, got {result:?}, want {value:?}"
-        );
-    }
-
-    #[test]
-    fn test_integer_arithmetic() {
-        let tests = [
-            ("1", 1),
-            ("2", 2),
-            ("1 + 2", 3),
-            ("1 - 2", -1),
-            ("1 * 2", 2),
-            ("4 / 2", 2),
-            ("50 / 2 * 2 + 10 - 5", 55),
-            ("5 + 5 + 5 + 5 - 10", 10),
-            ("2 * 2 * 2 * 2 * 2", 32),
-            ("5 * 2 + 10", 20),
-            ("5 + 2 * 10", 25),
-            ("5 * (2 + 10)", 60),
-            ("-5", -5),
-            ("-10", -10),
-            ("-50 + 100 + -50", 0),
-            ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
-        ];
-        for (test_input, test_value) in tests {
-            run_vm_test(test_input, 1, Object::new_integer(test_value));
-        }
-    }
-
-    #[test]
-    fn test_boolean_expressions() {
-        let tests = [
-            ("true", true),
-            ("false", false),
-            ("1 < 2", true),
-            ("1 > 2", false),
-            ("1 < 1", false),
-            ("1 > 1", false),
-            ("1 == 1", true),
-            ("1 != 1", false),
-            ("1 == 2", false),
-            ("1 != 2", true),
-            ("true == true", true),
-            ("false == false", true),
-            ("true == false", false),
-            ("true != false", true),
-            ("false != true", true),
-            ("(1 < 2) == true", true),
-            ("(1 < 2) == false", false),
-            ("(1 > 2) == true", false),
-            ("(1 > 2) == false", true),
-            ("!true", false),
-            ("!false", true),
-            ("!5", false),
-            ("!!true", true),
-            ("!!false", false),
-            ("!!5", true),
-            ("!(if (false) { 5; })", true),
-        ];
-        for (test_input, test_value) in tests {
-            run_vm_test(test_input, 1, Object::new_boolean(test_value));
-        }
-    }
-
-    #[test]
-    fn test_conditionals() {
-        let tests = [
-            ("if (true) { 10 }", Object::new_integer(10)),
-            ("if (true) { 10 } else { 20 }", Object::new_integer(10)),
-            ("if (false) { 10 } else { 20 } ", Object::new_integer(20)),
-            ("if (1) { 10 }", Object::new_integer(10)),
-            ("if (1 < 2) { 10 }", Object::new_integer(10)),
-            ("if (1 < 2) { 10 } else { 20 }", Object::new_integer(10)),
-            ("if (1 > 2) { 10 } else { 20 }", Object::new_integer(20)),
-            ("if (1 > 2) { 10 }", Object::new_null()),
-            ("if (false) { 10 }", Object::new_null()),
-            (
-                "if ((if (false) { 10 })) { 10 } else { 20 }",
-                Object::new_integer(20),
-            ),
-        ];
-        for (test_input, test_value) in tests {
-            run_vm_test(test_input, 1, test_value);
-        }
-    }
-
-    #[test]
-    fn test_global_let_statements() {
-        let tests = [
-            ("let one = 1; one", 2, 1),
-            ("let one = 1; let two = 2; one + two", 3, 3),
-            ("let one = 1; let two = one + one; one + two", 3, 3),
-        ];
-        for (test_input, test_stmts, test_value) in tests {
-            run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
-        }
-    }
-
-    #[test]
-    fn test_string_expressions() {
-        let tests = [
-            (r#""monkey""#, "monkey"),
-            (r#""mon" + "key""#, "monkey"),
-            (r#""mon" + "key" + "banana""#, "monkeybanana"),
-        ];
-        for (test_input, test_value) in tests {
-            run_vm_test(test_input, 1, Object::new_string(test_value.into()));
-        }
-    }
-
-    #[test]
-    fn test_array_literals() {
-        let tests = [
-            ("[]", vec![]),
-            ("[1, 2, 3]", vec![1, 2, 3]),
-            ("[1 + 2, 3 * 4, 5 + 6]", vec![3, 12, 11]),
-        ];
-        for (test_input, test_value) in tests {
-            let mut test_array = vec![];
-            for v in test_value {
-                test_array.push(Rc::new(Object::new_integer(v)));
-            }
-            run_vm_test(test_input, 1, Object::Array(test_array));
-        }
-    }
-
-    #[test]
-    fn test_hash_literals() {
-        let tests = [
-            ("{}", vec![]),
-            ("{1: 2, 2:3}", vec![(1, 2), (2, 3)]),
-            ("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", vec![(2, 4), (6, 16)]),
-        ];
-        for (test_input, test_value) in tests {
-            let mut test_hash = HashMap::new();
-            for (k, v) in test_value {
-                let key = Object::new_integer(k);
-                let value = Object::new_integer(v);
-                let hash = key.hash_key().expect("couldn't generate hash key");
-                let pair = (Rc::new(key), Rc::new(value));
-                test_hash.insert(hash, pair);
-            }
-            run_vm_test(test_input, 1, Object::Hash(test_hash));
-        }
-    }
-
-    #[test]
-    fn test_index_expressions() {
-        let tests = [
-            ("[1, 2, 3][1]", Object::new_integer(2)),
-            ("[1, 2, 3][0 + 2]", Object::new_integer(3)),
-            ("[[1, 1, 1]][0][0]", Object::new_integer(1)),
-            ("[][0]", Object::new_null()),
-            ("[1, 2, 3][99]", Object::new_null()),
-            ("[1][-1]", Object::new_null()),
-            ("{1: 1, 2: 2}[1]", Object::new_integer(1)),
-            ("{1: 1, 2: 2}[2]", Object::new_integer(2)),
-            ("{1: 1}[0]", Object::new_null()),
-            ("{}[0]", Object::new_null()),
-        ];
-        for (test_input, test_value) in tests {
-            run_vm_test(test_input, 1, test_value);
-        }
     }
 }

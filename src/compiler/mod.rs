@@ -56,6 +56,7 @@ pub struct Compiler {
     constants: Vec<Object>,
     symbols: SymbolTable,
     scopes: Vec<CompilationScope>,
+    // TODO: remove idx, use vec len/last?
     scope_idx: usize,
 }
 
@@ -269,7 +270,10 @@ impl Compiler {
 
                 after_alternative_pos
             }
-            Expression::Call(expr) => todo!("{expr:?}"),
+            Expression::Call(expr) => {
+                self.compile_expression(expr.function.as_ref())?;
+                self.emit(Opcode::Call, &[])
+            }
             Expression::Identifier(expr) => match self.symbols.resolve(&expr.value) {
                 Some(sym) => {
                     let index = sym.index;
