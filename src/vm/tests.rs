@@ -179,8 +179,20 @@ fn test_index_expressions() {
 
 #[test]
 fn test_calling_functions_without_arguments() {
-    let tests = [("let fivePlusTen = fn() { 5 + 10; }; fivePlusTen();", 15)];
-    for (test_input, test_value) in tests {
-        run_vm_test(test_input, 2, Object::new_integer(test_value));
+    let tests = [
+        ("let fivePlusTen = fn() { 5 + 10; }; fivePlusTen();", 2, 15),
+        (
+            "let one = fn() { 1; }; let two = fn() { 2; }; one() + two()",
+            3,
+            3,
+        ),
+        (
+            "let a = fn() { 1 }; let b = fn() { a() + 1 }; let c = fn() { b() + 1 }; c();",
+            4,
+            3,
+        ),
+    ];
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
     }
 }
