@@ -195,8 +195,14 @@ impl Compiler {
                 }
                 None => return Err(CompilerError::UndefinedVariable(expr.value.clone())),
             },
-            Expression::Index(expr) => todo!("{expr:?}"),
-            Expression::Macro(expr) => todo!("{expr:?}"),
+            Expression::Index(expr) => {
+                self.compile_expression(&expr.left)?;
+                self.compile_expression(&expr.index)?;
+                self.emit(Opcode::Index, &[])
+            }
+            Expression::Macro(_expr) => {
+                unreachable!("macros must be evaluated before generating bytecode")
+            }
         };
         Ok(())
     }
@@ -241,7 +247,7 @@ impl Compiler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::code::{make_ins, Instructions, Opcode};
+    use crate::code::{make_ins, tests::ReadInstructions, Opcode};
     use crate::parser::tests::parse_program;
 
     struct TestCase {
@@ -656,6 +662,44 @@ mod tests {
                     make_ins(Opcode::Constant, &[5]),
                     make_ins(Opcode::Mul, &[]),
                     make_ins(Opcode::Hash, &[4]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+        ];
+        run_compiler_tests(&tests);
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        let tests = [
+            TestCase::new_integer(
+                "[1, 2, 3][1 + 1]",
+                1,
+                vec![1, 2, 3, 1, 1],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Constant, &[2]),
+                    make_ins(Opcode::Array, &[3]),
+                    make_ins(Opcode::Constant, &[3]),
+                    make_ins(Opcode::Constant, &[4]),
+                    make_ins(Opcode::Add, &[0]),
+                    make_ins(Opcode::Index, &[0]),
+                    make_ins(Opcode::Pop, &[]),
+                ],
+            ),
+            TestCase::new_integer(
+                "{1: 2}[2 - 1]",
+                1,
+                vec![1, 2, 2, 1],
+                vec![
+                    make_ins(Opcode::Constant, &[0]),
+                    make_ins(Opcode::Constant, &[1]),
+                    make_ins(Opcode::Hash, &[2]),
+                    make_ins(Opcode::Constant, &[2]),
+                    make_ins(Opcode::Constant, &[3]),
+                    make_ins(Opcode::Sub, &[]),
+                    make_ins(Opcode::Index, &[]),
                     make_ins(Opcode::Pop, &[]),
                 ],
             ),

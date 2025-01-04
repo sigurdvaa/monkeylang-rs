@@ -1,6 +1,6 @@
 use crate::code::{read_u16_as_usize, Instruction, Opcode, OpcodeError};
 use crate::compiler::Bytecode;
-use crate::object::{HashKeyError, Object};
+use crate::object::{Array, HashKeyData, HashKeyError, HashObj, Integer, Object};
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
@@ -20,6 +20,7 @@ pub enum VmError {
     InvalidIntegerOperator(Opcode),
     InvalidBinaryTypes(&'static str, &'static str),
     InvalidComparisonTypes(&'static str, &'static str),
+    InvalidIndexTypes(&'static str, &'static str),
     InvalidPrefixType(&'static str),
 }
 
@@ -48,6 +49,9 @@ impl Display for VmError {
                     f,
                     "unsupported types for comparison operation: {left} {right}"
                 )
+            }
+            Self::InvalidIndexTypes(left, idx) => {
+                write!(f, "unsupported types for index operation: {left}[{idx}]")
             }
             Self::InvalidPrefixType(operand) => {
                 write!(f, "unsupported type for minus prefix operator: {operand}",)
@@ -209,6 +213,34 @@ impl Vm {
         }
     }
 
+    fn execute_array_index(left: &Array, index: &Integer) -> Rc<Object> {
+        left.get(index.value as usize)
+            .unwrap_or(&Rc::new(Object::new_null()))
+            .clone()
+    }
+
+    fn execute_hash_index(left: &HashObj, index: &HashKeyData) -> Rc<Object> {
+        match left.get(index) {
+            Some((_key, value)) => value.clone(),
+            None => Rc::new(Object::new_null()),
+        }
+    }
+
+    fn execute_index_expression(&mut self) -> Result<(), VmError> {
+        let idx = self.pop()?;
+        let left = self.pop()?;
+        let obj = match (&left, &idx) {
+            (Object::Array(obj), Object::Integer(idx)) => Self::execute_array_index(obj, idx),
+            (Object::Hash(obj), _) => {
+                // TODO: does the cache still work?
+                let hash_key = idx.hash_key().map_err(VmError::InvalidHashKey)?;
+                Self::execute_hash_index(obj, &hash_key)
+            }
+            _ => return Err(VmError::InvalidIndexTypes(left.kind(), idx.kind())),
+        };
+        self.push((*obj).clone())
+    }
+
     fn build_array(&mut self, start_idx: usize, end_idx: usize) -> Result<Object, VmError> {
         // TODO: can we remove Rc from array?
         let mut array = Vec::with_capacity(end_idx - start_idx);
@@ -309,6 +341,7 @@ impl Vm {
                     self.sp -= len;
                     self.push(hash)?;
                 }
+                Opcode::Index => self.execute_index_expression()?,
                 Opcode::EnumLength => unreachable!(),
             }
 
@@ -478,6 +511,25 @@ mod tests {
                 test_hash.insert(hash, pair);
             }
             run_vm_test(test_input, 1, Object::Hash(test_hash));
+        }
+    }
+
+    #[test]
+    fn test_index_expressions() {
+        let tests = [
+            ("[1, 2, 3][1]", Object::new_integer(2)),
+            ("[1, 2, 3][0 + 2]", Object::new_integer(3)),
+            ("[[1, 1, 1]][0][0]", Object::new_integer(1)),
+            ("[][0]", Object::new_null()),
+            ("[1, 2, 3][99]", Object::new_null()),
+            ("[1][-1]", Object::new_null()),
+            ("{1: 1, 2: 2}[1]", Object::new_integer(1)),
+            ("{1: 1, 2: 2}[2]", Object::new_integer(2)),
+            ("{1: 1}[0]", Object::new_null()),
+            ("{}[0]", Object::new_null()),
+        ];
+        for (test_input, test_value) in tests {
+            run_vm_test(test_input, 1, test_value);
         }
     }
 }

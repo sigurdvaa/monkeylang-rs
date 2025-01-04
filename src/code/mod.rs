@@ -2,38 +2,6 @@ use std::fmt::Display;
 
 pub type Instruction = u8;
 
-pub trait Instructions {
-    fn to_string(&self) -> String;
-}
-
-impl Instructions for [Instruction] {
-    fn to_string(&self) -> String {
-        let mut buffer = String::new();
-
-        let mut i = 0;
-        while i < self.len() {
-            let op = Opcode::try_from(self[i]).expect("ERROR: failed to print instructions, {e}");
-            let def = DEFINITIONS[op.clone() as usize];
-            let (operands, read) = read_operands(def, &self[i + 1..]);
-            buffer.push_str(&format!("{i:0>4} {op:?}",));
-            if !operands.is_empty() {
-                buffer.push(' ');
-                buffer.push_str(
-                    &operands
-                        .iter()
-                        .map(|i| i.to_string())
-                        .collect::<Vec<_>>()
-                        .join(","),
-                )
-            }
-            buffer.push('\n');
-            i += 1 + read;
-        }
-
-        buffer
-    }
-}
-
 pub struct Definition {
     // TODO: remove unused field?
     _opcode: Opcode,
@@ -75,6 +43,7 @@ pub enum Opcode {
     SetGlobal,
     Array,
     Hash,
+    Index,
     EnumLength,
 }
 
@@ -104,6 +73,7 @@ impl TryFrom<u8> for Opcode {
             18 if 18 == Self::SetGlobal as u8 => Ok(Self::SetGlobal),
             19 if 19 == Self::Array as u8 => Ok(Self::Array),
             20 if 20 == Self::Hash as u8 => Ok(Self::Hash),
+            21 if 21 == Self::Index as u8 => Ok(Self::Index),
             _ => Err(OpcodeError(op)),
         }
     }
@@ -194,6 +164,10 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
         _opcode: Opcode::Hash,
         operand_widths: [2, 0],
     },
+    &Definition {
+        _opcode: Opcode::Index,
+        operand_widths: [0, 0],
+    },
 ];
 
 pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
@@ -222,20 +196,6 @@ pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
     ins
 }
 
-pub fn read_operands(def: &Definition, ins: &[Instruction]) -> (Vec<usize>, usize) {
-    let mut operands = vec![];
-    let mut offset = 0;
-    for width in def.operand_widths {
-        match width {
-            2 => operands.push(read_u16_as_usize(&ins[offset..])),
-            0 => (),
-            _ => todo!("{width:?}"),
-        }
-        offset += width as usize;
-    }
-    (operands, offset)
-}
-
 pub fn read_u16_as_usize(ins: &[Instruction]) -> usize {
     u16::from_be_bytes(
         ins[..2]
@@ -245,8 +205,55 @@ pub fn read_u16_as_usize(ins: &[Instruction]) -> usize {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
+
+    pub trait ReadInstructions {
+        fn to_string(&self) -> String;
+    }
+
+    impl ReadInstructions for [Instruction] {
+        fn to_string(&self) -> String {
+            let mut buffer = String::new();
+
+            let mut i = 0;
+            while i < self.len() {
+                let op =
+                    Opcode::try_from(self[i]).expect("ERROR: failed to print instructions, {e}");
+                let def = DEFINITIONS[op.clone() as usize];
+                let (operands, read) = read_operands(def, &self[i + 1..]);
+                buffer.push_str(&format!("{i:0>4} {op:?}",));
+                if !operands.is_empty() {
+                    buffer.push(' ');
+                    buffer.push_str(
+                        &operands
+                            .iter()
+                            .map(|i| i.to_string())
+                            .collect::<Vec<_>>()
+                            .join(","),
+                    )
+                }
+                buffer.push('\n');
+                i += 1 + read;
+            }
+
+            buffer
+        }
+    }
+
+    fn read_operands(def: &Definition, ins: &[Instruction]) -> (Vec<usize>, usize) {
+        let mut operands = vec![];
+        let mut offset = 0;
+        for width in def.operand_widths {
+            match width {
+                2 => operands.push(read_u16_as_usize(&ins[offset..])),
+                0 => (),
+                _ => todo!("{width:?}"),
+            }
+            offset += width as usize;
+        }
+        (operands, offset)
+    }
 
     #[test]
     fn test_make() {

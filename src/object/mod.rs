@@ -221,6 +221,7 @@ impl Object {
 
     pub fn hash_key(&self) -> Result<HashKeyData, HashKeyError> {
         // TODO: avoid collisions
+        // TODO: improve cache, only works with binding
         match self {
             Self::Boolean(obj) => {
                 if let Some(hash_key) = obj.hash.borrow().as_ref() {

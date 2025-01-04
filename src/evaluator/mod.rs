@@ -65,14 +65,14 @@ fn eval_identifier(identifier: &IdentifierLiteral, env: Env) -> Rc<Object> {
 
 fn eval_array_index_expression(left: &Array, index: &Integer) -> Rc<Object> {
     left.get(index.value as usize)
-        .unwrap_or(&Rc::new(Object::Null))
+        .unwrap_or(&Rc::new(Object::new_null()))
         .clone()
 }
 
 fn eval_hash_index_expression(left: &HashObj, index: &HashKeyData) -> Rc<Object> {
     match left.get(index) {
         Some((_key, value)) => value.clone(),
-        None => Rc::new(Object::Null),
+        None => Rc::new(Object::new_null()),
     }
 }
 
@@ -215,7 +215,7 @@ fn eval_if_expression(expression: &IfExpression, env: Env) -> Rc<Object> {
         true => eval_block_statement(&expression.consequence, env),
         false => match &expression.alternative {
             Some(alt) => eval_block_statement(alt, env),
-            None => Rc::new(Object::Null),
+            None => Rc::new(Object::new_null()),
         },
     }
 }
