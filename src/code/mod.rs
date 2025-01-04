@@ -44,6 +44,9 @@ pub enum Opcode {
     Array,
     Hash,
     Index,
+    Call,
+    Return,
+    ReturnValue,
     EnumLength,
 }
 
@@ -74,6 +77,9 @@ impl TryFrom<u8> for Opcode {
             19 if 19 == Self::Array as u8 => Ok(Self::Array),
             20 if 20 == Self::Hash as u8 => Ok(Self::Hash),
             21 if 21 == Self::Index as u8 => Ok(Self::Index),
+            22 if 22 == Self::Call as u8 => Ok(Self::Call),
+            23 if 23 == Self::Return as u8 => Ok(Self::Return),
+            24 if 24 == Self::ReturnValue as u8 => Ok(Self::ReturnValue),
             _ => Err(OpcodeError(op)),
         }
     }
@@ -168,9 +174,22 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
         _opcode: Opcode::Index,
         operand_widths: [0, 0],
     },
+    &Definition {
+        _opcode: Opcode::Call,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        _opcode: Opcode::Return,
+        operand_widths: [0, 0],
+    },
+    &Definition {
+        _opcode: Opcode::ReturnValue,
+        operand_widths: [0, 0],
+    },
 ];
 
 pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
+    // TODO: replace const with method on enum?
     let def = DEFINITIONS[opcode.clone() as usize];
     let ins_len = 1 + def.operand_widths.iter().sum::<u32>();
 

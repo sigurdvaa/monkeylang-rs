@@ -1,6 +1,7 @@
 pub mod environment;
 
 use crate::ast::{BlockStatement, Expression, IdentifierLiteral};
+use crate::code::Instruction;
 use environment::Env;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
@@ -49,6 +50,11 @@ pub struct FunctionObj {
     pub env: Env,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct CompiledFunctionObj {
+    pub intructions: Vec<Instruction>,
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Clone)]
 pub struct HashKeyData {
     pub kind: &'static str,
@@ -64,6 +70,7 @@ pub enum Object {
     Return(Rc<Self>),
     Error(String),
     Function(FunctionObj),
+    CompiledFunction(CompiledFunctionObj),
     String(StringObj),
     Builtin(BuiltinFunction),
     Array(Array),
@@ -137,6 +144,7 @@ impl Object {
             Self::Return(_) => "RETURN",
             Self::Error(_) => "ERROR",
             Self::Function(_) => "FUNCTION",
+            Self::CompiledFunction(_) => "COMPILED_FUNCTION",
             Self::String(_) => "STRING",
             Self::Builtin(_) => "BUILTIN",
             Self::Array(_) => "ARRAY",
@@ -174,6 +182,7 @@ impl Object {
                     .join(", "),
                 &func.body.to_string()
             ),
+            Self::CompiledFunction(func) => format!("compiledfn[{func:p}]"),
             Self::Macro(func) => format!(
                 "macro({}) {{\n{}\n}}",
                 &func
