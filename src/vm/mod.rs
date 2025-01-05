@@ -16,7 +16,7 @@ const STACK_SIZE: usize = 2048;
 const GLOBALS_SIZE: usize = 65536;
 const FRAMES_SIZE: usize = 1024;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum VmError {
     InvalidInstruction(OpcodeError),
     InvalidHashKey(HashKeyError),
@@ -33,6 +33,7 @@ pub enum VmError {
     InvalidIndexTypes(&'static str, &'static str),
     InvalidPrefixType(&'static str),
     InvalidFunctionCall(usize, Object),
+    WrongNumberArguments(usize, usize),
 }
 
 impl std::error::Error for VmError {}
@@ -79,6 +80,9 @@ impl Display for VmError {
                     "invalid function call at stack pointer {sp}, of non-function object: {obj:?}",
                 )
             }
+            Self::WrongNumberArguments(want, got) => {
+                write!(f, "wrong number of arguments, want={want}, got={got}",)
+            }
         }
     }
 }
@@ -111,6 +115,7 @@ impl Vm {
         let func = Rc::new(CompiledFunctionObj {
             instructions,
             num_locals: 0,
+            num_parameters: 0,
         });
         let frame = Frame::new(func, 0);
         new.frames[0].replace(frame);
@@ -127,6 +132,7 @@ impl Vm {
         let func = Rc::new(CompiledFunctionObj {
             instructions: bytecode.instructions,
             num_locals: 0,
+            num_parameters: 0,
         });
         let frame = Frame::new(func, 0);
         self.frames[0].replace(frame);
@@ -347,6 +353,23 @@ impl Vm {
         Ok(Object::Hash(hash))
     }
 
+    fn call_function(&mut self, num_args: usize) -> Result<(), VmError> {
+        match &self.stack[self.sp - 1 - num_args] {
+            Some(Object::CompiledFunction(func)) => {
+                if func.num_parameters != num_args {
+                    return Err(VmError::WrongNumberArguments(func.num_parameters, num_args));
+                }
+
+                let frame = Frame::new(func.clone(), self.sp - num_args);
+                self.sp += func.num_locals;
+                self.push_frame(frame)?;
+            }
+            Some(obj) => return Err(VmError::InvalidFunctionCall(self.sp - 1, obj.clone())),
+            None => return Err(VmError::InvalidStackAccess(self.sp - 1 - num_args)),
+        }
+        Ok(())
+    }
+
     pub fn run(&mut self) -> Result<Object, VmError> {
         let mut ins;
         let mut ip;
@@ -458,16 +481,11 @@ impl Vm {
                     self.execute_index_expression()?;
                     self.curr_frame().ip += 1;
                 }
-                Opcode::Call => match &self.stack[self.sp - 1] {
-                    Some(Object::CompiledFunction(func)) => {
-                        let frame = Frame::new(func.clone(), self.sp);
-                        self.sp += func.num_locals;
-                        self.curr_frame().ip += 1;
-                        self.push_frame(frame)?;
-                    }
-                    Some(obj) => return Err(VmError::InvalidFunctionCall(self.sp, obj.clone())),
-                    None => return Err(VmError::InvalidStackAccess(self.sp)),
-                },
+                Opcode::Call => {
+                    let num_args = ins[ip + 1] as usize;
+                    self.curr_frame().ip += 2;
+                    self.call_function(num_args)?;
+                }
                 Opcode::Return => {
                     let frame = self.pop_frame()?;
                     self.sp = frame.bp;

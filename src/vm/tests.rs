@@ -310,3 +310,66 @@ fn test_calling_functions_with_bindings() {
         run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
     }
 }
+
+#[test]
+fn test_calling_functions_with_arguments_and_bindings() {
+    let tests = [
+        ("let identity = fn(a) { a; }; identity(4);", 2, 4),
+        ("let sum = fn(a, b) { a + b; }; sum(1, 2);", 2, 3),
+        ("let sum = fn(a, b) { let c = a + b; c; }; sum(1, 2);", 2, 3),
+        (
+            "let sum = fn(a, b) { let c = a + b; c; }; sum(1, 2) + sum(3, 4);",
+            2,
+            10,
+        ),
+        (
+            concat!(
+                "let sum = fn(a, b) { let c = a + b; c; };\n",
+                "let outer = fn() { sum(1, 2) + sum(3, 4); };\n",
+                "outer();"
+            ),
+            3,
+            10,
+        ),
+        (
+            concat!(
+                "let globalNum = 10;\n",
+                "let sum = fn(a, b) {\n",
+                "    let c = a + b;\n",
+                "    c + globalNum;\n",
+                "};\n",
+                "let outer = fn() {\n",
+                "    sum(1, 2) + sum(3, 4) + globalNum;\n",
+                "};\n",
+                "outer() + globalNum;"
+            ),
+            4,
+            50,
+        ),
+    ];
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+    }
+}
+
+#[test]
+fn test_calling_functions_with_wrong_arguments() {
+    let tests = [
+        ("fn() { 1; }(1);", 1, 0, 1),
+        ("fn(a) { a; }();", 1, 1, 0),
+        ("fn(a, b) { a + b; }(1);", 1, 2, 1),
+    ];
+    for (test_input, test_stmts, test_want, test_got) in tests {
+        let prog = parse_program(test_input, test_stmts);
+        let mut compiler = Compiler::new();
+        let _ = compiler
+            .compile_program(&prog)
+            .map_err(|e| panic!("compiler error: {e:?}"));
+        let mut vm = Vm::new(Some(compiler.bytecode()));
+        let result = vm.run();
+        assert_eq!(
+            result,
+            Err(VmError::WrongNumberArguments(test_want, test_got))
+        );
+    }
+}

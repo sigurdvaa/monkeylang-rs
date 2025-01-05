@@ -104,8 +104,8 @@ impl Compiler {
             .symbols
             .outer
             .clone()
-            .expect("can't restore outer scope");
-        let ins = self.scopes.pop().expect("can't leave last scope");
+            .expect("no outer scope to restore");
+        let ins = self.scopes.pop().expect("popped last scope");
         self.scope_idx -= 1;
         ins.instructions
     }
@@ -207,6 +207,10 @@ impl Compiler {
             Expression::Function(expr) => {
                 self.enter_scope();
 
+                for param in &expr.parameters {
+                    self.symbols.define(param.value.clone());
+                }
+
                 self.compile_statements(&expr.body.statements)?;
                 self.replace_last_pop_with_return();
                 self.emit_return_if_missing();
@@ -217,6 +221,7 @@ impl Compiler {
                 let func = Rc::new(CompiledFunctionObj {
                     instructions,
                     num_locals,
+                    num_parameters: expr.parameters.len(),
                 });
                 let obj = Object::CompiledFunction(func);
                 let operands = &[self.add_constant(obj)];
@@ -284,7 +289,10 @@ impl Compiler {
             }
             Expression::Call(expr) => {
                 self.compile_expression(expr.function.as_ref())?;
-                self.emit(Opcode::Call, &[])
+                for arg in &expr.arguments {
+                    self.compile_expression(arg)?;
+                }
+                self.emit(Opcode::Call, &[expr.arguments.len()])
             }
             Expression::Identifier(expr) => match self.symbols.resolve(&expr.value) {
                 Some(sym) => match sym.scope {

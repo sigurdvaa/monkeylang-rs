@@ -1,7 +1,7 @@
 use crate::object::CompiledFunctionObj;
 use std::rc::Rc;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Frame {
     // TODO: can we replace this with ref or Rc?
     pub func: Rc<CompiledFunctionObj>,

@@ -9,7 +9,7 @@ pub struct Definition {
     operand_widths: [u32; 2],
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct OpcodeError(u8);
 
 impl std::error::Error for OpcodeError {}
@@ -180,7 +180,7 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
     },
     &Definition {
         _opcode: Opcode::Call,
-        operand_widths: [0, 0],
+        operand_widths: [1, 0],
     },
     &Definition {
         _opcode: Opcode::Return,
@@ -211,9 +211,9 @@ pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
         let witdh = def.operand_widths[i];
         match witdh {
             2 => ins.extend((*operand as u16).to_be_bytes()),
-            1 => ins.push(*operand as u8),
+            1 => ins.push(*operand as Instruction),
             0 => (),
-            _ => todo!(),
+            _ => unreachable!(),
         }
     }
 
@@ -281,7 +281,7 @@ pub mod tests {
                 2 => operands.push(read_u16_as_usize(&ins[offset..])),
                 1 => operands.push(ins[offset] as usize),
                 0 => (),
-                _ => todo!("{width:?}"),
+                _ => unreachable!(),
             }
             offset += width as usize;
         }
@@ -336,9 +336,13 @@ pub mod tests {
 
     #[test]
     fn test_read_operands() {
-        let tests = [(Opcode::Constant, &[65535], 2)];
+        let tests = [
+            (Opcode::Constant, vec![65535], 2),
+            (Opcode::Add, vec![], 0),
+            (Opcode::GetLocal, vec![0], 1),
+        ];
         for (test_opcode, test_operands, test_read) in tests {
-            let ins = make_ins(test_opcode.clone(), test_operands);
+            let ins = make_ins(test_opcode.clone(), &test_operands);
             let def = DEFINITIONS[test_opcode as usize];
             let (operands_read, bytes_read) = read_operands(def, ins[1..].into());
             assert_eq!(bytes_read, test_read);

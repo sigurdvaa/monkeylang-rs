@@ -54,6 +54,7 @@ pub struct FunctionObj {
 pub struct CompiledFunctionObj {
     pub instructions: Vec<Instruction>,
     pub num_locals: usize,
+    pub num_parameters: usize,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Clone)]
