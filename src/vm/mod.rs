@@ -379,8 +379,9 @@ impl Vm {
             let frame = self.curr_frame();
             ip = frame.ip;
             ins = &frame.func.instructions;
-            let op = Opcode::try_from(ins[ip]).map_err(VmError::InvalidInstruction)?;
 
+            // TODO: make this lookup using u8 as index into array instead?
+            let op = Opcode::try_from(ins[ip]).map_err(VmError::InvalidInstruction)?;
             match op {
                 Opcode::Bang => {
                     self.execute_bang_operator()?;

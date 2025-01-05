@@ -1,3 +1,4 @@
+pub mod builtins;
 pub mod environment;
 
 use crate::ast::{BlockStatement, Expression, IdentifierLiteral};
