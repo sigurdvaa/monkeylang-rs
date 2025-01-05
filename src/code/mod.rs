@@ -49,6 +49,7 @@ pub enum Opcode {
     ReturnValue,
     GetLocal,
     SetLocal,
+    GetBuiltin,
     EnumLength,
 }
 
@@ -84,6 +85,7 @@ impl TryFrom<u8> for Opcode {
             24 if 24 == Self::ReturnValue as u8 => Ok(Self::ReturnValue),
             25 if 25 == Self::GetLocal as u8 => Ok(Self::GetLocal),
             26 if 26 == Self::SetLocal as u8 => Ok(Self::SetLocal),
+            27 if 27 == Self::GetBuiltin as u8 => Ok(Self::GetBuiltin),
             _ => Err(OpcodeError(op)),
         }
     }
@@ -196,6 +198,10 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
     },
     &Definition {
         _opcode: Opcode::SetLocal,
+        operand_widths: [1, 0],
+    },
+    &Definition {
+        _opcode: Opcode::GetBuiltin,
         operand_widths: [1, 0],
     },
 ];

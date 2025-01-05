@@ -3,15 +3,27 @@ use std::{io::Write, rc::Rc};
 
 pub fn get(name: &str) -> Option<Rc<Object>> {
     match name {
-        "len" => Some(Rc::new(Object::Builtin(len))),
-        "first" => Some(Rc::new(Object::Builtin(first))),
-        "last" => Some(Rc::new(Object::Builtin(last))),
-        "rest" => Some(Rc::new(Object::Builtin(rest))),
-        "push" => Some(Rc::new(Object::Builtin(push))),
-        "puts" => Some(Rc::new(Object::Builtin(puts))),
-        "string" => Some(Rc::new(Object::Builtin(string))),
+        "len" => Some(Rc::new(const { Object::Builtin(len) })),
+        "first" => Some(Rc::new(const { Object::Builtin(first) })),
+        "last" => Some(Rc::new(const { Object::Builtin(last) })),
+        "rest" => Some(Rc::new(const { Object::Builtin(rest) })),
+        "push" => Some(Rc::new(const { Object::Builtin(push) })),
+        "puts" => Some(Rc::new(const { Object::Builtin(puts) })),
+        "string" => Some(Rc::new(const { Object::Builtin(string) })),
         _ => None,
     }
+}
+
+pub fn get_all() -> &'static [(&'static str, Object)] {
+    &[
+        ("len", const { Object::Builtin(len) }),
+        ("first", const { Object::Builtin(first) }),
+        ("last", const { Object::Builtin(last) }),
+        ("rest", const { Object::Builtin(rest) }),
+        ("push", const { Object::Builtin(push) }),
+        ("puts", const { Object::Builtin(puts) }),
+        ("string", const { Object::Builtin(string) }),
+    ]
 }
 
 fn len(args: &[Rc<Object>]) -> Rc<Object> {
@@ -101,6 +113,8 @@ fn push(args: &[Rc<Object>]) -> Rc<Object> {
         Object::Array(value) => {
             let mut new = value.clone();
             if args.len() == 3 {
+                // if 3 args, insert value in array with 3rd arg as index
+                // TODO: replace with insert builtin?
                 match &*args[2] {
                     Object::Integer(i) => new.insert(i.value as usize, args[1].clone()),
                     _ => {
@@ -116,7 +130,7 @@ fn push(args: &[Rc<Object>]) -> Rc<Object> {
             Object::Array(new)
         }
         _ => Object::Error(format!(
-            "argument to \"push\" not supported, got {}",
+            "arguments to \"push\" not supported, got {}",
             args.iter().map(|v| v.kind()).collect::<Vec<_>>().join(", ")
         )),
     })

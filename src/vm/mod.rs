@@ -5,7 +5,8 @@ mod tests;
 use crate::code::{read_u16_as_usize, Opcode, OpcodeError};
 use crate::compiler::Bytecode;
 use crate::object::{
-    Array, CompiledFunctionObj, HashKeyData, HashKeyError, HashObj, Integer, Object,
+    builtins, Array, BuiltinFunction, CompiledFunctionObj, HashKeyData, HashKeyError, HashObj,
+    Integer, Object,
 };
 use frame::Frame;
 use std::collections::HashMap;
@@ -93,6 +94,7 @@ pub struct Vm {
     stack: [Option<Object>; STACK_SIZE],
     sp: usize,
     globals: Vec<Option<Object>>,
+    builtins: &'static [(&'static str, Object)],
     // TODO: wrap obj in Rc? avoid cloning when pushing globals
     frames: [Option<Frame>; FRAMES_SIZE],
     fp: usize,
@@ -109,6 +111,7 @@ impl Vm {
             stack: [const { None }; STACK_SIZE],
             sp: 0,
             globals: vec![None; GLOBALS_SIZE],
+            builtins: builtins::get_all(),
             frames: [const { None }; FRAMES_SIZE],
             fp: 1,
         };
@@ -353,20 +356,43 @@ impl Vm {
         Ok(Object::Hash(hash))
     }
 
-    fn call_function(&mut self, num_args: usize) -> Result<(), VmError> {
+    fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
         match &self.stack[self.sp - 1 - num_args] {
-            Some(Object::CompiledFunction(func)) => {
-                if func.num_parameters != num_args {
-                    return Err(VmError::WrongNumberArguments(func.num_parameters, num_args));
-                }
-
-                let frame = Frame::new(func.clone(), self.sp - num_args);
-                self.sp += func.num_locals;
-                self.push_frame(frame)?;
-            }
+            Some(Object::CompiledFunction(func)) => self.call_function(func.clone(), num_args)?,
+            Some(Object::Builtin(func)) => self.call_builtin(*func, num_args)?,
             Some(obj) => return Err(VmError::InvalidFunctionCall(self.sp - 1, obj.clone())),
             None => return Err(VmError::InvalidStackAccess(self.sp - 1 - num_args)),
         }
+        Ok(())
+    }
+
+    fn call_function(
+        &mut self,
+        func: Rc<CompiledFunctionObj>,
+        num_args: usize,
+    ) -> Result<(), VmError> {
+        if func.num_parameters != num_args {
+            return Err(VmError::WrongNumberArguments(func.num_parameters, num_args));
+        }
+
+        let frame = Frame::new(func.clone(), self.sp - num_args);
+        self.sp += func.num_locals;
+        self.push_frame(frame)?;
+        Ok(())
+    }
+
+    fn call_builtin(&mut self, func: BuiltinFunction, num_args: usize) -> Result<(), VmError> {
+        // TODO: convert stack to Rc to avoid creating Rc and cloning internal objects here?
+        let mut args = vec![];
+        for idx in self.sp - num_args..self.sp {
+            match &self.stack[idx] {
+                Some(obj) => args.push(Rc::new(obj.clone())),
+                None => return Err(VmError::InvalidStackAccess(idx)),
+            }
+        }
+        self.sp -= num_args + 1;
+        let result = func(&args).as_ref().clone();
+        self.push(result)?;
         Ok(())
     }
 
@@ -464,6 +490,12 @@ impl Vm {
                     frame.ip += 2;
                     self.stack[frame.bp + idx].replace(obj);
                 }
+                Opcode::GetBuiltin => {
+                    let idx = ins[ip + 1] as usize;
+                    self.curr_frame().ip += 2;
+                    let func = self.builtins[idx].1.clone();
+                    self.push(func)?;
+                }
                 Opcode::Array => {
                     let len = read_u16_as_usize(&ins[ip + 1..]);
                     self.curr_frame().ip += 3;
@@ -485,7 +517,7 @@ impl Vm {
                 Opcode::Call => {
                     let num_args = ins[ip + 1] as usize;
                     self.curr_frame().ip += 2;
-                    self.call_function(num_args)?;
+                    self.execute_call(num_args)?;
                 }
                 Opcode::Return => {
                     let frame = self.pop_frame()?;

@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -8,6 +8,7 @@ pub type Symbols = Rc<SymbolTable>;
 pub enum SymbolScope {
     Global,
     Local,
+    Builtin,
 }
 
 impl SymbolScope {
@@ -15,6 +16,7 @@ impl SymbolScope {
         match self {
             Self::Global => "GLOBAL",
             Self::Local => "LOCAL",
+            Self::Builtin => "BUILTIN",
         }
     }
 }
@@ -29,7 +31,7 @@ pub struct Symbol {
 #[derive(Debug, PartialEq)]
 pub struct SymbolTable {
     store: RefCell<HashMap<String, Rc<Symbol>>>,
-    num_definitions: usize, // TODO: remove/replace?
+    pub num_definitions: Cell<usize>,
     pub outer: Option<Rc<SymbolTable>>,
 }
 
@@ -37,7 +39,7 @@ impl SymbolTable {
     pub fn new() -> Symbols {
         Rc::new(Self {
             store: RefCell::new(HashMap::new()),
-            num_definitions: 0,
+            num_definitions: Cell::new(0),
             outer: None,
         })
     }
@@ -45,13 +47,9 @@ impl SymbolTable {
     pub fn new_enclosed(outer: Symbols) -> Symbols {
         Rc::new(Self {
             store: RefCell::new(HashMap::new()),
-            num_definitions: 0,
+            num_definitions: Cell::new(0),
             outer: Some(outer),
         })
-    }
-
-    pub fn len(&self) -> usize {
-        self.store.borrow().len()
     }
 
     pub fn define(&self, name: String) -> Rc<Symbol> {
@@ -59,10 +57,22 @@ impl SymbolTable {
             Some(_) => SymbolScope::Local,
             None => SymbolScope::Global,
         };
+        let index = self.num_definitions.get();
         let sym = Rc::new(Symbol {
             name: name.clone(),
-            index: self.len(),
+            index,
             scope,
+        });
+        self.num_definitions.set(index + 1);
+        self.store.borrow_mut().insert(name, sym.clone());
+        sym
+    }
+
+    pub fn define_builtin(&self, index: usize, name: String) -> Rc<Symbol> {
+        let sym = Rc::new(Symbol {
+            name: name.clone(),
+            index,
+            scope: SymbolScope::Builtin,
         });
         self.store.borrow_mut().insert(name, sym.clone());
         sym
@@ -95,6 +105,14 @@ mod tests {
         Rc::new(Symbol {
             name: name.into(),
             scope: SymbolScope::Local,
+            index,
+        })
+    }
+
+    fn make_symbol_builtin(name: &str, index: usize) -> Rc<Symbol> {
+        Rc::new(Symbol {
+            name: name.into(),
+            scope: SymbolScope::Builtin,
             index,
         })
     }
@@ -194,6 +212,32 @@ mod tests {
         for (scope, test) in tests {
             let sym = scope.resolve(&test.name);
             assert_eq!(sym, Some(test));
+        }
+    }
+
+    #[test]
+    fn test_define_resolve_builtins() {
+        let global = SymbolTable::new();
+        let first_local = SymbolTable::new_enclosed(global.clone());
+        let second_local = SymbolTable::new_enclosed(first_local.clone());
+
+        let tests = [
+            make_symbol_builtin("a", 0),
+            make_symbol_builtin("c", 1),
+            make_symbol_builtin("e", 2),
+            make_symbol_builtin("f", 3),
+        ];
+
+        for (i, sym) in tests.iter().enumerate() {
+            global.define_builtin(i, sym.name.clone());
+        }
+
+        let scopes = [global, first_local, second_local];
+        for scope in scopes {
+            for test in &tests {
+                let sym = scope.resolve(&test.name);
+                assert_eq!(sym, Some(test.clone()));
+            }
         }
     }
 }

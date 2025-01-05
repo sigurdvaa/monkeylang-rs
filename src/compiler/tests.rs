@@ -77,7 +77,7 @@ fn run_compiler_tests(tests: &[TestCase]) {
 
         let _ = compiler
             .compile_program(&program)
-            .map_err(|e| panic!("compile error: {e:?}"));
+            .map_err(|e| panic!("compile error:\n {e}"));
 
         let bytecode = compiler.bytecode();
         assert_eq!(bytecode.constants, test.constants);
@@ -786,6 +786,44 @@ fn test_let_statement_scopes() {
                 ),
             ],
             vec![make_ins(Opcode::Constant, &[2]), make_ins(Opcode::Pop, &[])],
+        ),
+    ];
+    run_compiler_tests(&tests);
+}
+
+#[test]
+fn test_builtins() {
+    let tests = [
+        TestCase::new(
+            "len([]); push([], 1);",
+            2,
+            vec![Object::new_integer(1)],
+            vec![
+                make_ins(Opcode::GetBuiltin, &[0]),
+                make_ins(Opcode::Array, &[0]),
+                make_ins(Opcode::Call, &[1]),
+                make_ins(Opcode::Pop, &[]),
+                make_ins(Opcode::GetBuiltin, &[4]),
+                make_ins(Opcode::Array, &[0]),
+                make_ins(Opcode::Constant, &[0]),
+                make_ins(Opcode::Call, &[2]),
+                make_ins(Opcode::Pop, &[]),
+            ],
+        ),
+        TestCase::new(
+            "fn() { len([]) }",
+            1,
+            vec![make_compiled_func(
+                vec![
+                    make_ins(Opcode::GetBuiltin, &[0]),
+                    make_ins(Opcode::Array, &[0]),
+                    make_ins(Opcode::Call, &[1]),
+                    make_ins(Opcode::ReturnValue, &[]),
+                ],
+                0,
+                0,
+            )],
+            vec![make_ins(Opcode::Constant, &[0]), make_ins(Opcode::Pop, &[])],
         ),
     ];
     run_compiler_tests(&tests);

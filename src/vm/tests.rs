@@ -373,3 +373,61 @@ fn test_calling_functions_with_wrong_arguments() {
         );
     }
 }
+
+#[test]
+fn test_builtin_functions() {
+    let tests = [
+        ("len(\"\")", 1, Object::new_integer(0)),
+        ("len(\"four\")", 1, Object::new_integer(4)),
+        ("len(\"hello world\")", 1, Object::new_integer(11)),
+        (
+            "len(1)",
+            1,
+            Object::Error("argument to \"len\" not supported, got INTEGER".into()),
+        ),
+        (
+            r#"len("one", "two")"#,
+            1,
+            Object::Error("wrong number of arguments. got=2, want=1".into()),
+        ),
+        ("len([1, 2, 3])", 1, Object::new_integer(3)),
+        ("len([])", 1, Object::new_integer(0)),
+        (r#"puts("hello", "world!")"#, 1, Object::None),
+        ("first([1, 2, 3])", 1, Object::new_integer(1)),
+        ("first([])", 1, Object::new_null()),
+        (
+            "first(1)",
+            1,
+            Object::Error("argument to \"first\" not supported, got INTEGER".into()),
+        ),
+        ("last([1, 2, 3])", 1, Object::new_integer(3)),
+        ("last([])", 1, Object::new_null()),
+        (
+            "last(1)",
+            1,
+            Object::Error("argument to \"last\" not supported, got INTEGER".into()),
+        ),
+        (
+            "rest([1, 2, 3])",
+            1,
+            Object::Array(vec![
+                Rc::new(Object::new_integer(2)),
+                Rc::new(Object::new_integer(3)),
+            ]),
+        ),
+        ("rest([])", 1, Object::new_null()),
+        (
+            "push([], 1)",
+            1,
+            Object::Array(vec![Rc::new(Object::new_integer(1))]),
+        ),
+        (
+            "push(1, 1)",
+            1,
+            Object::Error("arguments to \"push\" not supported, got INTEGER, INTEGER".into()),
+        ),
+    ];
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, test_value);
+    }
+}

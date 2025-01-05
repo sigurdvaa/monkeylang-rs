@@ -7,7 +7,7 @@ use std::rc::Rc;
 
 use crate::ast::{Expression, Operator, Program, Statement};
 use crate::code::{make_ins, Instruction, Opcode};
-use crate::object::{CompiledFunctionObj, Object};
+use crate::object::{builtins, CompiledFunctionObj, Object};
 pub use symbol::{SymbolScope, SymbolTable, Symbols};
 
 #[derive(Debug)]
@@ -63,9 +63,13 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new() -> Self {
+        let symbols = SymbolTable::new();
+        for (i, (name, _builtin)) in builtins::get_all().iter().enumerate() {
+            symbols.define_builtin(i, name.to_string());
+        }
         Self {
             constants: vec![],
-            symbols: SymbolTable::new(),
+            symbols,
             scopes: vec![CompilationScope::new()],
             scope_idx: 0,
         }
@@ -215,7 +219,7 @@ impl Compiler {
                 self.replace_last_pop_with_return();
                 self.emit_return_if_missing();
 
-                let num_locals = self.symbols.len();
+                let num_locals = self.symbols.num_definitions.get();
                 let instructions = self.leave_scope();
 
                 let func = Rc::new(CompiledFunctionObj {
@@ -298,6 +302,7 @@ impl Compiler {
                 Some(sym) => match sym.scope {
                     SymbolScope::Global => self.emit(Opcode::GetGlobal, &[sym.index]),
                     SymbolScope::Local => self.emit(Opcode::GetLocal, &[sym.index]),
+                    SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[sym.index]),
                 },
                 None => return Err(CompilerError::UndefinedVariable(expr.value.clone())),
             },
@@ -321,6 +326,9 @@ impl Compiler {
                 match sym.scope {
                     SymbolScope::Global => self.emit(Opcode::SetGlobal, &[sym.index]),
                     SymbolScope::Local => self.emit(Opcode::SetLocal, &[sym.index]),
+                    SymbolScope::Builtin => {
+                        unreachable!("builtins cannot be defined with let statements")
+                    }
                 };
             }
             Statement::Return(expr) => {
