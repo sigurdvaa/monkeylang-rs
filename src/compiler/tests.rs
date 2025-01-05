@@ -2,6 +2,13 @@ use super::*;
 use crate::code::{make_ins, tests::ReadInstructions, Opcode};
 use crate::parser::tests::parse_program;
 
+fn make_compiled_func(ins: Vec<Vec<Instruction>>, num_locals: usize) -> Object {
+    Object::CompiledFunction(Rc::new(CompiledFunctionObj {
+        instructions: ins.into_iter().flatten().collect(),
+        num_locals,
+    }))
+}
+
 struct TestCase {
     input: &'static str,
     statements: usize,
@@ -481,16 +488,14 @@ fn test_functions() {
             vec![
                 Object::new_integer(5),
                 Object::new_integer(10),
-                Object::CompiledFunction(
+                make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
                         make_ins(Opcode::Constant, &[1]),
                         make_ins(Opcode::Add, &[]),
                         make_ins(Opcode::ReturnValue, &[]),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+                    ],
+                    0,
                 ),
             ],
             vec![make_ins(Opcode::Constant, &[2]), make_ins(Opcode::Pop, &[])],
@@ -501,16 +506,14 @@ fn test_functions() {
             vec![
                 Object::new_integer(5),
                 Object::new_integer(10),
-                Object::CompiledFunction(
+                make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
                         make_ins(Opcode::Constant, &[1]),
                         make_ins(Opcode::Add, &[]),
                         make_ins(Opcode::ReturnValue, &[]),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+                    ],
+                    0,
                 ),
             ],
             vec![make_ins(Opcode::Constant, &[2]), make_ins(Opcode::Pop, &[])],
@@ -521,16 +524,14 @@ fn test_functions() {
             vec![
                 Object::new_integer(1),
                 Object::new_integer(2),
-                Object::CompiledFunction(
+                make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
                         make_ins(Opcode::Pop, &[]),
                         make_ins(Opcode::Constant, &[1]),
                         make_ins(Opcode::ReturnValue, &[]),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+                    ],
+                    0,
                 ),
             ],
             vec![make_ins(Opcode::Constant, &[2]), make_ins(Opcode::Pop, &[])],
@@ -544,7 +545,7 @@ fn test_functions_without_return_value() {
     let tests = [TestCase::new(
         "fn() { }",
         1,
-        vec![Object::CompiledFunction(make_ins(Opcode::Return, &[]))],
+        vec![make_compiled_func(vec![make_ins(Opcode::Return, &[])], 0)],
         vec![make_ins(Opcode::Constant, &[0]), make_ins(Opcode::Pop, &[])],
     )];
     run_compiler_tests(&tests);
@@ -553,6 +554,7 @@ fn test_functions_without_return_value() {
 #[test]
 fn test_compiler_scopes() {
     let mut compiler = Compiler::new();
+    let global = compiler.symbols.clone();
     assert_eq!(compiler.scope_idx, 0);
 
     compiler.emit(Opcode::Mul, &[]);
@@ -570,8 +572,22 @@ fn test_compiler_scopes() {
         })
     );
 
+    assert_ne!(
+        global, compiler.symbols,
+        "compiler did not enclose symbolTable"
+    );
+
     compiler.leave_scope();
     assert_eq!(compiler.scope_idx, 0);
+
+    assert_eq!(
+        global, compiler.symbols,
+        "compiler did not restore global symbol table"
+    );
+    assert_eq!(
+        compiler.symbols.outer, None,
+        "compiler modified global symbol table incorrectly"
+    );
 
     compiler.emit(Opcode::Add, &[]);
     assert_eq!(compiler.curr_scope_ins_len(), 2);
@@ -599,14 +615,12 @@ fn test_function_calls() {
             1,
             vec![
                 Object::new_integer(24),
-                Object::CompiledFunction(
+                make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
                         make_ins(Opcode::ReturnValue, &[]),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+                    ],
+                    0,
                 ),
             ],
             vec![
@@ -620,14 +634,12 @@ fn test_function_calls() {
             2,
             vec![
                 Object::new_integer(24),
-                Object::CompiledFunction(
+                make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
                         make_ins(Opcode::ReturnValue, &[]),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect(),
+                    ],
+                    0,
                 ),
             ],
             vec![
@@ -637,6 +649,72 @@ fn test_function_calls() {
                 make_ins(Opcode::Call, &[]),
                 make_ins(Opcode::Pop, &[]),
             ],
+        ),
+    ];
+    run_compiler_tests(&tests);
+}
+
+#[test]
+fn test_let_statement_scopes() {
+    let tests = [
+        TestCase::new(
+            "let num = 55; fn() { num }",
+            2,
+            vec![
+                Object::new_integer(55),
+                make_compiled_func(
+                    vec![
+                        make_ins(Opcode::GetGlobal, &[0]),
+                        make_ins(Opcode::ReturnValue, &[]),
+                    ],
+                    0,
+                ),
+            ],
+            vec![
+                make_ins(Opcode::Constant, &[0]),
+                make_ins(Opcode::SetGlobal, &[0]),
+                make_ins(Opcode::Constant, &[1]),
+                make_ins(Opcode::Pop, &[]),
+            ],
+        ),
+        TestCase::new(
+            "fn() { let num = 55; num }",
+            1,
+            vec![
+                Object::new_integer(55),
+                make_compiled_func(
+                    vec![
+                        make_ins(Opcode::Constant, &[0]),
+                        make_ins(Opcode::SetLocal, &[0]),
+                        make_ins(Opcode::GetLocal, &[0]),
+                        make_ins(Opcode::ReturnValue, &[]),
+                    ],
+                    1,
+                ),
+            ],
+            vec![make_ins(Opcode::Constant, &[1]), make_ins(Opcode::Pop, &[])],
+        ),
+        TestCase::new(
+            "fn() { let a = 55; let b = 77; a + b }",
+            1,
+            vec![
+                Object::new_integer(55),
+                Object::new_integer(77),
+                make_compiled_func(
+                    vec![
+                        make_ins(Opcode::Constant, &[0]),
+                        make_ins(Opcode::SetLocal, &[0]),
+                        make_ins(Opcode::Constant, &[1]),
+                        make_ins(Opcode::SetLocal, &[1]),
+                        make_ins(Opcode::GetLocal, &[0]),
+                        make_ins(Opcode::GetLocal, &[1]),
+                        make_ins(Opcode::Add, &[]),
+                        make_ins(Opcode::ReturnValue, &[]),
+                    ],
+                    2,
+                ),
+            ],
+            vec![make_ins(Opcode::Constant, &[2]), make_ins(Opcode::Pop, &[])],
         ),
     ];
     run_compiler_tests(&tests);

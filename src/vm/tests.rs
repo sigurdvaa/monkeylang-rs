@@ -235,15 +235,77 @@ fn test_functions_without_return_value() {
 
 #[test]
 fn test_first_class_functions() {
-    let tests = [(
-        concat!(
-            "let returnsOne = fn() { 1; };\n",
-            "let returnsOneReturner = fn() { returnsOne; };\n",
-            "returnsOneReturner()();"
+    let tests = [
+        (
+            concat!(
+                "let returnsOne = fn() { 1; };\n",
+                "let returnsOneReturner = fn() { returnsOne; };\n",
+                "returnsOneReturner()();"
+            ),
+            3,
+            1,
         ),
-        3,
-        1,
-    )];
+        (
+            concat!(
+                "let returnsOneReturner = fn() {\n",
+                "    let returnsOne = fn() { 1; };\n",
+                "    returnsOne;\n",
+                "};\n",
+                "returnsOneReturner()();"
+            ),
+            2,
+            1,
+        ),
+    ];
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+    }
+}
+
+#[test]
+fn test_calling_functions_with_bindings() {
+    let tests = [
+        ("let one = fn() { let one = 1; one }; one();", 2, 1),
+        (
+            "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; }; oneAndTwo();",
+            2,
+            3,
+        ),
+        (
+            concat!(
+                "let oneAndTwo = fn() { let one = 1; let two = 2; one + two; };\n",
+                "let threeAndFour = fn() { let three = 3; let four = 4; three + four; };\n",
+                "oneAndTwo() + threeAndFour();"
+            ),
+            3,
+            10,
+        ),
+        (
+            concat!(
+                "let firstFoobar = fn() { let foobar = 50; foobar; };\n",
+                "let secondFoobar = fn() { let foobar = 100; foobar; };\n",
+                "firstFoobar() + secondFoobar();",
+            ),
+            3,
+            150,
+        ),
+        (
+            concat!(
+                "let globalSeed = 50;\n",
+                "let minusOne = fn() {\n",
+                "    let num = 1;\n",
+                "    globalSeed - num;\n",
+                "}\n",
+                "let minusTwo = fn() {\n",
+                "    let num = 2;\n",
+                "    globalSeed - num;\n",
+                "}\n",
+                "minusOne() + minusTwo();",
+            ),
+            4,
+            97,
+        ),
+    ];
     for (test_input, test_stmts, test_value) in tests {
         run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
     }

@@ -2,9 +2,11 @@ mod frame;
 #[cfg(test)]
 mod tests;
 
-use crate::code::{read_u16_as_usize, Instruction, Opcode, OpcodeError};
+use crate::code::{read_u16_as_usize, Opcode, OpcodeError};
 use crate::compiler::Bytecode;
-use crate::object::{Array, HashKeyData, HashKeyError, HashObj, Integer, Object};
+use crate::object::{
+    Array, CompiledFunctionObj, HashKeyData, HashKeyError, HashObj, Integer, Object,
+};
 use frame::Frame;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -83,9 +85,11 @@ impl Display for VmError {
 
 pub struct Vm {
     constants: Vec<Object>,
+    // TODO: wrap obj in Rc? avoid cloning when pushing locals
     stack: [Option<Object>; STACK_SIZE],
     sp: usize,
     globals: Vec<Option<Object>>,
+    // TODO: wrap obj in Rc? avoid cloning when pushing globals
     frames: [Option<Frame>; FRAMES_SIZE],
     fp: usize,
 }
@@ -104,7 +108,11 @@ impl Vm {
             frames: [const { None }; FRAMES_SIZE],
             fp: 1,
         };
-        let frame = Frame::new(instructions);
+        let func = Rc::new(CompiledFunctionObj {
+            instructions,
+            num_locals: 0,
+        });
+        let frame = Frame::new(func, 0);
         new.frames[0].replace(frame);
         new
     }
@@ -116,8 +124,11 @@ impl Vm {
         self.frames = [const { None }; FRAMES_SIZE];
         self.fp = 1;
 
-        // TODO: is clone needed?
-        let frame = Frame::new(bytecode.instructions.clone());
+        let func = Rc::new(CompiledFunctionObj {
+            instructions: bytecode.instructions,
+            num_locals: 0,
+        });
+        let frame = Frame::new(func, 0);
         self.frames[0].replace(frame);
     }
 
@@ -142,7 +153,7 @@ impl Vm {
 
     fn curr_frame_running(&mut self) -> bool {
         match &mut self.frames[self.fp - 1] {
-            Some(frame) => frame.ip < frame.instructions.len(),
+            Some(frame) => frame.ip < frame.func.instructions.len(),
             None => panic!("main frame missing"),
         }
     }
@@ -344,7 +355,7 @@ impl Vm {
         while self.curr_frame_running() {
             let frame = self.curr_frame();
             ip = frame.ip;
-            ins = &frame.instructions;
+            ins = &frame.func.instructions;
             let op = Opcode::try_from(ins[ip]).map_err(VmError::InvalidInstruction)?;
 
             match op {
@@ -412,6 +423,23 @@ impl Vm {
                     let obj = self.pop()?;
                     self.globals[idx] = Some(obj);
                 }
+                Opcode::GetLocal => {
+                    let idx = ins[ip + 1] as usize;
+                    let frame = self.curr_frame();
+                    frame.ip += 2;
+                    let bp = frame.bp;
+                    match &self.stack[bp + idx] {
+                        Some(obj) => self.push(obj.clone())?,
+                        _ => return Err(VmError::InvalidStackAccess(bp + idx)),
+                    }
+                }
+                Opcode::SetLocal => {
+                    let idx = ins[ip + 1] as usize;
+                    let obj = self.pop()?;
+                    let frame = self.curr_frame();
+                    frame.ip += 2;
+                    self.stack[frame.bp + idx].replace(obj);
+                }
                 Opcode::Array => {
                     let len = read_u16_as_usize(&ins[ip + 1..]);
                     self.curr_frame().ip += 3;
@@ -431,9 +459,9 @@ impl Vm {
                     self.curr_frame().ip += 1;
                 }
                 Opcode::Call => match &self.stack[self.sp - 1] {
-                    Some(Object::CompiledFunction(ins)) => {
-                        // TODO: make frame use ref to ins?
-                        let frame = Frame::new(ins.clone());
+                    Some(Object::CompiledFunction(func)) => {
+                        let frame = Frame::new(func.clone(), self.sp);
+                        self.sp += func.num_locals;
                         self.curr_frame().ip += 1;
                         self.push_frame(frame)?;
                     }
@@ -441,13 +469,15 @@ impl Vm {
                     None => return Err(VmError::InvalidStackAccess(self.sp)),
                 },
                 Opcode::Return => {
-                    self.pop_frame()?;
+                    let frame = self.pop_frame()?;
+                    self.sp = frame.bp;
                     self.pop()?;
                     self.push(Object::new_null())?;
                 }
                 Opcode::ReturnValue => {
                     let value = self.pop()?;
-                    self.pop_frame()?;
+                    let frame = self.pop_frame()?;
+                    self.sp = frame.bp;
                     self.pop()?;
                     self.push(value)?;
                 }

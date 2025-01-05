@@ -3,11 +3,12 @@ mod symbol;
 mod tests;
 
 use std::fmt::Display;
+use std::rc::Rc;
 
 use crate::ast::{Expression, Operator, Program, Statement};
 use crate::code::{make_ins, Instruction, Opcode};
-use crate::object::Object;
-pub use symbol::SymbolTable;
+use crate::object::{CompiledFunctionObj, Object};
+pub use symbol::{SymbolScope, SymbolTable, Symbols};
 
 #[derive(Debug)]
 pub enum CompilerError {
@@ -54,7 +55,7 @@ struct EmittedIns {
 
 pub struct Compiler {
     constants: Vec<Object>,
-    symbols: SymbolTable,
+    symbols: Symbols,
     scopes: Vec<CompilationScope>,
     // TODO: remove idx, use vec len/last?
     scope_idx: usize,
@@ -96,8 +97,14 @@ impl Compiler {
         let scope = CompilationScope::new();
         self.scopes.push(scope);
         self.scope_idx += 1;
+        self.symbols = SymbolTable::new_enclosed(self.symbols.clone());
     }
     fn leave_scope(&mut self) -> Vec<Instruction> {
+        self.symbols = self
+            .symbols
+            .outer
+            .clone()
+            .expect("can't restore outer scope");
         let ins = self.scopes.pop().expect("can't leave last scope");
         self.scope_idx -= 1;
         ins.instructions
@@ -204,9 +211,14 @@ impl Compiler {
                 self.replace_last_pop_with_return();
                 self.emit_return_if_missing();
 
-                let ins = self.leave_scope();
+                let num_locals = self.symbols.len();
+                let instructions = self.leave_scope();
 
-                let obj = Object::CompiledFunction(ins);
+                let func = Rc::new(CompiledFunctionObj {
+                    instructions,
+                    num_locals,
+                });
+                let obj = Object::CompiledFunction(func);
                 let operands = &[self.add_constant(obj)];
                 self.emit(Opcode::Constant, operands)
             }
@@ -275,10 +287,10 @@ impl Compiler {
                 self.emit(Opcode::Call, &[])
             }
             Expression::Identifier(expr) => match self.symbols.resolve(&expr.value) {
-                Some(sym) => {
-                    let index = sym.index;
-                    self.emit(Opcode::GetGlobal, &[index])
-                }
+                Some(sym) => match sym.scope {
+                    SymbolScope::Global => self.emit(Opcode::GetGlobal, &[sym.index]),
+                    SymbolScope::Local => self.emit(Opcode::GetLocal, &[sym.index]),
+                },
                 None => return Err(CompilerError::UndefinedVariable(expr.value.clone())),
             },
             Expression::Index(expr) => {
@@ -298,8 +310,10 @@ impl Compiler {
             Statement::Let(expr) => {
                 self.compile_expression(&expr.value)?;
                 let sym = self.symbols.define(expr.name.value.clone());
-                let index = sym.index;
-                self.emit(Opcode::SetGlobal, &[index]);
+                match sym.scope {
+                    SymbolScope::Global => self.emit(Opcode::SetGlobal, &[sym.index]),
+                    SymbolScope::Local => self.emit(Opcode::SetLocal, &[sym.index]),
+                };
             }
             Statement::Return(expr) => {
                 self.compile_expression(&expr.value)?;

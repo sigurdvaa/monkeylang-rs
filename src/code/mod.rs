@@ -47,6 +47,8 @@ pub enum Opcode {
     Call,
     Return,
     ReturnValue,
+    GetLocal,
+    SetLocal,
     EnumLength,
 }
 
@@ -80,6 +82,8 @@ impl TryFrom<u8> for Opcode {
             22 if 22 == Self::Call as u8 => Ok(Self::Call),
             23 if 23 == Self::Return as u8 => Ok(Self::Return),
             24 if 24 == Self::ReturnValue as u8 => Ok(Self::ReturnValue),
+            25 if 25 == Self::GetLocal as u8 => Ok(Self::GetLocal),
+            26 if 26 == Self::SetLocal as u8 => Ok(Self::SetLocal),
             _ => Err(OpcodeError(op)),
         }
     }
@@ -186,6 +190,14 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
         _opcode: Opcode::ReturnValue,
         operand_widths: [0, 0],
     },
+    &Definition {
+        _opcode: Opcode::GetLocal,
+        operand_widths: [1, 0],
+    },
+    &Definition {
+        _opcode: Opcode::SetLocal,
+        operand_widths: [1, 0],
+    },
 ];
 
 pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
@@ -199,6 +211,7 @@ pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
         let witdh = def.operand_widths[i];
         match witdh {
             2 => ins.extend((*operand as u16).to_be_bytes()),
+            1 => ins.push(*operand as u8),
             0 => (),
             _ => todo!(),
         }
@@ -266,6 +279,7 @@ pub mod tests {
         for width in def.operand_widths {
             match width {
                 2 => operands.push(read_u16_as_usize(&ins[offset..])),
+                1 => operands.push(ins[offset] as usize),
                 0 => (),
                 _ => todo!("{width:?}"),
             }
@@ -283,6 +297,11 @@ pub mod tests {
                 vec![Opcode::Constant as u8, 255, 254],
             ),
             (Opcode::Add, vec![], vec![Opcode::Add as u8]),
+            (
+                Opcode::GetLocal,
+                vec![255],
+                vec![Opcode::GetLocal as u8, 255],
+            ),
         ];
         for (test_opcode, test_operands, test_value) in tests {
             let instruction = make_ins(test_opcode, &test_operands);
@@ -299,6 +318,7 @@ pub mod tests {
             make_ins(Opcode::Constant, &[65535]),
             make_ins(Opcode::Add, &[]),
             make_ins(Opcode::Pop, &[]),
+            make_ins(Opcode::GetLocal, &[1]),
         ]
         .into_iter()
         .flatten()
@@ -309,6 +329,7 @@ pub mod tests {
             "0006 Constant 65535\n",
             "0009 Add\n",
             "0010 Pop\n",
+            "0011 GetLocal 1\n",
         );
         assert_eq!(instructions.to_string(), expected);
     }
