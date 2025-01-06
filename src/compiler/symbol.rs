@@ -9,6 +9,7 @@ pub enum SymbolScope {
     Global,
     Local,
     Builtin,
+    Free,
 }
 
 impl SymbolScope {
@@ -17,6 +18,7 @@ impl SymbolScope {
             Self::Global => "GLOBAL",
             Self::Local => "LOCAL",
             Self::Builtin => "BUILTIN",
+            Self::Free => "FREE",
         }
     }
 }
@@ -33,6 +35,7 @@ pub struct SymbolTable {
     store: RefCell<HashMap<String, Rc<Symbol>>>,
     pub num_definitions: Cell<usize>,
     pub outer: Option<Rc<SymbolTable>>,
+    pub free: RefCell<Vec<Rc<Symbol>>>,
 }
 
 impl SymbolTable {
@@ -41,6 +44,7 @@ impl SymbolTable {
             store: RefCell::new(HashMap::new()),
             num_definitions: Cell::new(0),
             outer: None,
+            free: RefCell::new(vec![]),
         })
     }
 
@@ -49,6 +53,7 @@ impl SymbolTable {
             store: RefCell::new(HashMap::new()),
             num_definitions: Cell::new(0),
             outer: Some(outer),
+            free: RefCell::new(vec![]),
         })
     }
 
@@ -68,6 +73,16 @@ impl SymbolTable {
         sym
     }
 
+    pub fn define_free(&self, original: Rc<Symbol>) -> Rc<Symbol> {
+        let sym = Rc::new(Symbol {
+            name: original.name.clone(),
+            index: self.free.borrow().len(),
+            scope: SymbolScope::Free,
+        });
+        self.free.borrow_mut().push(original);
+        sym
+    }
+
     pub fn define_builtin(&self, index: usize, name: String) -> Rc<Symbol> {
         let sym = Rc::new(Symbol {
             name: name.clone(),
@@ -82,7 +97,10 @@ impl SymbolTable {
         match self.store.borrow().get(name) {
             Some(v) => Some(v.clone()),
             None => match &self.outer {
-                Some(outer) => outer.resolve(name),
+                Some(outer) => outer.resolve(name).map(|sym| match sym.scope {
+                    SymbolScope::Global | SymbolScope::Builtin => sym,
+                    _ => self.define_free(sym),
+                }),
                 None => None,
             },
         }
@@ -97,6 +115,14 @@ mod tests {
         Rc::new(Symbol {
             name: name.into(),
             scope: SymbolScope::Global,
+            index,
+        })
+    }
+
+    fn make_symbol_free(name: &str, index: usize) -> Rc<Symbol> {
+        Rc::new(Symbol {
+            name: name.into(),
+            scope: SymbolScope::Free,
             index,
         })
     }
@@ -238,6 +264,70 @@ mod tests {
                 let sym = scope.resolve(&test.name);
                 assert_eq!(sym, Some(test.clone()));
             }
+        }
+    }
+
+    #[test]
+    fn test_resolve_free() {
+        let global = SymbolTable::new();
+        global.define("a".into());
+        global.define("b".into());
+
+        let first_local = SymbolTable::new_enclosed(global);
+        first_local.define("c".into());
+        first_local.define("d".into());
+
+        let second_local = SymbolTable::new_enclosed(first_local.clone());
+        second_local.define("e".into());
+        second_local.define("f".into());
+
+        let tests = [
+            (&first_local, make_symbol_global("a", 0)),
+            (&first_local, make_symbol_global("b", 1)),
+            (&first_local, make_symbol_local("c", 0)),
+            (&first_local, make_symbol_local("d", 1)),
+            (&second_local, make_symbol_global("a", 0)),
+            (&second_local, make_symbol_global("b", 1)),
+            (&second_local, make_symbol_free("c", 0)),
+            (&second_local, make_symbol_free("d", 1)),
+            (&second_local, make_symbol_local("e", 0)),
+            (&second_local, make_symbol_local("f", 1)),
+        ];
+
+        for (scope, test) in tests {
+            let sym = scope.resolve(&test.name);
+            assert_eq!(sym, Some(test));
+        }
+    }
+
+    #[test]
+    fn test_resolve_unresolvable_free() {
+        let global = SymbolTable::new();
+        global.define("a".into());
+
+        let first_local = SymbolTable::new_enclosed(global);
+        first_local.define("c".into());
+
+        let second_local = SymbolTable::new_enclosed(first_local.clone());
+        second_local.define("e".into());
+        second_local.define("f".into());
+
+        let tests_some = [
+            make_symbol_global("a", 0),
+            make_symbol_free("c", 0),
+            make_symbol_local("e", 0),
+            make_symbol_local("f", 1),
+        ];
+
+        let tests_none = ["b", "d"];
+
+        for some in tests_some {
+            let sym = second_local.resolve(&some.name);
+            assert_eq!(sym, Some(some));
+        }
+        for none in tests_none {
+            let sym = second_local.resolve(none);
+            assert_eq!(sym, None);
         }
     }
 }

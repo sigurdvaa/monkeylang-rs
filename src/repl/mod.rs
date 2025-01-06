@@ -8,7 +8,7 @@ use crate::object::environment::{Env, Environment};
 use crate::object::Object;
 use crate::parser::{Parser, ParserError};
 use crate::vm::Vm;
-use std::io::{stdin, stdout, Stdout, Write};
+use std::io::{stdin, Write};
 use std::iter::Peekable;
 use std::rc::Rc;
 use std::str::Chars;
@@ -28,29 +28,20 @@ const MONKEY_FACE: &str = concat!(
     "           '-----'\n",
 );
 
-fn print_parser_errors(output: &mut Stdout, errors: &[ParserError]) {
-    writeln!(
-        output,
-        "{MONKEY_FACE}Woops! We ran into some monkey business here!\n parser errors:"
-    )
-    .expect("writing to stdout failed");
+fn print_parser_errors(errors: &[ParserError]) {
+    println!("{MONKEY_FACE}Woops! We ran into some monkey business here!\n parser errors:");
     for err in errors {
-        writeln!(output, "\t{err}").expect("writing to stdout failed")
+        println!("\t{err}");
     }
 }
 
-fn repl_eval(
-    input: Peekable<Chars<'_>>,
-    output: &mut Stdout,
-    env: Env,
-    macro_env: Env,
-) -> Rc<Object> {
+fn repl_eval(input: Peekable<Chars<'_>>, env: Env, macro_env: Env) -> Rc<Object> {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
 
     if !parser.errors.is_empty() {
-        print_parser_errors(output, &parser.errors);
+        print_parser_errors(&parser.errors);
         return Rc::new(Object::None);
     }
 
@@ -63,52 +54,37 @@ fn repl_eval(
 pub fn run_repl_eval(input: Peekable<Chars<'_>>) {
     let env = Environment::new();
     let macro_env = Environment::new();
-    let mut output = stdout();
-    let _ = repl_eval(input, &mut output, env, macro_env);
+    let _ = repl_eval(input, env, macro_env);
 }
 
 // TODO: add engine args to main
 pub fn _start_repl_eval() {
     let input = stdin();
-    let mut output = stdout();
     let env = Environment::new();
     let macro_env = Environment::new();
     loop {
         // TODO: add history? will require tty raw mode
         let mut buf = String::new();
-
-        output
-            .write_all(PROMPT.as_bytes())
-            .expect("failed to write prompt");
-        output.flush().expect("failed to flush prompt");
+        print!("{PROMPT}");
+        let _ = std::io::stdout().flush();
 
         input.read_line(&mut buf).expect("reading input failed");
-        let eval = repl_eval(
-            buf.chars().peekable(),
-            &mut output,
-            env.clone(),
-            macro_env.clone(),
-        );
+        let eval = repl_eval(buf.chars().peekable(), env.clone(), macro_env.clone());
 
         match *eval {
             Object::None => (),
-            _ => writeln!(output, "{}", eval.inspect()).expect("writing to stdout failed"),
+            _ => println!("{}", eval.inspect()),
         }
     }
 }
 
-fn repl_vm(
-    input: Peekable<Chars<'_>>,
-    output: &mut Stdout,
-    compiler: &mut Compiler,
-    vm: &mut Vm,
-) -> Option<Object> {
+fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> Option<Object> {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
 
     if !parser.errors.is_empty() {
-        print_parser_errors(output, &parser.errors);
+        print_parser_errors(&parser.errors);
         return Some(Object::None);
     }
 
@@ -134,24 +110,19 @@ fn repl_vm(
 
 pub fn start_repl_vm() {
     let input = stdin();
-    let mut output = stdout();
     let mut compiler = Compiler::new();
     let mut vm = Vm::new(None);
     loop {
         // TODO: add history? will require tty raw mode
         let mut buf = String::new();
-
-        output
-            .write_all(PROMPT.as_bytes())
-            .expect("failed to write prompt");
-        output.flush().expect("failed to flush prompt");
-
+        print!("{PROMPT}");
+        let _ = std::io::stdout().flush();
         input.read_line(&mut buf).expect("reading input failed");
-        let result = repl_vm(buf.chars().peekable(), &mut output, &mut compiler, &mut vm);
+        let result = repl_vm(buf.chars().peekable(), &mut compiler, &mut vm);
         match result {
             Some(Object::None) | None => (),
             Some(result) => {
-                writeln!(output, "{}", result.inspect()).expect("writing to stdout failed")
+                println!("{}", result.inspect());
             }
         }
     }

@@ -1,5 +1,5 @@
 use super::Object;
-use std::{io::Write, rc::Rc};
+use std::rc::Rc;
 
 pub fn get(name: &str) -> Option<Rc<Object>> {
     match name {
@@ -136,17 +136,13 @@ fn push(args: &[Rc<Object>]) -> Rc<Object> {
     })
 }
 
-// TODO: rework puts? print first arg, second arg to control flush
 fn puts(args: &[Rc<Object>]) -> Rc<Object> {
-    let mut output = std::io::stdout().lock();
     for arg in args {
         match arg.as_ref() {
             Object::String(_) => {
-                write!(output, "{arg}").expect("builtin \"puts\" failed writing to stdout");
-                let _ = output.flush();
+                print!("{arg}");
             }
-            _ => write!(output, "{}", arg.inspect())
-                .expect("builtin \"puts\" failed writing to stdout"),
+            _ => print!("{}", arg.inspect()),
         }
     }
     Rc::new(Object::None)

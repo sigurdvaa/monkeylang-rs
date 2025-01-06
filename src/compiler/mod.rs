@@ -219,8 +219,17 @@ impl Compiler {
                 self.replace_last_pop_with_return();
                 self.emit_return_if_missing();
 
+                let prev_scope = self.symbols.clone();
                 let num_locals = self.symbols.num_definitions.get();
                 let instructions = self.leave_scope();
+                for sym in prev_scope.free.borrow().iter() {
+                    match sym.scope {
+                        SymbolScope::Global => self.emit(Opcode::GetGlobal, &[sym.index]),
+                        SymbolScope::Free => self.emit(Opcode::GetFree, &[sym.index]),
+                        SymbolScope::Local => self.emit(Opcode::GetLocal, &[sym.index]),
+                        SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[sym.index]),
+                    };
+                }
 
                 let func = Rc::new(CompiledFunctionObj {
                     instructions,
@@ -228,8 +237,8 @@ impl Compiler {
                     num_parameters: expr.parameters.len(),
                 });
                 let obj = Object::CompiledFunction(func);
-                let operands = &[self.add_constant(obj)];
-                self.emit(Opcode::Constant, operands)
+                let operands = &[self.add_constant(obj), prev_scope.free.borrow().len()];
+                self.emit(Opcode::Closure, operands)
             }
             Expression::Array(expr) => {
                 for element in &expr.elements {
@@ -301,6 +310,7 @@ impl Compiler {
             Expression::Identifier(expr) => match self.symbols.resolve(&expr.value) {
                 Some(sym) => match sym.scope {
                     SymbolScope::Global => self.emit(Opcode::GetGlobal, &[sym.index]),
+                    SymbolScope::Free => self.emit(Opcode::GetFree, &[sym.index]),
                     SymbolScope::Local => self.emit(Opcode::GetLocal, &[sym.index]),
                     SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[sym.index]),
                 },
@@ -326,9 +336,7 @@ impl Compiler {
                 match sym.scope {
                     SymbolScope::Global => self.emit(Opcode::SetGlobal, &[sym.index]),
                     SymbolScope::Local => self.emit(Opcode::SetLocal, &[sym.index]),
-                    SymbolScope::Builtin => {
-                        unreachable!("builtins cannot be defined with let statements")
-                    }
+                    _ => unreachable!(),
                 };
             }
             Statement::Return(expr) => {

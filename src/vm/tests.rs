@@ -392,7 +392,7 @@ fn test_builtin_functions() {
         ),
         ("len([1, 2, 3])", 1, Object::new_integer(3)),
         ("len([])", 1, Object::new_integer(0)),
-        (r#"puts("hello", "world!")"#, 1, Object::None),
+        (r#"puts("Hello,", " ", "World!")"#, 1, Object::None),
         ("first([1, 2, 3])", 1, Object::new_integer(1)),
         ("first([])", 1, Object::new_null()),
         (

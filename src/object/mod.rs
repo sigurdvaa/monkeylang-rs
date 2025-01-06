@@ -58,6 +58,12 @@ pub struct CompiledFunctionObj {
     pub num_parameters: usize,
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct ClosureObj {
+    pub func: Rc<CompiledFunctionObj>,
+    pub free: Vec<Object>,
+}
+
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Clone)]
 pub struct HashKeyData {
     pub kind: &'static str,
@@ -80,6 +86,7 @@ pub enum Object {
     Hash(HashObj),
     Quote(Expression),
     Macro(FunctionObj),
+    Closure(Rc<ClosureObj>),
 }
 
 impl fmt::Display for Object {
@@ -154,6 +161,7 @@ impl Object {
             Self::Hash(_) => "HASH",
             Self::Quote(_) => "QUOTE",
             Self::Macro(_) => "MACRO",
+            Self::Closure(_) => "CLOSURE",
         }
     }
 
@@ -186,6 +194,7 @@ impl Object {
                 &func.body.to_string()
             ),
             Self::CompiledFunction(func) => format!("compiledfn[{func:p}]"),
+            Self::Closure(func) => format!("closure[{func:p}]"),
             Self::Macro(func) => format!(
                 "macro({}) {{\n{}\n}}",
                 &func

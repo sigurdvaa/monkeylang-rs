@@ -5,8 +5,8 @@ mod tests;
 use crate::code::{read_u16_as_usize, Opcode, OpcodeError};
 use crate::compiler::Bytecode;
 use crate::object::{
-    builtins, Array, BuiltinFunction, CompiledFunctionObj, HashKeyData, HashKeyError, HashObj,
-    Integer, Object,
+    builtins, Array, BuiltinFunction, ClosureObj, CompiledFunctionObj, HashKeyData, HashKeyError,
+    HashObj, Integer, Object,
 };
 use frame::Frame;
 use std::collections::HashMap;
@@ -34,6 +34,7 @@ pub enum VmError {
     InvalidIndexTypes(&'static str, &'static str),
     InvalidPrefixType(&'static str),
     InvalidFunctionCall(usize, Object),
+    InvalidClosure(usize, Object),
     WrongNumberArguments(usize, usize),
 }
 
@@ -81,6 +82,12 @@ impl Display for VmError {
                     "invalid function call at stack pointer {sp}, of non-function object: {obj:?}",
                 )
             }
+            Self::InvalidClosure(idx, obj) => {
+                write!(
+                    f,
+                    "invalid function constant at index {idx} used for closure, got non-function object: {obj:?}",
+                )
+            }
             Self::WrongNumberArguments(want, got) => {
                 write!(f, "wrong number of arguments, want={want}, got={got}",)
             }
@@ -120,7 +127,8 @@ impl Vm {
             num_locals: 0,
             num_parameters: 0,
         });
-        let frame = Frame::new(func, 0);
+        let closure = Rc::new(ClosureObj { func, free: vec![] });
+        let frame = Frame::new(closure, 0);
         new.frames[0].replace(frame);
         new
     }
@@ -137,7 +145,8 @@ impl Vm {
             num_locals: 0,
             num_parameters: 0,
         });
-        let frame = Frame::new(func, 0);
+        let closure = Rc::new(ClosureObj { func, free: vec![] });
+        let frame = Frame::new(closure, 0);
         self.frames[0].replace(frame);
     }
 
@@ -162,7 +171,7 @@ impl Vm {
 
     fn curr_frame_running(&mut self) -> bool {
         match &mut self.frames[self.fp - 1] {
-            Some(frame) => frame.ip < frame.func.instructions.len(),
+            Some(frame) => frame.ip < frame.closure.func.instructions.len(),
             None => panic!("main frame missing"),
         }
     }
@@ -191,6 +200,20 @@ impl Vm {
             Some(frame) => Ok(frame),
             None => Err(VmError::InvalidFramesAccess(self.fp)),
         }
+    }
+
+    fn push_closure(&mut self, idx: usize) -> Result<(), VmError> {
+        match &self.constants[idx] {
+            Object::CompiledFunction(func) => {
+                let closure = ClosureObj {
+                    func: func.clone(),
+                    free: vec![],
+                };
+                self.push(Object::Closure(Rc::new(closure)))?;
+            }
+            _ => return Err(VmError::InvalidClosure(idx, self.constants[idx].clone())),
+        }
+        Ok(())
     }
 
     fn execute_binary_integer_operation(
@@ -358,7 +381,7 @@ impl Vm {
 
     fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
         match &self.stack[self.sp - 1 - num_args] {
-            Some(Object::CompiledFunction(func)) => self.call_function(func.clone(), num_args)?,
+            Some(Object::Closure(closure)) => self.call_closure(closure.clone(), num_args)?,
             Some(Object::Builtin(func)) => self.call_builtin(*func, num_args)?,
             Some(obj) => return Err(VmError::InvalidFunctionCall(self.sp - 1, obj.clone())),
             None => return Err(VmError::InvalidStackAccess(self.sp - 1 - num_args)),
@@ -366,17 +389,16 @@ impl Vm {
         Ok(())
     }
 
-    fn call_function(
-        &mut self,
-        func: Rc<CompiledFunctionObj>,
-        num_args: usize,
-    ) -> Result<(), VmError> {
-        if func.num_parameters != num_args {
-            return Err(VmError::WrongNumberArguments(func.num_parameters, num_args));
+    fn call_closure(&mut self, closure: Rc<ClosureObj>, num_args: usize) -> Result<(), VmError> {
+        if closure.func.num_parameters != num_args {
+            return Err(VmError::WrongNumberArguments(
+                closure.func.num_parameters,
+                num_args,
+            ));
         }
 
-        let frame = Frame::new(func.clone(), self.sp - num_args);
-        self.sp += func.num_locals;
+        let frame = Frame::new(closure.clone(), self.sp - num_args);
+        self.sp += closure.func.num_locals;
         self.push_frame(frame)?;
         Ok(())
     }
@@ -404,7 +426,7 @@ impl Vm {
         while self.curr_frame_running() {
             let frame = self.curr_frame();
             ip = frame.ip;
-            ins = &frame.func.instructions;
+            ins = frame.ins();
 
             // TODO: make this lookup using u8 as index into array instead?
             let op = Opcode::try_from(ins[ip]).map_err(VmError::InvalidInstruction)?;
@@ -519,6 +541,12 @@ impl Vm {
                     self.curr_frame().ip += 2;
                     self.execute_call(num_args)?;
                 }
+                Opcode::Closure => {
+                    let idx = read_u16_as_usize(&ins[ip + 1..]);
+                    let _num_free = ins[ip + 3] as usize; // TODO: FIX ME
+                    self.curr_frame().ip += 4;
+                    self.push_closure(idx)?;
+                }
                 Opcode::Return => {
                     let frame = self.pop_frame()?;
                     self.sp = frame.bp;
@@ -532,6 +560,7 @@ impl Vm {
                     self.pop()?;
                     self.push(value)?;
                 }
+                Opcode::GetFree => todo!(),
                 Opcode::EnumLength => unreachable!(),
             }
         }

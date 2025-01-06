@@ -50,6 +50,8 @@ pub enum Opcode {
     GetLocal,
     SetLocal,
     GetBuiltin,
+    Closure,
+    GetFree,
     EnumLength,
 }
 
@@ -86,6 +88,8 @@ impl TryFrom<u8> for Opcode {
             25 if 25 == Self::GetLocal as u8 => Ok(Self::GetLocal),
             26 if 26 == Self::SetLocal as u8 => Ok(Self::SetLocal),
             27 if 27 == Self::GetBuiltin as u8 => Ok(Self::GetBuiltin),
+            28 if 28 == Self::Closure as u8 => Ok(Self::Closure),
+            29 if 29 == Self::GetFree as u8 => Ok(Self::GetFree),
             _ => Err(OpcodeError(op)),
         }
     }
@@ -204,6 +208,14 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
         _opcode: Opcode::GetBuiltin,
         operand_widths: [1, 0],
     },
+    &Definition {
+        _opcode: Opcode::Closure,
+        operand_widths: [2, 1],
+    },
+    &Definition {
+        _opcode: Opcode::GetFree,
+        operand_widths: [1, 0],
+    },
 ];
 
 pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
@@ -256,8 +268,8 @@ pub mod tests {
 
             let mut i = 0;
             while i < self.len() {
-                let op =
-                    Opcode::try_from(self[i]).expect("ERROR: failed to print instructions, {e}");
+                let op = Opcode::try_from(self[i])
+                    .unwrap_or_else(|e| panic!("ERROR: failed to print instructions, {e}"));
                 let def = DEFINITIONS[op.clone() as usize];
                 let (operands, read) = read_operands(def, &self[i + 1..]);
                 buffer.push_str(&format!("{i:0>4} {op:?}",));
@@ -268,7 +280,7 @@ pub mod tests {
                             .iter()
                             .map(|i| i.to_string())
                             .collect::<Vec<_>>()
-                            .join(","),
+                            .join(" "),
                     )
                 }
                 buffer.push('\n');
@@ -308,6 +320,11 @@ pub mod tests {
                 vec![255],
                 vec![Opcode::GetLocal as u8, 255],
             ),
+            (
+                Opcode::Closure,
+                vec![65534, 255],
+                vec![Opcode::Closure as u8, 255, 254, 255],
+            ),
         ];
         for (test_opcode, test_operands, test_value) in tests {
             let instruction = make_ins(test_opcode, &test_operands);
@@ -325,6 +342,7 @@ pub mod tests {
             make_ins(Opcode::Add, &[]),
             make_ins(Opcode::Pop, &[]),
             make_ins(Opcode::GetLocal, &[1]),
+            make_ins(Opcode::Closure, &[65535, 255]),
         ]
         .into_iter()
         .flatten()
@@ -336,6 +354,7 @@ pub mod tests {
             "0009 Add\n",
             "0010 Pop\n",
             "0011 GetLocal 1\n",
+            "0013 Closure 65535 255\n",
         );
         assert_eq!(instructions.to_string(), expected);
     }
@@ -346,6 +365,7 @@ pub mod tests {
             (Opcode::Constant, vec![65535], 2),
             (Opcode::Add, vec![], 0),
             (Opcode::GetLocal, vec![0], 1),
+            (Opcode::Closure, vec![65535, 255], 3),
         ];
         for (test_opcode, test_operands, test_read) in tests {
             let ins = make_ins(test_opcode.clone(), &test_operands);
