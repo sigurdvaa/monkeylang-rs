@@ -575,3 +575,22 @@ fn test_recursive_functions() {
         run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
     }
 }
+
+#[test]
+fn test_recursive_fibonacci() {
+    let input = concat!(
+        "let fibonacci = fn(x) {\n",
+        "    if (x == 0) {\n",
+        "        return 0;\n",
+        "    } else {\n",
+        "        if (x == 1) {\n",
+        "            return 1;\n",
+        "        } else {\n",
+        "            fibonacci(x - 1) + fibonacci(x - 2);\n",
+        "        }\n",
+        "    }\n",
+        "};\n",
+        "fibonacci(15);\n",
+    );
+    run_vm_test(input, 2, Object::new_integer(610));
+}

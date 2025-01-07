@@ -8,6 +8,7 @@ use crate::object::environment::{Env, Environment};
 use crate::object::Object;
 use crate::parser::{Parser, ParserError};
 use crate::vm::Vm;
+use std::fmt::Display;
 use std::io::{stdin, Write};
 use std::iter::Peekable;
 use std::rc::Rc;
@@ -27,6 +28,21 @@ const MONKEY_FACE: &str = concat!(
     "        '._ '-=-' _.'\n",
     "           '-----'\n",
 );
+
+#[derive(Debug)]
+pub enum Engine {
+    Eval,
+    Vm,
+}
+
+impl Display for Engine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Eval => write!(f, "eval"),
+            Self::Vm => write!(f, "vm"),
+        }
+    }
+}
 
 fn print_parser_errors(errors: &[ParserError]) {
     println!("{MONKEY_FACE}Woops! We ran into some monkey business here!\n parser errors:");
@@ -51,13 +67,13 @@ fn repl_eval(input: Peekable<Chars<'_>>, env: Env, macro_env: Env) -> Rc<Object>
     eval_program(&program, env.clone())
 }
 
-pub fn run_repl_eval(input: Peekable<Chars<'_>>) {
+pub fn run_repl_eval(input: Peekable<Chars<'_>>) -> Rc<Object> {
     let env = Environment::new();
     let macro_env = Environment::new();
-    let _ = repl_eval(input, env, macro_env);
+    repl_eval(input, env, macro_env)
 }
 
-// TODO: add engine args to main
+// TODO: add engine as arg
 pub fn _start_repl_eval() {
     let input = stdin();
     let env = Environment::new();
@@ -78,6 +94,7 @@ pub fn _start_repl_eval() {
     }
 }
 
+// TODO: fix same return type for eval and vm
 fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> Option<Object> {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
@@ -106,6 +123,12 @@ fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> 
         }
         Ok(v) => Some(v),
     }
+}
+
+pub fn run_repl_vm(input: Peekable<Chars<'_>>) -> Option<Object> {
+    let mut compiler = Compiler::new();
+    let mut vm = Vm::new(None);
+    repl_vm(input, &mut compiler, &mut vm)
 }
 
 pub fn start_repl_vm() {
