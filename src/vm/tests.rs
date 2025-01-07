@@ -431,3 +431,74 @@ fn test_builtin_functions() {
         run_vm_test(test_input, test_stmts, test_value);
     }
 }
+
+#[test]
+fn test_closures() {
+    let tests = [
+        (
+            concat!(
+                "let newClosure = fn(a) {\n",
+                "    fn() { a; };\n",
+                "};\n",
+                "let closure = newClosure(99);\n",
+                "closure();\n",
+            ),
+            3,
+            99,
+        ),
+        (
+            concat!(
+                "let newAdder = fn(a, b) {\n",
+                "    fn(c) { a + b + c };\n",
+                "};\n",
+                "let adder = newAdder(1, 2);\n",
+                "adder(8);",
+            ),
+            3,
+            11,
+        ),
+        (
+            concat!(
+                "let newAdder = fn(a, b) {\n",
+                "    let c = a + b;\n",
+                "    fn(d) { c + d };\n",
+                "};\n",
+                "let adder = newAdder(1, 2);\n",
+                "adder(8);",
+            ),
+            3,
+            11,
+        ),
+        (
+            concat!(
+                "let a = 1;\n",
+                "let newAdderOuter = fn(b) {\n",
+                "    fn(c) {\n",
+                "        fn(d) { a + b + c + d };\n",
+                "    };\n",
+                "};\n",
+                "let newAdderInner = newAdderOuter(2)\n",
+                "let adder = newAdderInner(3);\n",
+                "adder(8);\n",
+            ),
+            5,
+            14,
+        ),
+        (
+            concat!(
+                "let newClosure = fn(a, b) {\n",
+                "    let one = fn() { a; };\n",
+                "    let two = fn() { b; };\n",
+                "    fn() { one() + two(); };\n",
+                "};\n",
+                "let closure = newClosure(9, 90);\n",
+                "closure();\n",
+            ),
+            3,
+            99,
+        ),
+    ];
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+    }
+}

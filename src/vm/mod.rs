@@ -99,6 +99,7 @@ pub struct Vm {
     constants: Vec<Object>,
     // TODO: wrap obj in Rc? avoid cloning when pushing locals
     stack: [Option<Object>; STACK_SIZE],
+    // TODO: verify that all obj has been taken from the stack when we decrement sp
     sp: usize,
     globals: Vec<Option<Object>>,
     builtins: &'static [(&'static str, Object)],
@@ -202,12 +203,20 @@ impl Vm {
         }
     }
 
-    fn push_closure(&mut self, idx: usize) -> Result<(), VmError> {
+    fn push_closure(&mut self, idx: usize, num_free: usize) -> Result<(), VmError> {
         match &self.constants[idx] {
             Object::CompiledFunction(func) => {
+                let mut free = Vec::with_capacity(num_free);
+                for idx in self.sp - num_free..self.sp {
+                    match self.stack[idx].take() {
+                        Some(obj) => free.push(obj),
+                        None => return Err(VmError::InvalidStackAccess(idx)),
+                    };
+                }
+                self.sp -= num_free;
                 let closure = ClosureObj {
                     func: func.clone(),
-                    free: vec![],
+                    free,
                 };
                 self.push(Object::Closure(Rc::new(closure)))?;
             }
@@ -543,9 +552,9 @@ impl Vm {
                 }
                 Opcode::Closure => {
                     let idx = read_u16_as_usize(&ins[ip + 1..]);
-                    let _num_free = ins[ip + 3] as usize; // TODO: FIX ME
+                    let num_free = ins[ip + 3] as usize;
                     self.curr_frame().ip += 4;
-                    self.push_closure(idx)?;
+                    self.push_closure(idx, num_free)?;
                 }
                 Opcode::Return => {
                     let frame = self.pop_frame()?;
@@ -560,7 +569,13 @@ impl Vm {
                     self.pop()?;
                     self.push(value)?;
                 }
-                Opcode::GetFree => todo!(),
+                Opcode::GetFree => {
+                    let idx = ins[ip + 1] as usize;
+                    let frame = self.curr_frame();
+                    frame.ip += 2;
+                    let obj = frame.closure.free[idx].clone();
+                    self.push(obj)?;
+                }
                 Opcode::EnumLength => unreachable!(),
             }
         }
