@@ -1,5 +1,4 @@
 use crate::repl::{run_repl_eval, run_repl_vm, Engine};
-use std::rc::Rc;
 use std::time::Instant;
 
 const TEST: &str = concat!(
@@ -20,13 +19,12 @@ const TEST: &str = concat!(
 pub fn run(engine: Engine) {
     let start = Instant::now();
     let result = match engine {
-        Engine::Eval => run_repl_eval(TEST.chars().peekable()).clone(),
-        Engine::Vm => Rc::new(run_repl_vm(TEST.chars().peekable()).unwrap()),
+        Engine::Eval => run_repl_eval(TEST.chars().peekable()).inspect(),
+        Engine::Vm => run_repl_vm(TEST.chars().peekable()).unwrap().inspect(),
     };
     let duration = start.elapsed();
     println!(
-        "engine={engine}, result={}, duration={}",
-        result.inspect(),
+        "engine={engine}, result={result}, duration={}",
         duration.as_secs_f64()
     );
 }

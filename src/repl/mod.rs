@@ -73,7 +73,7 @@ pub fn run_repl_eval(input: Peekable<Chars<'_>>) -> Rc<Object> {
     repl_eval(input, env, macro_env)
 }
 
-// TODO: add engine as arg
+// TODO: add engine as arg to make this available for repl?
 pub fn _start_repl_eval() {
     let input = stdin();
     let env = Environment::new();
@@ -94,7 +94,6 @@ pub fn _start_repl_eval() {
     }
 }
 
-// TODO: fix same return type for eval and vm
 fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> Option<Object> {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);

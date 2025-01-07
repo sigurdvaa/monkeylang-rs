@@ -86,8 +86,8 @@ fn test_conditionals() {
         ("if (1 < 2) { 10 }", Object::new_integer(10)),
         ("if (1 < 2) { 10 } else { 20 }", Object::new_integer(10)),
         ("if (1 > 2) { 10 } else { 20 }", Object::new_integer(20)),
-        ("if (1 > 2) { 10 }", Object::new_null()),
-        ("if (false) { 10 }", Object::new_null()),
+        ("if (1 > 2) { 10 }", Object::Null),
+        ("if (false) { 10 }", Object::Null),
         (
             "if ((if (false) { 10 })) { 10 } else { 20 }",
             Object::new_integer(20),
@@ -164,13 +164,13 @@ fn test_index_expressions() {
         ("[1, 2, 3][1]", Object::new_integer(2)),
         ("[1, 2, 3][0 + 2]", Object::new_integer(3)),
         ("[[1, 1, 1]][0][0]", Object::new_integer(1)),
-        ("[][0]", Object::new_null()),
-        ("[1, 2, 3][99]", Object::new_null()),
-        ("[1][-1]", Object::new_null()),
+        ("[][0]", Object::Null),
+        ("[1, 2, 3][99]", Object::Null),
+        ("[1][-1]", Object::Null),
         ("{1: 1, 2: 2}[1]", Object::new_integer(1)),
         ("{1: 1, 2: 2}[2]", Object::new_integer(2)),
-        ("{1: 1}[0]", Object::new_null()),
-        ("{}[0]", Object::new_null()),
+        ("{1: 1}[0]", Object::Null),
+        ("{}[0]", Object::Null),
     ];
     for (test_input, test_value) in tests {
         run_vm_test(test_input, 1, test_value);
@@ -229,7 +229,7 @@ fn test_functions_without_return_value() {
         ),
     ];
     for (test_input, test_stmts) in tests {
-        run_vm_test(test_input, test_stmts, Object::new_null());
+        run_vm_test(test_input, test_stmts, Object::Null);
     }
 }
 
@@ -394,14 +394,14 @@ fn test_builtin_functions() {
         ("len([])", 1, Object::new_integer(0)),
         (r#"puts("Hello,", " ", "World!")"#, 1, Object::None),
         ("first([1, 2, 3])", 1, Object::new_integer(1)),
-        ("first([])", 1, Object::new_null()),
+        ("first([])", 1, Object::Null),
         (
             "first(1)",
             1,
             Object::Error("argument to \"first\" not supported, got INTEGER".into()),
         ),
         ("last([1, 2, 3])", 1, Object::new_integer(3)),
-        ("last([])", 1, Object::new_null()),
+        ("last([])", 1, Object::Null),
         (
             "last(1)",
             1,
@@ -415,7 +415,7 @@ fn test_builtin_functions() {
                 Rc::new(Object::new_integer(3)),
             ]),
         ),
-        ("rest([])", 1, Object::new_null()),
+        ("rest([])", 1, Object::Null),
         (
             "push([], 1)",
             1,

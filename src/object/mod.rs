@@ -99,10 +99,6 @@ impl fmt::Display for Object {
 }
 
 impl Object {
-    pub fn new_null() -> Self {
-        const { Object::Null }
-    }
-
     pub fn new_boolean(value: bool) -> Self {
         match value {
             true => {
@@ -242,7 +238,7 @@ impl Object {
 
     pub fn hash_key(&self) -> Result<HashKeyData, HashKeyError> {
         // TODO: avoid collisions
-        // TODO: improve cache, only works with binding
+        // TODO: improve cache, currently only works with bindings (attached to obj)
         match self {
             Self::Boolean(obj) => {
                 if let Some(hash_key) = obj.hash.borrow().as_ref() {

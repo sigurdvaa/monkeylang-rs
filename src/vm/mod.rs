@@ -331,14 +331,14 @@ impl Vm {
 
     fn execute_array_index(left: &Array, index: &Integer) -> Rc<Object> {
         left.get(index.value as usize)
-            .unwrap_or(&Rc::new(Object::new_null()))
+            .unwrap_or(&Rc::new(Object::Null))
             .clone()
     }
 
     fn execute_hash_index(left: &HashObj, index: &HashKeyData) -> Rc<Object> {
         match left.get(index) {
             Some((_key, value)) => value.clone(),
-            None => Rc::new(Object::new_null()),
+            None => Rc::new(Object::Null),
         }
     }
 
@@ -457,7 +457,7 @@ impl Vm {
                     self.curr_frame().ip += 1;
                 }
                 Opcode::Null => {
-                    self.push(Object::new_null())?;
+                    self.push(Object::Null)?;
                     self.curr_frame().ip += 1;
                 }
                 Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
@@ -560,7 +560,7 @@ impl Vm {
                     let frame = self.pop_frame()?;
                     self.sp = frame.bp;
                     self.pop()?;
-                    self.push(Object::new_null())?;
+                    self.push(Object::Null)?;
                 }
                 Opcode::ReturnValue => {
                     let value = self.pop()?;

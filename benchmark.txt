@@ -1,0 +1,11 @@
+from the book (unknown hardware):
+engine=eval, result=9227465, duration=27.204277379s
+engine=vm, result=9227465, duration=8.876222455s
+
+version 0.2.0 (dell precision intel i9)
+engine=eval, result=9227465, duration=39.249363618
+engine=eval, result=9227465, duration=39.186252218
+engine=eval, result=9227465, duration=39.185956577
+engine=vm, result=9227465, duration=16.275710842
+engine=vm, result=9227465, duration=16.270166381
+engine=vm, result=9227465, duration=16.346434668
