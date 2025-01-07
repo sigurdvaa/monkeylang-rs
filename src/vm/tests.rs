@@ -7,7 +7,7 @@ fn run_vm_test(input: &str, statements: usize, value: Object) {
     let mut compiler = Compiler::new();
     let _ = compiler
         .compile_program(&prog)
-        .map_err(|e| panic!("compiler error: {e:?}"));
+        .map_err(|e| panic!("compiler error: {e}"));
     let mut vm = Vm::new(Some(compiler.bytecode()));
     let result = vm.run().unwrap_or_else(|e| panic!("vm error:\n {e}"));
     assert_eq!(
@@ -471,6 +471,22 @@ fn test_closures() {
         ),
         (
             concat!(
+                "let newAdderOuter = fn(a, b) {\n",
+                "    let c = a + b;\n",
+                "    fn(d) {\n",
+                "        let e = d + c;\n",
+                "        fn(f) { e + f; };\n",
+                "    };\n",
+                "};\n",
+                "let newAdderInner = newAdderOuter(1, 2)\n",
+                "let adder = newAdderInner(3);\n",
+                "adder(8);\n",
+            ),
+            4,
+            14,
+        ),
+        (
+            concat!(
                 "let a = 1;\n",
                 "let newAdderOuter = fn(b) {\n",
                 "    fn(c) {\n",
@@ -496,6 +512,63 @@ fn test_closures() {
             ),
             3,
             99,
+        ),
+    ];
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+    }
+}
+
+#[test]
+fn test_recursive_functions() {
+    let tests = [
+        (
+            concat!(
+                "let countDown = fn(x) {\n",
+                "    if (x == 0) {\n",
+                "        return 0;\n",
+                "    } else {\n",
+                "        countDown(x - 1);\n",
+                "    }\n",
+                "};\n",
+                "countDown(1);\n",
+            ),
+            2,
+            0,
+        ),
+        (
+            concat!(
+                "let countDown = fn(x) {\n",
+                "    if (x == 0) {\n",
+                "        return 0;\n",
+                "    } else {\n",
+                "        countDown(x - 1);\n",
+                "    }\n",
+                "};\n",
+                "let wrapper = fn() {\n",
+                "    countDown(1);\n",
+                "};\n",
+                "wrapper();\n",
+            ),
+            3,
+            0,
+        ),
+        (
+            concat!(
+                "let wrapper = fn() {\n",
+                "    let countDown = fn(x) {\n",
+                "        if (x == 0) {\n",
+                "            return 0;\n",
+                "        } else {\n",
+                "            countDown(x - 1);\n",
+                "        }\n",
+                "    };\n",
+                "    countDown(1);\n",
+                "};\n",
+                "wrapper();\n",
+            ),
+            2,
+            0,
         ),
     ];
     for (test_input, test_stmts, test_value) in tests {

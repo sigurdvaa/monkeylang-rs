@@ -104,6 +104,7 @@ pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<IdentifierLiteral>,
     pub body: BlockStatement,
+    pub name: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
@@ -180,17 +181,22 @@ impl fmt::Display for Expression {
                     write!(f, "if ({}) {{ {} }}", expr.condition, expr.consequence)
                 }
             }
-            Self::Function(expr) | Self::Macro(expr) => write!(
-                f,
-                "{}({}) {{ {}",
-                expr.token.literal,
-                expr.parameters
-                    .iter()
-                    .map(|i| i.value.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                expr.body,
-            ),
+            Self::Function(expr) | Self::Macro(expr) => {
+                let mut buffer = String::from(&expr.token.literal);
+                if let Some(name) = &expr.name {
+                    buffer.push_str(&format!("<{name}>",));
+                }
+                write!(
+                    f,
+                    "{buffer}({}) {{ {} }}",
+                    expr.parameters
+                        .iter()
+                        .map(|i| i.value.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    expr.body,
+                )
+            }
             Self::String(expr) => write!(f, "\"{}\"", expr.value),
             Self::Array(expr) => write!(
                 f,

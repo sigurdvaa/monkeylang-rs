@@ -10,6 +10,7 @@ pub enum SymbolScope {
     Local,
     Builtin,
     Free,
+    Function,
 }
 
 impl SymbolScope {
@@ -19,6 +20,7 @@ impl SymbolScope {
             Self::Local => "LOCAL",
             Self::Builtin => "BUILTIN",
             Self::Free => "FREE",
+            Self::Function => "FUNCTION",
         }
     }
 }
@@ -88,6 +90,16 @@ impl SymbolTable {
             name: name.clone(),
             index,
             scope: SymbolScope::Builtin,
+        });
+        self.store.borrow_mut().insert(name, sym.clone());
+        sym
+    }
+
+    pub fn define_function_name(&self, name: String) -> Rc<Symbol> {
+        let sym = Rc::new(Symbol {
+            name: name.clone(),
+            index: 0,
+            scope: SymbolScope::Function,
         });
         self.store.borrow_mut().insert(name, sym.clone());
         sym
@@ -329,5 +341,34 @@ mod tests {
             let sym = second_local.resolve(none);
             assert_eq!(sym, None);
         }
+    }
+
+    #[test]
+    fn test_define_and_resolve_function_name() {
+        let global = SymbolTable::new();
+        global.define_function_name("a".into());
+
+        let test = Symbol {
+            name: "a".into(),
+            scope: SymbolScope::Function,
+            index: 0,
+        };
+
+        assert_eq!(global.resolve("a"), Some(Rc::new(test)));
+    }
+
+    #[test]
+    fn test_shadowing_function_name() {
+        let global = SymbolTable::new();
+        global.define_function_name("a".into());
+        global.define("a".into());
+
+        let test = Symbol {
+            name: "a".into(),
+            scope: SymbolScope::Global,
+            index: 0,
+        };
+
+        assert_eq!(global.resolve("a"), Some(Rc::new(test)));
     }
 }

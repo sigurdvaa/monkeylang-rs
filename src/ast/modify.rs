@@ -200,6 +200,7 @@ mod tests {
             token: token.clone(),
             parameters,
             body,
+            name: None,
         });
         let statements = vec![Statement::Expression(ExpressionStatement { token, value })];
         Program { statements }

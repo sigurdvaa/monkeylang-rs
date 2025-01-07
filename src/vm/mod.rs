@@ -576,6 +576,12 @@ impl Vm {
                     let obj = frame.closure.free[idx].clone();
                     self.push(obj)?;
                 }
+                Opcode::CurrentClosure => {
+                    let frame = self.curr_frame();
+                    frame.ip += 1;
+                    let closure = frame.closure.clone();
+                    self.push(Object::Closure(closure))?;
+                }
                 Opcode::EnumLength => unreachable!(),
             }
         }

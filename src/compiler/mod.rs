@@ -8,6 +8,7 @@ use std::rc::Rc;
 use crate::ast::{Expression, Operator, Program, Statement};
 use crate::code::{make_ins, Instruction, Opcode};
 use crate::object::{builtins, CompiledFunctionObj, Object};
+use symbol::Symbol;
 pub use symbol::{SymbolScope, SymbolTable, Symbols};
 
 #[derive(Debug)]
@@ -192,6 +193,16 @@ impl Compiler {
         self.replace_ins(pos, new_ins);
     }
 
+    fn load_symbol(&mut self, sym: &Symbol) -> usize {
+        match sym.scope {
+            SymbolScope::Global => self.emit(Opcode::GetGlobal, &[sym.index]),
+            SymbolScope::Free => self.emit(Opcode::GetFree, &[sym.index]),
+            SymbolScope::Local => self.emit(Opcode::GetLocal, &[sym.index]),
+            SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[sym.index]),
+            SymbolScope::Function => self.emit(Opcode::CurrentClosure, &[]),
+        }
+    }
+
     fn compile_expression(&mut self, expr: &Expression) -> Result<(), CompilerError> {
         let _ = match expr {
             Expression::Boolean(expr) => match expr.value {
@@ -211,6 +222,10 @@ impl Compiler {
             Expression::Function(expr) => {
                 self.enter_scope();
 
+                if let Some(name) = &expr.name {
+                    self.symbols.define_function_name(name.into());
+                }
+
                 for param in &expr.parameters {
                     self.symbols.define(param.value.clone());
                 }
@@ -223,12 +238,7 @@ impl Compiler {
                 let num_locals = self.symbols.num_definitions.get();
                 let instructions = self.leave_scope();
                 for sym in prev_scope.free.borrow().iter() {
-                    match sym.scope {
-                        SymbolScope::Global => self.emit(Opcode::GetGlobal, &[sym.index]),
-                        SymbolScope::Free => self.emit(Opcode::GetFree, &[sym.index]),
-                        SymbolScope::Local => self.emit(Opcode::GetLocal, &[sym.index]),
-                        SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[sym.index]),
-                    };
+                    self.load_symbol(sym);
                 }
 
                 let func = Rc::new(CompiledFunctionObj {
@@ -307,13 +317,8 @@ impl Compiler {
                 }
                 self.emit(Opcode::Call, &[expr.arguments.len()])
             }
-            Expression::Identifier(expr) => match self.symbols.resolve(&expr.value) {
-                Some(sym) => match sym.scope {
-                    SymbolScope::Global => self.emit(Opcode::GetGlobal, &[sym.index]),
-                    SymbolScope::Free => self.emit(Opcode::GetFree, &[sym.index]),
-                    SymbolScope::Local => self.emit(Opcode::GetLocal, &[sym.index]),
-                    SymbolScope::Builtin => self.emit(Opcode::GetBuiltin, &[sym.index]),
-                },
+            Expression::Identifier(expr) => match &self.symbols.resolve(&expr.value) {
+                Some(sym) => self.load_symbol(sym),
                 None => return Err(CompilerError::UndefinedVariable(expr.value.clone())),
             },
             Expression::Index(expr) => {
@@ -331,8 +336,8 @@ impl Compiler {
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompilerError> {
         match stmt {
             Statement::Let(expr) => {
-                self.compile_expression(&expr.value)?;
                 let sym = self.symbols.define(expr.name.value.clone());
+                self.compile_expression(&expr.value)?;
                 match sym.scope {
                     SymbolScope::Global => self.emit(Opcode::SetGlobal, &[sym.index]),
                     SymbolScope::Local => self.emit(Opcode::SetLocal, &[sym.index]),

@@ -993,3 +993,83 @@ fn test_closures() {
     ];
     run_compiler_tests(&tests);
 }
+
+#[test]
+fn test_recursive_functions() {
+    let tests = [
+        TestCase::new(
+            "let countDown = fn(x) { countDown(x - 1); }; countDown(1);",
+            2,
+            vec![
+                Object::new_integer(1),
+                make_compiled_func(
+                    vec![
+                        make_ins(Opcode::CurrentClosure, &[]),
+                        make_ins(Opcode::GetLocal, &[0]),
+                        make_ins(Opcode::Constant, &[0]),
+                        make_ins(Opcode::Sub, &[]),
+                        make_ins(Opcode::Call, &[1]),
+                        make_ins(Opcode::ReturnValue, &[]),
+                    ],
+                    1,
+                    1,
+                ),
+                Object::new_integer(1),
+            ],
+            vec![
+                make_ins(Opcode::Closure, &[1, 0]),
+                make_ins(Opcode::SetGlobal, &[0]),
+                make_ins(Opcode::GetGlobal, &[0]),
+                make_ins(Opcode::Constant, &[2]),
+                make_ins(Opcode::Call, &[1]),
+                make_ins(Opcode::Pop, &[]),
+            ],
+        ),
+        TestCase::new(
+            concat!(
+                "let wrapper = fn() {\n",
+                "    let countDown = fn(x) { countDown(x - 1); };\n",
+                "    countDown(1);\n",
+                "};\n",
+                "wrapper();\n",
+            ),
+            2,
+            vec![
+                Object::new_integer(1),
+                make_compiled_func(
+                    vec![
+                        make_ins(Opcode::CurrentClosure, &[]),
+                        make_ins(Opcode::GetLocal, &[0]),
+                        make_ins(Opcode::Constant, &[0]),
+                        make_ins(Opcode::Sub, &[]),
+                        make_ins(Opcode::Call, &[1]),
+                        make_ins(Opcode::ReturnValue, &[]),
+                    ],
+                    1,
+                    1,
+                ),
+                Object::new_integer(1),
+                make_compiled_func(
+                    vec![
+                        make_ins(Opcode::Closure, &[1, 0]),
+                        make_ins(Opcode::SetLocal, &[0]),
+                        make_ins(Opcode::GetLocal, &[0]),
+                        make_ins(Opcode::Constant, &[2]),
+                        make_ins(Opcode::Call, &[1]),
+                        make_ins(Opcode::ReturnValue, &[]),
+                    ],
+                    1,
+                    0,
+                ),
+            ],
+            vec![
+                make_ins(Opcode::Closure, &[3, 0]),
+                make_ins(Opcode::SetGlobal, &[0]),
+                make_ins(Opcode::GetGlobal, &[0]),
+                make_ins(Opcode::Call, &[0]),
+                make_ins(Opcode::Pop, &[]),
+            ],
+        ),
+    ];
+    run_compiler_tests(&tests);
+}

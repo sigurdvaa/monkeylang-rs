@@ -811,3 +811,25 @@ fn test_macro_literal_parsing() {
         &Literal::Ident("y"),
     );
 }
+
+#[test]
+fn test_function_literal_with_name() {
+    let input = "let myFunction = fn() { };";
+    let program = parse_program(input, 1);
+
+    let stmt = match &program.statements[0] {
+        Statement::Let(stmt) => {
+            assert_eq!(stmt.token.kind, TokenKind::Let);
+            assert_eq!(stmt.token.literal, "let");
+            stmt
+        }
+        _ => panic!("not a let statement, got: {}", &program.statements[0]),
+    };
+
+    let expr = match &stmt.value {
+        Expression::Function(expr) => expr,
+        _ => panic!("not a function expression, got: {}", stmt.value),
+    };
+
+    assert_eq!(expr.name, Some("myFunction".into()));
+}

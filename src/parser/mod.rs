@@ -188,7 +188,10 @@ impl<'a> Parser<'a> {
         self.expect_token(TokenKind::Assign)?;
         self.next_tokens();
 
-        let value = self.parse_expression(Precedence::Lowest)?;
+        let mut value = self.parse_expression(Precedence::Lowest)?;
+        if let Expression::Function(expr) = &mut value {
+            expr.name = Some(name.value.clone());
+        }
 
         if self.next_token.kind == TokenKind::Semicolon {
             self.next_tokens();
@@ -303,6 +306,7 @@ impl<'a> Parser<'a> {
             token,
             parameters,
             body,
+            name: None,
         }))
     }
 
@@ -319,6 +323,7 @@ impl<'a> Parser<'a> {
             token,
             parameters,
             body,
+            name: None,
         }))
     }
 

@@ -52,6 +52,7 @@ pub enum Opcode {
     GetBuiltin,
     Closure,
     GetFree,
+    CurrentClosure,
     EnumLength,
 }
 
@@ -90,6 +91,7 @@ impl TryFrom<u8> for Opcode {
             27 if 27 == Self::GetBuiltin as u8 => Ok(Self::GetBuiltin),
             28 if 28 == Self::Closure as u8 => Ok(Self::Closure),
             29 if 29 == Self::GetFree as u8 => Ok(Self::GetFree),
+            30 if 30 == Self::CurrentClosure as u8 => Ok(Self::CurrentClosure),
             _ => Err(OpcodeError(op)),
         }
     }
@@ -215,6 +217,10 @@ const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
     &Definition {
         _opcode: Opcode::GetFree,
         operand_widths: [1, 0],
+    },
+    &Definition {
+        _opcode: Opcode::GetFree,
+        operand_widths: [0, 0],
     },
 ];
 
