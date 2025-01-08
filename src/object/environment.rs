@@ -7,7 +7,6 @@ pub type Env = Rc<Environment>;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Environment {
-    // TODO: use &str instead of String as key?
     store: RefCell<HashMap<String, Rc<Object>>>,
     outer: Option<Env>,
 }

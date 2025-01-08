@@ -258,7 +258,6 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
             apply_function(&func, &args)
         }
         Expression::Function(expr) => Rc::new(Object::Function(FunctionObj {
-            // TODO: cloning param and body could be expensive
             parameters: expr.parameters.clone(),
             body: expr.body.clone(),
             env: env.clone(),
@@ -289,7 +288,6 @@ fn eval_expression(expression: &Expression, env: Env) -> Rc<Object> {
                 _ => eval_prefix_expression(&expr.operator, right),
             }
         }
-        // TODO: use &str instead of String in obj?
         Expression::String(expr) => Rc::new(Object::new_string(expr.value.to_owned())),
         Expression::Array(expr) => {
             let array = eval_expressions(&expr.elements, env);
@@ -324,7 +322,6 @@ fn eval_statement(statement: &Statement, env: Env) -> Rc<Object> {
             if let Object::Error(_) = *value {
                 return value;
             }
-            // TODO: env could hold &str instead of String, expr outlives eval
             env.set(expr.name.value.clone(), value);
             Rc::new(Object::None)
         }
