@@ -24,7 +24,7 @@ pub fn run(engine: Engine) {
     };
     let duration = start.elapsed();
     println!(
-        "engine={engine}, result={result}, duration={}",
+        "engine={engine}, result={result}, duration={}s",
         duration.as_secs_f64()
     );
 }
