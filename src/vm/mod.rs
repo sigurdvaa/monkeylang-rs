@@ -21,7 +21,7 @@ const FRAMES_SIZE: usize = 1024;
 pub enum VmError {
     InvalidInstruction(OpcodeError),
     InvalidHashKey(HashKeyError),
-    StackOverflow(Object),
+    StackOverflow(Rc<Object>),
     FramesOverflow(Frame),
     InvalidStackAccess(usize),
     InvalidFramesAccess(usize),
@@ -33,8 +33,8 @@ pub enum VmError {
     InvalidComparisonTypes(&'static str, &'static str),
     InvalidIndexTypes(&'static str, &'static str),
     InvalidPrefixType(&'static str),
-    InvalidFunctionCall(usize, Object),
-    InvalidClosure(usize, Object),
+    InvalidFunctionCall(usize, Rc<Object>),
+    InvalidClosure(usize, Rc<Object>),
     WrongNumberArguments(usize, usize),
 }
 
@@ -96,14 +96,12 @@ impl Display for VmError {
 }
 
 pub struct Vm {
-    constants: Vec<Object>,
-    // TODO: wrap obj in Rc? avoid cloning when pushing locals
-    stack: [Option<Object>; STACK_SIZE],
+    constants: Vec<Rc<Object>>,
+    stack: [Option<Rc<Object>>; STACK_SIZE],
     // TODO: verify that all obj has been taken from the stack when we decrement sp
     sp: usize,
-    globals: Vec<Option<Object>>,
-    builtins: &'static [(&'static str, Object)],
-    // TODO: wrap obj in Rc? avoid cloning when pushing globals
+    globals: Vec<Option<Rc<Object>>>,
+    builtins: Vec<(&'static str, Rc<Object>)>,
     frames: [Option<Frame>; FRAMES_SIZE],
     fp: usize,
 }
@@ -151,7 +149,7 @@ impl Vm {
         self.frames[0].replace(frame);
     }
 
-    fn push(&mut self, obj: Object) -> Result<(), VmError> {
+    fn push(&mut self, obj: Rc<Object>) -> Result<(), VmError> {
         if self.sp >= STACK_SIZE {
             return Err(VmError::StackOverflow(obj));
         }
@@ -162,7 +160,7 @@ impl Vm {
         Ok(())
     }
 
-    fn pop(&mut self) -> Result<Object, VmError> {
+    fn pop(&mut self) -> Result<Rc<Object>, VmError> {
         self.sp -= 1;
         match self.stack[self.sp].take() {
             Some(obj) => Ok(obj),
@@ -204,7 +202,7 @@ impl Vm {
     }
 
     fn push_closure(&mut self, idx: usize, num_free: usize) -> Result<(), VmError> {
-        match &self.constants[idx] {
+        match self.constants[idx].as_ref() {
             Object::CompiledFunction(func) => {
                 let mut free = Vec::with_capacity(num_free);
                 for idx in self.sp - num_free..self.sp {
@@ -218,7 +216,7 @@ impl Vm {
                     func: func.clone(),
                     free,
                 };
-                self.push(Object::Closure(Rc::new(closure)))?;
+                self.push(Rc::new(Object::Closure(Rc::new(closure))))?;
             }
             _ => return Err(VmError::InvalidClosure(idx, self.constants[idx].clone())),
         }
@@ -238,7 +236,7 @@ impl Vm {
             Opcode::Div => left / right,
             _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
-        self.push(Object::new_integer(value))?;
+        self.push(Rc::new(Object::new_integer(value)))?;
         Ok(())
     }
 
@@ -252,14 +250,14 @@ impl Vm {
             Opcode::Add => String::from_iter([left, right]),
             _ => return Err(VmError::InvalidStringOperator(op)),
         };
-        self.push(Object::new_string(value))?;
+        self.push(Rc::new(Object::new_string(value)))?;
         Ok(())
     }
 
     fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), VmError> {
         let right = self.pop()?;
         let left = self.pop()?;
-        match (&left, &right) {
+        match (left.as_ref(), right.as_ref()) {
             (Object::Integer(left), Object::Integer(right)) => {
                 self.execute_binary_integer_operation(op, left.value, right.value)
             }
@@ -283,7 +281,7 @@ impl Vm {
             Opcode::Lt => left < right,
             _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
-        self.push(Object::new_boolean(value))?;
+        self.push(Rc::new(Object::new_boolean(value)))?;
         Ok(())
     }
 
@@ -298,14 +296,14 @@ impl Vm {
             Opcode::NotEq => left != right,
             _ => return Err(VmError::InvalidBooleanOperator(op)),
         };
-        self.push(Object::new_boolean(value))?;
+        self.push(Rc::new(Object::new_boolean(value)))?;
         Ok(())
     }
 
     fn execute_comparison(&mut self, op: Opcode) -> Result<(), VmError> {
         let right = self.pop()?;
         let left = self.pop()?;
-        match (&left, &right) {
+        match (left.as_ref(), right.as_ref()) {
             (Object::Integer(left), Object::Integer(right)) => {
                 self.execute_integer_comparison(op, left.value, right.value)
             }
@@ -318,13 +316,13 @@ impl Vm {
 
     fn execute_bang_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop()?;
-        self.push(Object::new_boolean(!operand.is_truthy()))
+        self.push(Rc::new(Object::new_boolean(!operand.is_truthy())))
     }
 
     fn execute_minus_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop()?;
-        match &operand {
-            Object::Integer(obj) => self.push(Object::new_integer(-obj.value)),
+        match operand.as_ref() {
+            Object::Integer(obj) => self.push(Rc::new(Object::new_integer(-obj.value))),
             _ => Err(VmError::InvalidPrefixType(operand.kind())),
         }
     }
@@ -345,7 +343,7 @@ impl Vm {
     fn execute_index_expression(&mut self) -> Result<(), VmError> {
         let idx = self.pop()?;
         let left = self.pop()?;
-        let obj = match (&left, &idx) {
+        let obj = match (left.as_ref(), idx.as_ref()) {
             (Object::Array(obj), Object::Integer(idx)) => Self::execute_array_index(obj, idx),
             (Object::Hash(obj), _) => {
                 // TODO: does the cache still work?
@@ -354,15 +352,14 @@ impl Vm {
             }
             _ => return Err(VmError::InvalidIndexTypes(left.kind(), idx.kind())),
         };
-        self.push((*obj).clone())
+        self.push(obj)
     }
 
     fn build_array(&mut self, start_idx: usize, end_idx: usize) -> Result<Object, VmError> {
-        // TODO: can we remove Rc from array?
         let mut array = Vec::with_capacity(end_idx - start_idx);
         for i in start_idx..end_idx {
             match self.stack[i].take() {
-                Some(obj) => array.push(Rc::new(obj)),
+                Some(obj) => array.push(obj),
                 None => return Err(VmError::InvalidStackAccess(i)),
             }
         }
@@ -370,7 +367,6 @@ impl Vm {
     }
 
     fn build_hash(&mut self, start_idx: usize, end_idx: usize) -> Result<Object, VmError> {
-        // TODO: can we remove Rc from hash?
         let mut hash = HashMap::with_capacity(end_idx - start_idx);
         for i in (start_idx..end_idx).step_by(2) {
             let key = match self.stack[i].take() {
@@ -382,7 +378,7 @@ impl Vm {
                 None => return Err(VmError::InvalidStackAccess(i)),
             };
             let hash_key = key.hash_key().map_err(VmError::InvalidHashKey)?;
-            let pair = (Rc::new(key), Rc::new(value));
+            let pair = (key, value);
             hash.insert(hash_key, pair);
         }
         Ok(Object::Hash(hash))
@@ -390,9 +386,11 @@ impl Vm {
 
     fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
         match &self.stack[self.sp - 1 - num_args] {
-            Some(Object::Closure(closure)) => self.call_closure(closure.clone(), num_args)?,
-            Some(Object::Builtin(func)) => self.call_builtin(*func, num_args)?,
-            Some(obj) => return Err(VmError::InvalidFunctionCall(self.sp - 1, obj.clone())),
+            Some(obj) => match obj.as_ref() {
+                Object::Closure(closure) => self.call_closure(closure.clone(), num_args)?,
+                Object::Builtin(func) => self.call_builtin(*func, num_args)?,
+                _ => return Err(VmError::InvalidFunctionCall(self.sp - 1, obj.clone())),
+            },
             None => return Err(VmError::InvalidStackAccess(self.sp - 1 - num_args)),
         }
         Ok(())
@@ -413,24 +411,23 @@ impl Vm {
     }
 
     fn call_builtin(&mut self, func: BuiltinFunction, num_args: usize) -> Result<(), VmError> {
-        // TODO: convert stack to Rc to avoid creating Rc and cloning internal objects here?
         let mut args = vec![];
         for idx in self.sp - num_args..self.sp {
             match &self.stack[idx] {
-                Some(obj) => args.push(Rc::new(obj.clone())),
+                Some(obj) => args.push(obj.clone()),
                 None => return Err(VmError::InvalidStackAccess(idx)),
             }
         }
         self.sp -= num_args + 1;
-        let result = func(&args).as_ref().clone();
+        let result = func(&args);
         self.push(result)?;
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<Object, VmError> {
+    pub fn run(&mut self) -> Result<Rc<Object>, VmError> {
         let mut ins;
         let mut ip;
-        let mut last_pop = Object::None;
+        let mut last_pop = Rc::new(Object::None);
 
         while self.curr_frame_running() {
             let frame = self.curr_frame();
@@ -449,15 +446,15 @@ impl Vm {
                     self.curr_frame().ip += 1;
                 }
                 Opcode::True => {
-                    self.push(Object::new_boolean(true))?;
+                    self.push(Rc::new(Object::new_boolean(true)))?;
                     self.curr_frame().ip += 1;
                 }
                 Opcode::False => {
-                    self.push(Object::new_boolean(false))?;
+                    self.push(Rc::new(Object::new_boolean(false)))?;
                     self.curr_frame().ip += 1;
                 }
                 Opcode::Null => {
-                    self.push(Object::Null)?;
+                    self.push(Rc::new(Object::Null))?;
                     self.curr_frame().ip += 1;
                 }
                 Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
@@ -532,14 +529,14 @@ impl Vm {
                     self.curr_frame().ip += 3;
                     let array = self.build_array(self.sp - len, self.sp)?;
                     self.sp -= len;
-                    self.push(array)?;
+                    self.push(Rc::new(array))?;
                 }
                 Opcode::Hash => {
                     let len = read_u16_as_usize(&ins[ip + 1..]);
                     self.curr_frame().ip += 3;
                     let hash = self.build_hash(self.sp - len, self.sp)?;
                     self.sp -= len;
-                    self.push(hash)?;
+                    self.push(Rc::new(hash))?;
                 }
                 Opcode::Index => {
                     self.execute_index_expression()?;
@@ -560,7 +557,7 @@ impl Vm {
                     let frame = self.pop_frame()?;
                     self.sp = frame.bp;
                     self.pop()?;
-                    self.push(Object::Null)?;
+                    self.push(Rc::new(Object::Null))?;
                 }
                 Opcode::ReturnValue => {
                     let value = self.pop()?;
@@ -580,7 +577,7 @@ impl Vm {
                     let frame = self.curr_frame();
                     frame.ip += 1;
                     let closure = frame.closure.clone();
-                    self.push(Object::Closure(closure))?;
+                    self.push(Rc::new(Object::Closure(closure)))?;
                 }
                 Opcode::EnumLength => unreachable!(),
             }

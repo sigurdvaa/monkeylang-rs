@@ -61,7 +61,7 @@ pub struct CompiledFunctionObj {
 #[derive(Debug, PartialEq, Clone)]
 pub struct ClosureObj {
     pub func: Rc<CompiledFunctionObj>,
-    pub free: Vec<Object>,
+    pub free: Vec<Rc<Object>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Clone)]

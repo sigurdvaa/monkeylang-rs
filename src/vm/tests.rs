@@ -11,7 +11,7 @@ fn run_vm_test(input: &str, statements: usize, value: Object) {
     let mut vm = Vm::new(Some(compiler.bytecode()));
     let result = vm.run().unwrap_or_else(|e| panic!("vm error:\n {e}"));
     assert_eq!(
-        result, value,
+        *result, value,
         "unexpected result, got {result:?}, want {value:?}"
     );
 }

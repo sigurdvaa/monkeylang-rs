@@ -94,14 +94,14 @@ pub fn _start_repl_eval() {
     }
 }
 
-fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> Option<Object> {
+fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> Option<Rc<Object>> {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
 
     if !parser.errors.is_empty() {
         print_parser_errors(&parser.errors);
-        return Some(Object::None);
+        return None;
     }
 
     let macro_env = Environment::new();
@@ -124,7 +124,7 @@ fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> 
     }
 }
 
-pub fn run_repl_vm(input: Peekable<Chars<'_>>) -> Option<Object> {
+pub fn run_repl_vm(input: Peekable<Chars<'_>>) -> Option<Rc<Object>> {
     let mut compiler = Compiler::new();
     let mut vm = Vm::new(None);
     repl_vm(input, &mut compiler, &mut vm)
@@ -141,10 +141,10 @@ pub fn start_repl_vm() {
         let _ = std::io::stdout().flush();
         input.read_line(&mut buf).expect("reading input failed");
         let result = repl_vm(buf.chars().peekable(), &mut compiler, &mut vm);
-        match result {
-            Some(Object::None) | None => (),
-            Some(result) => {
-                println!("{}", result.inspect());
+        if let Some(result) = result {
+            match *result {
+                Object::None => (),
+                _ => println!("{}", result.inspect()),
             }
         }
     }

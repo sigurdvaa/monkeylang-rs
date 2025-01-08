@@ -32,7 +32,7 @@ impl Display for CompilerError {
 
 pub struct Bytecode {
     pub instructions: Vec<Instruction>,
-    pub constants: Vec<Object>,
+    pub constants: Vec<Rc<Object>>,
 }
 
 #[derive(Default)]
@@ -55,7 +55,7 @@ struct EmittedIns {
 }
 
 pub struct Compiler {
-    constants: Vec<Object>,
+    constants: Vec<Rc<Object>>,
     symbols: Symbols,
     scopes: Vec<CompilationScope>,
     // TODO: remove idx, use vec len/last?
@@ -83,7 +83,7 @@ impl Compiler {
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {
-        self.constants.push(obj);
+        self.constants.push(Rc::new(obj));
         self.constants.len() - 1
     }
 

@@ -17,7 +17,7 @@ fn make_compiled_func(
 struct TestCase {
     input: &'static str,
     statements: usize,
-    constants: Vec<Object>,
+    constants: Vec<Rc<Object>>,
     instructions: Vec<Instruction>,
 }
 
@@ -31,7 +31,7 @@ impl TestCase {
         Self {
             input,
             statements,
-            constants,
+            constants: constants.into_iter().map(|v| Rc::new(v)).collect(),
             instructions: instructions.into_iter().flatten().collect(),
         }
     }
@@ -46,7 +46,7 @@ impl TestCase {
             statements,
             constants: constants
                 .into_iter()
-                .map(|i| Object::new_integer(i as isize))
+                .map(|i| Rc::new(Object::new_integer(i as isize)))
                 .collect(),
             instructions: instructions.into_iter().flatten().collect(),
         }
@@ -63,7 +63,7 @@ impl TestCase {
             statements,
             constants: constants
                 .into_iter()
-                .map(|i| Object::new_string(i.into()))
+                .map(|i| Rc::new(Object::new_string(i.into())))
                 .collect(),
             instructions: instructions.into_iter().flatten().collect(),
         }

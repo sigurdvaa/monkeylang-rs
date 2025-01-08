@@ -14,15 +14,15 @@ pub fn get(name: &str) -> Option<Rc<Object>> {
     }
 }
 
-pub fn get_all() -> &'static [(&'static str, Object)] {
-    &[
-        ("len", const { Object::Builtin(len) }),
-        ("first", const { Object::Builtin(first) }),
-        ("last", const { Object::Builtin(last) }),
-        ("rest", const { Object::Builtin(rest) }),
-        ("push", const { Object::Builtin(push) }),
-        ("puts", const { Object::Builtin(puts) }),
-        ("string", const { Object::Builtin(string) }),
+pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
+    vec![
+        ("len", Rc::new(const { Object::Builtin(len) })),
+        ("first", Rc::new(const { Object::Builtin(first) })),
+        ("last", Rc::new(const { Object::Builtin(last) })),
+        ("rest", Rc::new(const { Object::Builtin(rest) })),
+        ("push", Rc::new(const { Object::Builtin(push) })),
+        ("puts", Rc::new(const { Object::Builtin(puts) })),
+        ("string", Rc::new(const { Object::Builtin(string) })),
     ]
 }
 
