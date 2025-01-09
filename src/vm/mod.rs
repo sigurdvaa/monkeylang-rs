@@ -323,9 +323,10 @@ impl Vm {
     }
 
     fn execute_array_index(left: &Array, index: &Integer) -> Rc<Object> {
-        left.get(index.value as usize)
-            .unwrap_or(&Rc::new(Object::Null))
-            .clone()
+        match left.get(index.value as usize) {
+            Some(value) => value.clone(),
+            None => Rc::new(Object::Null),
+        }
     }
 
     fn execute_hash_index(left: &HashObj, index: &HashKeyData) -> Rc<Object> {
