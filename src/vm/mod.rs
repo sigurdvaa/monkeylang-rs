@@ -1,4 +1,3 @@
-mod frame;
 #[cfg(test)]
 mod tests;
 
@@ -8,7 +7,6 @@ use crate::object::{
     builtins, Array, BuiltinFunction, ClosureObj, CompiledFunctionObj, HashKeyData, HashKeyError,
     HashObj, Integer, Object,
 };
-use frame::Frame;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
@@ -91,6 +89,23 @@ impl Display for VmError {
             Self::WrongNumberArguments(want, got) => {
                 write!(f, "wrong number of arguments, want={want}, got={got}",)
             }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Frame {
+    pub closure: Rc<ClosureObj>,
+    pub ip: usize,
+    pub bp: usize,
+}
+
+impl Frame {
+    pub fn new(func: Rc<ClosureObj>, bp: usize) -> Self {
+        Self {
+            closure: func,
+            ip: 0,
+            bp,
         }
     }
 }
@@ -421,7 +436,7 @@ impl Vm {
         let mut ins;
         while self.curr_frame_running() {
             let frame = self.curr_frame();
-            ins = frame.ins();
+            ins = &frame.closure.func.instructions;
             let op = Opcode::try_from(ins[frame.ip]).map_err(VmError::InvalidInstruction)?;
             match op {
                 Opcode::Bang => {
