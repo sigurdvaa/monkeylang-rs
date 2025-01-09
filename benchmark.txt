@@ -13,9 +13,13 @@ engine=vm, result=9227465, duration=6.433731666s
 version 0.2.1 (laptop: dell precision intel i9) - vm stack Rc<Object>
 engine=vm, result=9227465, duration=12.135916885s
 
-version 0.2.1 (desktop: AMD Ryzen 9 5900X) - vm stack Rc<Object>
+version 0.2.1 (desktop: AMD Ryzen 9 5900X)
 engine=vm, result=9227465, duration=5.259170427s
 
 version 0.2.1 (laptop: thinkpad intel i7-1356u)
 engine=eval, result=9227465, duration=12.328627892s
 engine=vm, result=9227465, duration=4.023792874s
+
+version 0.2.2 (laptop: dell precision intel i9) - new build config, misc minor cleanup and refactor
+engine=eval, result=9227465, duration=33.984064225s
+engine=vm, result=9227465, duration=8.838147554s
