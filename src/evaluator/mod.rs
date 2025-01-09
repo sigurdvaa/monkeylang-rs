@@ -1,4 +1,5 @@
 mod builtins;
+mod environment;
 pub mod r#macro;
 #[cfg(test)]
 pub mod tests;
@@ -8,9 +9,9 @@ use crate::ast::{
     Statement,
 };
 use crate::object::{
-    environment::{Env, Environment},
     Array, BooleanObj, FunctionObj, HashKeyData, HashObj, Integer, IntegerObj, Object, StringObj,
 };
+pub use environment::{Env, Environment};
 use r#macro::quote;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -51,10 +52,6 @@ fn apply_function(function: &Rc<Object>, args: &[Rc<Object>]) -> Rc<Object> {
 
 fn eval_identifier(identifier: &IdentifierLiteral, env: Env) -> Rc<Object> {
     if let Some(value) = env.get(&identifier.value) {
-        return value;
-    }
-
-    if let Some(value) = builtins::get(&identifier.value) {
         return value;
     }
 

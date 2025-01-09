@@ -2,11 +2,10 @@ use super::apply_function;
 use crate::object::{self, Object};
 use std::rc::Rc;
 
-pub fn get(name: &str) -> Option<Rc<Object>> {
-    match name {
-        "map" => Some(Rc::new(Object::Builtin(map))),
-        _ => object::builtins::get(name),
-    }
+pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
+    let mut all = object::builtins::get_all();
+    all.push(("map", Rc::new(Object::Builtin(map))));
+    all
 }
 
 fn map(args: &[Rc<Object>]) -> Rc<Object> {

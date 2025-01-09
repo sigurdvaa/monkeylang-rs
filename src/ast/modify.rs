@@ -1,5 +1,5 @@
 use crate::ast::{Expression, Program, Statement};
-use crate::object::environment::Env;
+use crate::evaluator::Env;
 use std::collections::BTreeMap;
 
 pub type ModifierFunc = fn(&mut Expression, &Env);
@@ -82,7 +82,7 @@ pub fn modify_program(prog: &mut Program, func: ModifierFunc, env: &Env) {
 mod tests {
     use super::*;
     use crate::ast::*;
-    use crate::object::environment::Environment;
+    use crate::evaluator::Environment;
     use crate::token::{Token, TokenKind};
 
     fn create_token(kind: TokenKind) -> Token {

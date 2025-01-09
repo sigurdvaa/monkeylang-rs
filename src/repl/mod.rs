@@ -3,8 +3,8 @@ use crate::evaluator::{
     eval_program,
     r#macro::{define_macros, expand_macros},
 };
+use crate::evaluator::{Env, Environment};
 use crate::lexer::Lexer;
-use crate::object::environment::{Env, Environment};
 use crate::object::Object;
 use crate::parser::{Parser, ParserError};
 use crate::vm::Vm;

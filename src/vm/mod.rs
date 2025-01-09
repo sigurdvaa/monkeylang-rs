@@ -98,7 +98,6 @@ impl Display for VmError {
 pub struct Vm {
     constants: Vec<Rc<Object>>,
     stack: [Option<Rc<Object>>; STACK_SIZE],
-    // TODO: verify that all obj has been taken from the stack when we decrement sp
     sp: usize,
     globals: Vec<Option<Rc<Object>>>,
     builtins: Vec<(&'static str, Rc<Object>)>,

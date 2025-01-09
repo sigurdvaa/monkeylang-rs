@@ -1,9 +1,8 @@
 pub mod builtins;
-pub mod environment;
 
 use crate::ast::{BlockStatement, Expression, IdentifierLiteral};
 use crate::code::Instruction;
-use environment::Env;
+use crate::evaluator::Env;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::fmt::{self, Display};

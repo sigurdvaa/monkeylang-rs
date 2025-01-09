@@ -1,19 +1,6 @@
 use super::Object;
 use std::rc::Rc;
 
-pub fn get(name: &str) -> Option<Rc<Object>> {
-    match name {
-        "len" => Some(Rc::new(const { Object::Builtin(len) })),
-        "first" => Some(Rc::new(const { Object::Builtin(first) })),
-        "last" => Some(Rc::new(const { Object::Builtin(last) })),
-        "rest" => Some(Rc::new(const { Object::Builtin(rest) })),
-        "push" => Some(Rc::new(const { Object::Builtin(push) })),
-        "puts" => Some(Rc::new(const { Object::Builtin(puts) })),
-        "string" => Some(Rc::new(const { Object::Builtin(string) })),
-        _ => None,
-    }
-}
-
 pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
     vec![
         ("len", Rc::new(const { Object::Builtin(len) })),

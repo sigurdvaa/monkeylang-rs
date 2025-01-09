@@ -12,7 +12,7 @@ mod vm;
 
 use repl::Engine;
 
-const VERSION: &str = "0.2.1";
+const VERSION: &str = "0.2.2";
 
 fn usage(args: &[String]) {
     eprintln!(
