@@ -418,56 +418,52 @@ impl Vm {
     }
 
     pub fn run(&mut self) -> Result<Rc<Object>, VmError> {
-        let mut ins;
-        let mut ip;
         let mut last_pop = Rc::new(Object::None);
-
+        let mut ins;
         while self.curr_frame_running() {
             let frame = self.curr_frame();
-            ip = frame.ip;
             ins = frame.ins();
-
-            let op = Opcode::try_from(ins[ip]).map_err(VmError::InvalidInstruction)?;
+            let op = Opcode::try_from(ins[frame.ip]).map_err(VmError::InvalidInstruction)?;
             match op {
                 Opcode::Bang => {
                     self.execute_bang_operator()?;
                     self.curr_frame().ip += 1;
                 }
                 Opcode::Minus => {
+                    frame.ip += 1;
                     self.execute_minus_operator()?;
-                    self.curr_frame().ip += 1;
                 }
                 Opcode::True => {
+                    frame.ip += 1;
                     self.push(Rc::new(Object::new_boolean(true)))?;
-                    self.curr_frame().ip += 1;
                 }
                 Opcode::False => {
+                    frame.ip += 1;
                     self.push(Rc::new(Object::new_boolean(false)))?;
-                    self.curr_frame().ip += 1;
                 }
                 Opcode::Null => {
+                    frame.ip += 1;
                     self.push(Rc::new(Object::Null))?;
-                    self.curr_frame().ip += 1;
                 }
                 Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
+                    frame.ip += 1;
                     self.execute_binary_operation(op)?;
-                    self.curr_frame().ip += 1;
                 }
                 Opcode::Eq | Opcode::NotEq | Opcode::Gt | Opcode::Lt => {
+                    frame.ip += 1;
                     self.execute_comparison(op)?;
-                    self.curr_frame().ip += 1;
                 }
                 Opcode::Pop => {
+                    frame.ip += 1;
                     last_pop = self.pop()?;
-                    self.curr_frame().ip += 1;
                 }
                 Opcode::Jump => {
-                    let pos = read_u16_as_usize(&ins[ip + 1..]);
-                    self.curr_frame().ip = pos;
+                    let pos = read_u16_as_usize(&ins[frame.ip + 1..]);
+                    frame.ip = pos;
                 }
                 Opcode::JumpNotTrue => {
-                    let pos = read_u16_as_usize(&ins[ip + 1..]);
-                    self.curr_frame().ip += 3;
+                    let pos = read_u16_as_usize(&ins[frame.ip + 1..]);
+                    frame.ip += 3;
                     let condition = self.pop()?;
                     if !condition.is_truthy() {
                         self.curr_frame().ip = pos;
@@ -475,27 +471,26 @@ impl Vm {
                 }
                 Opcode::Constant => {
                     // TODO: use def and width to read and increment ip?
-                    let idx = read_u16_as_usize(&ins[ip + 1..]);
-                    self.curr_frame().ip += 3;
+                    let idx = read_u16_as_usize(&ins[frame.ip + 1..]);
+                    frame.ip += 3;
                     self.push(self.constants[idx].clone())?;
                 }
                 Opcode::GetGlobal => {
-                    let idx = read_u16_as_usize(&ins[ip + 1..]);
-                    self.curr_frame().ip += 3;
+                    let idx = read_u16_as_usize(&ins[frame.ip + 1..]);
+                    frame.ip += 3;
                     match &self.globals[idx] {
                         Some(obj) => self.push(obj.clone())?,
                         _ => return Err(VmError::InvalidGlobalsIndex(idx)),
                     }
                 }
                 Opcode::SetGlobal => {
-                    let idx = read_u16_as_usize(&ins[ip + 1..]);
-                    self.curr_frame().ip += 3;
+                    let idx = read_u16_as_usize(&ins[frame.ip + 1..]);
+                    frame.ip += 3;
                     let obj = self.pop()?;
                     self.globals[idx] = Some(obj);
                 }
                 Opcode::GetLocal => {
-                    let idx = ins[ip + 1] as usize;
-                    let frame = self.curr_frame();
+                    let idx = ins[frame.ip + 1] as usize;
                     frame.ip += 2;
                     let bp = frame.bp;
                     match &self.stack[bp + idx] {
@@ -504,45 +499,45 @@ impl Vm {
                     }
                 }
                 Opcode::SetLocal => {
-                    let idx = ins[ip + 1] as usize;
-                    let obj = self.pop()?;
-                    let frame = self.curr_frame();
+                    let idx = ins[frame.ip + 1] as usize;
                     frame.ip += 2;
-                    self.stack[frame.bp + idx].replace(obj);
+                    let bp = frame.bp;
+                    let obj = self.pop()?;
+                    self.stack[bp + idx].replace(obj);
                 }
                 Opcode::GetBuiltin => {
-                    let idx = ins[ip + 1] as usize;
-                    self.curr_frame().ip += 2;
+                    let idx = ins[frame.ip + 1] as usize;
+                    frame.ip += 2;
                     let func = self.builtins[idx].1.clone();
                     self.push(func)?;
                 }
                 Opcode::Array => {
-                    let len = read_u16_as_usize(&ins[ip + 1..]);
-                    self.curr_frame().ip += 3;
+                    let len = read_u16_as_usize(&ins[frame.ip + 1..]);
+                    frame.ip += 3;
                     let array = self.build_array(self.sp - len, self.sp)?;
                     self.sp -= len;
                     self.push(Rc::new(array))?;
                 }
                 Opcode::Hash => {
-                    let len = read_u16_as_usize(&ins[ip + 1..]);
-                    self.curr_frame().ip += 3;
+                    let len = read_u16_as_usize(&ins[frame.ip + 1..]);
+                    frame.ip += 3;
                     let hash = self.build_hash(self.sp - len, self.sp)?;
                     self.sp -= len;
                     self.push(Rc::new(hash))?;
                 }
                 Opcode::Index => {
+                    frame.ip += 1;
                     self.execute_index_expression()?;
-                    self.curr_frame().ip += 1;
                 }
                 Opcode::Call => {
-                    let num_args = ins[ip + 1] as usize;
-                    self.curr_frame().ip += 2;
+                    let num_args = ins[frame.ip + 1] as usize;
+                    frame.ip += 2;
                     self.execute_call(num_args)?;
                 }
                 Opcode::Closure => {
-                    let idx = read_u16_as_usize(&ins[ip + 1..]);
-                    let num_free = ins[ip + 3] as usize;
-                    self.curr_frame().ip += 4;
+                    let idx = read_u16_as_usize(&ins[frame.ip + 1..]);
+                    let num_free = ins[frame.ip + 3] as usize;
+                    frame.ip += 4;
                     self.push_closure(idx, num_free)?;
                 }
                 Opcode::Return => {
@@ -559,14 +554,12 @@ impl Vm {
                     self.push(value)?;
                 }
                 Opcode::GetFree => {
-                    let idx = ins[ip + 1] as usize;
-                    let frame = self.curr_frame();
+                    let idx = ins[frame.ip + 1] as usize;
                     frame.ip += 2;
                     let obj = frame.closure.free[idx].clone();
                     self.push(obj)?;
                 }
                 Opcode::CurrentClosure => {
-                    let frame = self.curr_frame();
                     frame.ip += 1;
                     let closure = frame.closure.clone();
                     self.push(Rc::new(Object::Closure(closure)))?;
@@ -574,7 +567,6 @@ impl Vm {
                 Opcode::EnumLength => unreachable!(),
             }
         }
-
         Ok(last_pop)
     }
 }
