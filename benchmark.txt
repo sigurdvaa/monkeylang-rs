@@ -1,6 +1,10 @@
-from the book (unknown hardware):
+version from the book (values from book, unknown hardware):
 engine=eval, result=9227465, duration=27.204277379s
 engine=vm, result=9227465, duration=8.876222455s
+
+version from the book (laptop: dell precision intel i9):
+engine=eval, result=9227465, duration=30.836747314s
+engine=vm, result=9227465, duration=9.006686677s
 
 version 0.2.0 (laptop: dell precision intel i9)
 engine=eval, result=9227465, duration=39.186252218s
