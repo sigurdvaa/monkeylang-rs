@@ -216,11 +216,10 @@ impl Vm {
                     func: func.clone(),
                     free,
                 };
-                self.push(Rc::new(Object::Closure(Rc::new(closure))))?;
+                self.push(Rc::new(Object::Closure(Rc::new(closure))))
             }
-            _ => return Err(VmError::InvalidClosure(idx, self.constants[idx].clone())),
+            _ => Err(VmError::InvalidClosure(idx, self.constants[idx].clone())),
         }
-        Ok(())
     }
 
     fn execute_binary_integer_operation(
@@ -236,8 +235,7 @@ impl Vm {
             Opcode::Div => left / right,
             _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
-        self.push(Rc::new(Object::new_integer(value)))?;
-        Ok(())
+        self.push(Rc::new(Object::new_integer(value)))
     }
 
     fn execute_binary_string_operation(
@@ -250,8 +248,7 @@ impl Vm {
             Opcode::Add => String::from_iter([left, right]),
             _ => return Err(VmError::InvalidStringOperator(op)),
         };
-        self.push(Rc::new(Object::new_string(value)))?;
-        Ok(())
+        self.push(Rc::new(Object::new_string(value)))
     }
 
     fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), VmError> {
@@ -281,8 +278,7 @@ impl Vm {
             Opcode::Lt => left < right,
             _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
-        self.push(Rc::new(Object::new_boolean(value)))?;
-        Ok(())
+        self.push(Rc::new(Object::new_boolean(value)))
     }
 
     fn execute_boolean_comparison(
@@ -296,8 +292,7 @@ impl Vm {
             Opcode::NotEq => left != right,
             _ => return Err(VmError::InvalidBooleanOperator(op)),
         };
-        self.push(Rc::new(Object::new_boolean(value)))?;
-        Ok(())
+        self.push(Rc::new(Object::new_boolean(value)))
     }
 
     fn execute_comparison(&mut self, op: Opcode) -> Result<(), VmError> {
@@ -387,13 +382,12 @@ impl Vm {
     fn execute_call(&mut self, num_args: usize) -> Result<(), VmError> {
         match &self.stack[self.sp - 1 - num_args] {
             Some(obj) => match obj.as_ref() {
-                Object::Closure(closure) => self.call_closure(closure.clone(), num_args)?,
-                Object::Builtin(func) => self.call_builtin(*func, num_args)?,
-                _ => return Err(VmError::InvalidFunctionCall(self.sp - 1, obj.clone())),
+                Object::Closure(closure) => self.call_closure(closure.clone(), num_args),
+                Object::Builtin(func) => self.call_builtin(*func, num_args),
+                _ => Err(VmError::InvalidFunctionCall(self.sp - 1, obj.clone())),
             },
-            None => return Err(VmError::InvalidStackAccess(self.sp - 1 - num_args)),
+            None => Err(VmError::InvalidStackAccess(self.sp - 1 - num_args)),
         }
-        Ok(())
     }
 
     fn call_closure(&mut self, closure: Rc<ClosureObj>, num_args: usize) -> Result<(), VmError> {
@@ -406,8 +400,7 @@ impl Vm {
 
         let frame = Frame::new(closure.clone(), self.sp - num_args);
         self.sp += closure.func.num_locals;
-        self.push_frame(frame)?;
-        Ok(())
+        self.push_frame(frame)
     }
 
     fn call_builtin(&mut self, func: BuiltinFunction, num_args: usize) -> Result<(), VmError> {
@@ -420,8 +413,7 @@ impl Vm {
         }
         self.sp -= num_args + 1;
         let result = func(&args);
-        self.push(result)?;
-        Ok(())
+        self.push(result)
     }
 
     pub fn run(&mut self) -> Result<Rc<Object>, VmError> {
@@ -434,7 +426,6 @@ impl Vm {
             ip = frame.ip;
             ins = frame.ins();
 
-            // TODO: make this lookup using u8 as index into array instead?
             let op = Opcode::try_from(ins[ip]).map_err(VmError::InvalidInstruction)?;
             match op {
                 Opcode::Bang => {
