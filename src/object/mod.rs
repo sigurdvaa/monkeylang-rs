@@ -100,29 +100,21 @@ impl fmt::Display for Object {
 impl Object {
     pub fn new_boolean(value: bool) -> Self {
         match value {
-            true => {
-                const {
-                    Object::Boolean(BooleanObj {
-                        value: true,
-                        hash: RefCell::new(Some(HashKeyData {
-                            kind: "BOOLEAN",
-                            value: 1,
-                        })),
-                    })
-                }
-            }
+            true => Object::Boolean(BooleanObj {
+                value: true,
+                hash: RefCell::new(Some(HashKeyData {
+                    kind: "BOOLEAN",
+                    value: 1,
+                })),
+            }),
 
-            false => {
-                const {
-                    Object::Boolean(BooleanObj {
-                        value: false,
-                        hash: RefCell::new(Some(HashKeyData {
-                            kind: "BOOLEAN",
-                            value: 0,
-                        })),
-                    })
-                }
-            }
+            false => Object::Boolean(BooleanObj {
+                value: false,
+                hash: RefCell::new(Some(HashKeyData {
+                    kind: "BOOLEAN",
+                    value: 0,
+                })),
+            }),
         }
     }
 

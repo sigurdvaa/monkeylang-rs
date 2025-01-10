@@ -120,6 +120,10 @@ pub struct Vm {
     builtins: Vec<(&'static str, Rc<Object>)>,
     frames: [Option<Frame>; FRAMES_SIZE],
     fp: usize,
+    obj_true: Rc<Object>,
+    obj_false: Rc<Object>,
+    obj_null: Rc<Object>,
+    obj_none: Rc<Object>,
 }
 
 impl Vm {
@@ -137,6 +141,10 @@ impl Vm {
             builtins: builtins::get_all(),
             frames: [const { None }; FRAMES_SIZE],
             fp: 1,
+            obj_true: Rc::new(Object::new_boolean(true)),
+            obj_false: Rc::new(Object::new_boolean(false)),
+            obj_null: Rc::new(Object::Null),
+            obj_none: Rc::new(Object::None),
         };
         let func = Rc::new(CompiledFunctionObj {
             instructions,
@@ -281,7 +289,10 @@ impl Vm {
             Opcode::Lt => left < right,
             _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
-        self.push_stack(Rc::new(Object::new_boolean(value)))
+        match value {
+            true => self.push_stack(self.obj_true.clone()),
+            false => self.push_stack(self.obj_false.clone()),
+        }
     }
 
     fn execute_boolean_comparison(
@@ -295,7 +306,10 @@ impl Vm {
             Opcode::NotEq => left != right,
             _ => return Err(VmError::InvalidBooleanOperator(op)),
         };
-        self.push_stack(Rc::new(Object::new_boolean(value)))
+        match value {
+            true => self.push_stack(self.obj_true.clone()),
+            false => self.push_stack(self.obj_false.clone()),
+        }
     }
 
     fn execute_null_comparison(&mut self, op: Opcode, other: &Object) -> Result<(), VmError> {
@@ -327,7 +341,10 @@ impl Vm {
 
     fn execute_bang_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop_stack()?;
-        self.push_stack(Rc::new(Object::new_boolean(!operand.is_truthy())))
+        match operand.is_truthy() {
+            true => self.push_stack(self.obj_false.clone()),
+            false => self.push_stack(self.obj_true.clone()),
+        }
     }
 
     fn execute_minus_operator(&mut self) -> Result<(), VmError> {
@@ -338,17 +355,17 @@ impl Vm {
         }
     }
 
-    fn execute_array_index(left: &Array, index: &Integer) -> Rc<Object> {
+    fn execute_array_index(&self, left: &Array, index: &Integer) -> Rc<Object> {
         match left.get(index.value as usize) {
             Some(value) => value.clone(),
-            None => Rc::new(Object::Null),
+            None => self.obj_null.clone(),
         }
     }
 
-    fn execute_hash_index(left: &HashObj, index: &HashKeyData) -> Rc<Object> {
+    fn execute_hash_index(&self, left: &HashObj, index: &HashKeyData) -> Rc<Object> {
         match left.get(index) {
             Some((_key, value)) => value.clone(),
-            None => Rc::new(Object::Null),
+            None => self.obj_null.clone(),
         }
     }
 
@@ -356,11 +373,11 @@ impl Vm {
         let idx = self.pop_stack()?;
         let left = self.pop_stack()?;
         let obj = match (left.as_ref(), idx.as_ref()) {
-            (Object::Array(obj), Object::Integer(idx)) => Self::execute_array_index(obj, idx),
+            (Object::Array(obj), Object::Integer(idx)) => self.execute_array_index(obj, idx),
             (Object::Hash(obj), _) => {
                 // TODO: does the cache still work?
                 let hash_key = idx.hash_key().map_err(VmError::InvalidHashKey)?;
-                Self::execute_hash_index(obj, &hash_key)
+                self.execute_hash_index(obj, &hash_key)
             }
             _ => return Err(VmError::InvalidIndexTypes(left.kind(), idx.kind())),
         };
@@ -449,7 +466,7 @@ impl Vm {
     }
 
     pub fn run(&mut self) -> Result<Rc<Object>, VmError> {
-        let mut last_pop = Rc::new(Object::None);
+        let mut last_pop = self.obj_none.clone();
         let mut frame: Frame = self.frames[0].take().expect("main frame missing");
         loop {
             let ins = &frame.closure.func.instructions;
@@ -469,15 +486,15 @@ impl Vm {
                 }
                 Opcode::True => {
                     frame.ip += 1;
-                    self.push_stack(Rc::new(Object::new_boolean(true)))?;
+                    self.push_stack(self.obj_true.clone())?;
                 }
                 Opcode::False => {
                     frame.ip += 1;
-                    self.push_stack(Rc::new(Object::new_boolean(false)))?;
+                    self.push_stack(self.obj_false.clone())?;
                 }
                 Opcode::Null => {
                     frame.ip += 1;
-                    self.push_stack(Rc::new(Object::Null))?;
+                    self.push_stack(self.obj_null.clone())?;
                 }
                 Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div => {
                     frame.ip += 1;
@@ -576,7 +593,7 @@ impl Vm {
                 Opcode::Return => {
                     self.sp = frame.bp;
                     self.pop_stack()?;
-                    self.push_stack(Rc::new(Object::Null))?;
+                    self.push_stack(self.obj_null.clone())?;
                     frame = self.pop_frame()?;
                 }
                 Opcode::ReturnValue => {

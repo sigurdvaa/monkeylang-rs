@@ -16,6 +16,9 @@ use r#macro::quote;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+// TODO: allocate only one Rc<Object> per bool, null, and none. Add to env? or introduce a struct
+// for eval?
+
 fn extend_function_env(function: &FunctionObj, args: &[Rc<Object>]) -> Env {
     let env = Environment::new_enclosed(&function.env);
     for (i, param) in function.parameters.iter().enumerate() {

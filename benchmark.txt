@@ -33,3 +33,7 @@ engine=vm, result=9227465, duration=8.838147554s
 version 0.2.2 (desktop: AMD Ryzen 9 5900X)
 engine=eval, result=9227465, duration=12.289668421s
 engine=vm, result=9227465, duration=3.605540563s
+
+version 0.2.4 (laptop: dell precision intel i9) - refactor use of frame, only one alloc for some obj
+engine=eval, result=9227465, duration=34.08756375s
+engine=vm, result=9227465, duration=5.597200354s
