@@ -2,13 +2,6 @@ use std::fmt::Display;
 
 pub type Instruction = u8;
 
-pub struct Definition {
-    // TODO: remove unused field?
-    _opcode: Opcode,
-    // TODO: rework def to vec?
-    operand_widths: [u32; 2],
-}
-
 #[derive(Debug, PartialEq)]
 pub struct OpcodeError(u8);
 
@@ -53,7 +46,6 @@ pub enum Opcode {
     Closure,
     GetFree,
     CurrentClosure,
-    EnumLength,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -97,147 +89,41 @@ impl TryFrom<u8> for Opcode {
     }
 }
 
-const DEFINITIONS: &[&Definition; Opcode::EnumLength as usize] = &[
-    &Definition {
-        _opcode: Opcode::Constant,
-        operand_widths: [2, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Add,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Pop,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Sub,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Mul,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Div,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::True,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::False,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Eq,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::NotEq,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Gt,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Lt,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Minus,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Bang,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Jump,
-        operand_widths: [2, 0],
-    },
-    &Definition {
-        _opcode: Opcode::JumpNotTrue,
-        operand_widths: [2, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Null,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::GetGlobal,
-        operand_widths: [2, 0],
-    },
-    &Definition {
-        _opcode: Opcode::SetGlobal,
-        operand_widths: [2, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Array,
-        operand_widths: [2, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Hash,
-        operand_widths: [2, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Index,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Call,
-        operand_widths: [1, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Return,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::ReturnValue,
-        operand_widths: [0, 0],
-    },
-    &Definition {
-        _opcode: Opcode::GetLocal,
-        operand_widths: [1, 0],
-    },
-    &Definition {
-        _opcode: Opcode::SetLocal,
-        operand_widths: [1, 0],
-    },
-    &Definition {
-        _opcode: Opcode::GetBuiltin,
-        operand_widths: [1, 0],
-    },
-    &Definition {
-        _opcode: Opcode::Closure,
-        operand_widths: [2, 1],
-    },
-    &Definition {
-        _opcode: Opcode::GetFree,
-        operand_widths: [1, 0],
-    },
-    &Definition {
-        _opcode: Opcode::GetFree,
-        operand_widths: [0, 0],
-    },
-];
+impl Opcode {
+    fn widths(&self) -> &'static [u8] {
+        match self {
+            Self::Constant => &[2],
+            Self::Jump => &[2],
+            Self::JumpNotTrue => &[2],
+            Self::GetGlobal => &[2],
+            Self::SetGlobal => &[2],
+            Self::Array => &[2],
+            Self::Hash => &[2],
+            Self::Call => &[1],
+            Self::GetLocal => &[1],
+            Self::SetLocal => &[1],
+            Self::GetBuiltin => &[1],
+            Self::Closure => &[2, 1],
+            Self::GetFree => &[1],
+            _ => &[],
+        }
+    }
+}
 
 pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
-    // TODO: replace const with method on enum?
-    let def = DEFINITIONS[opcode.clone() as usize];
-    let ins_len = 1 + def.operand_widths.iter().sum::<u32>();
+    let def = opcode.widths();
+    let ins_len = 1 + def.iter().sum::<u8>();
 
-    let mut ins = vec![opcode as Instruction];
+    if def.len() != operands.len() {
+        panic!("Opcode with too many operands, opcode {opcode:?}, operands {operands:?}",);
+    }
+    let mut ins = vec![opcode.clone() as Instruction];
     for (i, operand) in operands.iter().enumerate() {
-        // TODO: improve the logic for building ins? and check len?
-        let witdh = def.operand_widths[i];
+        let witdh = def[i];
         match witdh {
             2 => ins.extend((*operand as u16).to_be_bytes()),
             1 => ins.push(*operand as Instruction),
-            0 => (),
-            _ => unreachable!(),
+            _ => panic!("Operand width not supported, opcode {opcode:?}, def {def:?}",),
         }
     }
 
@@ -276,8 +162,8 @@ pub mod tests {
             while i < self.len() {
                 let op = Opcode::try_from(self[i])
                     .unwrap_or_else(|e| panic!("ERROR: failed to print instructions, {e}"));
-                let def = DEFINITIONS[op.clone() as usize];
-                let (operands, read) = read_operands(def, &self[i + 1..]);
+                let def = op.widths();
+                let (operands, read) = read_operands(&def, &self[i + 1..]);
                 buffer.push_str(&format!("{i:0>4} {op:?}",));
                 if !operands.is_empty() {
                     buffer.push(' ');
@@ -297,17 +183,17 @@ pub mod tests {
         }
     }
 
-    fn read_operands(def: &Definition, ins: &[Instruction]) -> (Vec<usize>, usize) {
+    fn read_operands(def: &[u8], ins: &[Instruction]) -> (Vec<usize>, usize) {
         let mut operands = vec![];
         let mut offset = 0;
-        for width in def.operand_widths {
+        for width in def {
             match width {
                 2 => operands.push(read_u16_as_usize(&ins[offset..])),
                 1 => operands.push(ins[offset] as usize),
                 0 => (),
                 _ => unreachable!(),
             }
-            offset += width as usize;
+            offset += *width as usize;
         }
         (operands, offset)
     }
@@ -375,8 +261,8 @@ pub mod tests {
         ];
         for (test_opcode, test_operands, test_read) in tests {
             let ins = make_ins(test_opcode.clone(), &test_operands);
-            let def = DEFINITIONS[test_opcode as usize];
-            let (operands_read, bytes_read) = read_operands(def, ins[1..].into());
+            let def = test_opcode.widths();
+            let (operands_read, bytes_read) = read_operands(&def, ins[1..].into());
             assert_eq!(bytes_read, test_read);
             assert_eq!(operands_read, test_operands);
         }

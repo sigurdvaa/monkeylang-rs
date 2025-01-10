@@ -12,7 +12,7 @@ mod vm;
 
 use repl::Engine;
 
-const VERSION: &str = "0.2.2";
+const VERSION: &str = "0.2.3";
 
 fn usage(args: &[String]) {
     eprintln!(
@@ -31,7 +31,6 @@ fn usage(args: &[String]) {
 
 fn run_with_file_input(args: &[String]) {
     let file_path = args[1].as_str();
-    // TODO: replace with iter of chars in file?
     let input = std::fs::read_to_string(file_path).unwrap_or_else(|err| {
         println!("Error reading file '{file_path}': {err}");
         std::process::exit(1);
@@ -45,7 +44,6 @@ fn main() {
     match args.len() {
         1 => {
             println!("Monkeylang {VERSION}.\npress ctrl-c to exit.");
-            // TODO: add args for choosing eval or vm
             repl::start_repl_vm();
         }
         2 => run_with_file_input(&args),

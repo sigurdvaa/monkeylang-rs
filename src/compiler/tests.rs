@@ -31,7 +31,7 @@ impl TestCase {
         Self {
             input,
             statements,
-            constants: constants.into_iter().map(|v| Rc::new(v)).collect(),
+            constants: constants.into_iter().map(Rc::new).collect(),
             instructions: instructions.into_iter().flatten().collect(),
         }
     }
@@ -167,13 +167,13 @@ fn test_boolean_expressions() {
             "true",
             1,
             vec![],
-            vec![make_ins(Opcode::True, &[0]), make_ins(Opcode::Pop, &[])],
+            vec![make_ins(Opcode::True, &[]), make_ins(Opcode::Pop, &[])],
         ),
         TestCase::new_integer(
             "false",
             1,
             vec![],
-            vec![make_ins(Opcode::False, &[0]), make_ins(Opcode::Pop, &[])],
+            vec![make_ins(Opcode::False, &[]), make_ins(Opcode::Pop, &[])],
         ),
         TestCase::new_integer(
             "1 > 2",
@@ -460,8 +460,8 @@ fn test_index_expressions() {
                 make_ins(Opcode::Array, &[3]),
                 make_ins(Opcode::Constant, &[3]),
                 make_ins(Opcode::Constant, &[4]),
-                make_ins(Opcode::Add, &[0]),
-                make_ins(Opcode::Index, &[0]),
+                make_ins(Opcode::Add, &[]),
+                make_ins(Opcode::Index, &[]),
                 make_ins(Opcode::Pop, &[]),
             ],
         ),

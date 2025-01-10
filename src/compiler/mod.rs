@@ -58,7 +58,6 @@ pub struct Compiler {
     constants: Vec<Rc<Object>>,
     symbols: Symbols,
     scopes: Vec<CompilationScope>,
-    // TODO: remove idx, use vec len/last?
     scope_idx: usize,
 }
 
@@ -263,7 +262,7 @@ impl Compiler {
                 }
                 self.emit(Opcode::Hash, &[expr.pairs.len() * 2])
             }
-            Expression::Null(expr) => todo!("{expr:?}"),
+            Expression::Null(_expr) => self.emit(Opcode::Null, &[]),
             Expression::Infix(expr) => {
                 self.compile_expression(&expr.left)?;
                 self.compile_expression(&expr.right)?;

@@ -27,6 +27,7 @@ pub enum VmError {
     InvalidBooleanOperator(Opcode),
     InvalidStringOperator(Opcode),
     InvalidIntegerOperator(Opcode),
+    InvalidNullOperator(Opcode),
     InvalidBinaryTypes(&'static str, &'static str),
     InvalidComparisonTypes(&'static str, &'static str),
     InvalidIndexTypes(&'static str, &'static str),
@@ -59,6 +60,7 @@ impl Display for VmError {
             Self::InvalidBooleanOperator(op) => write!(f, "invalid boolean operator: {op:?}"),
             Self::InvalidStringOperator(op) => write!(f, "invalid string operator: {op:?}"),
             Self::InvalidIntegerOperator(op) => write!(f, "invalid integer operator: {op:?}"),
+            Self::InvalidNullOperator(op) => write!(f, "invalid null operator: {op:?}"),
             Self::InvalidBinaryTypes(left, right) => {
                 write!(f, "unsupported types for binary operation: {left} {right}")
             }
@@ -131,6 +133,7 @@ impl Vm {
             stack: [const { None }; STACK_SIZE],
             sp: 0,
             globals: vec![None; GLOBALS_SIZE],
+            // TODO: create builtins module for VM, with "map"?
             builtins: builtins::get_all(),
             frames: [const { None }; FRAMES_SIZE],
             fp: 1,
@@ -179,13 +182,6 @@ impl Vm {
         match self.stack[self.sp].take() {
             Some(obj) => Ok(obj),
             None => Err(VmError::InvalidStackAccess(self.sp)),
-        }
-    }
-
-    fn curr_frame_running(&mut self) -> bool {
-        match &mut self.frames[self.fp - 1] {
-            Some(frame) => frame.ip < frame.closure.func.instructions.len(),
-            None => panic!("main frame missing"),
         }
     }
 
@@ -309,6 +305,16 @@ impl Vm {
         self.push(Rc::new(Object::new_boolean(value)))
     }
 
+    fn execute_null_comparison(&mut self, op: Opcode, other: &Object) -> Result<(), VmError> {
+        let truth = matches!(other, Object::Null);
+        let value = match op {
+            Opcode::Eq => truth,
+            Opcode::NotEq => !truth,
+            _ => return Err(VmError::InvalidNullOperator(op.clone())),
+        };
+        self.push(Rc::new(Object::new_boolean(value)))
+    }
+
     fn execute_comparison(&mut self, op: Opcode) -> Result<(), VmError> {
         let right = self.pop()?;
         let left = self.pop()?;
@@ -318,6 +324,9 @@ impl Vm {
             }
             (Object::Boolean(left), Object::Boolean(right)) => {
                 self.execute_boolean_comparison(op, left.value, right.value)
+            }
+            (Object::Null, other) | (other, Object::Null) => {
+                self.execute_null_comparison(op, other)
             }
             _ => Err(VmError::InvalidComparisonTypes(left.kind(), right.kind())),
         }
@@ -433,10 +442,13 @@ impl Vm {
 
     pub fn run(&mut self) -> Result<Rc<Object>, VmError> {
         let mut last_pop = Rc::new(Object::None);
-        let mut ins;
-        while self.curr_frame_running() {
+        loop {
             let frame = self.curr_frame();
-            ins = &frame.closure.func.instructions;
+            let ins = &frame.closure.func.instructions;
+            if frame.ip >= ins.len() {
+                break;
+            };
+
             let op = Opcode::try_from(ins[frame.ip]).map_err(VmError::InvalidInstruction)?;
             match op {
                 Opcode::Bang => {
@@ -484,7 +496,6 @@ impl Vm {
                     }
                 }
                 Opcode::Constant => {
-                    // TODO: use def and width to read and increment ip?
                     let idx = read_u16_as_usize(&ins[frame.ip + 1..]);
                     frame.ip += 3;
                     self.push(self.constants[idx].clone())?;
@@ -549,6 +560,8 @@ impl Vm {
                     self.execute_call(num_args)?;
                 }
                 Opcode::Closure => {
+                    // TODO: instead of pushing frame, and then getting current right after,
+                    // push existing frame, and return new frame which can be assigned to local var
                     let idx = read_u16_as_usize(&ins[frame.ip + 1..]);
                     let num_free = ins[frame.ip + 3] as usize;
                     frame.ip += 4;
@@ -578,7 +591,6 @@ impl Vm {
                     let closure = frame.closure.clone();
                     self.push(Rc::new(Object::Closure(closure)))?;
                 }
-                Opcode::EnumLength => unreachable!(),
             }
         }
         Ok(last_pop)

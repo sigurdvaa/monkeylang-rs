@@ -73,13 +73,11 @@ pub fn run_repl_eval(input: Peekable<Chars<'_>>) -> Rc<Object> {
     repl_eval(input, env, macro_env)
 }
 
-// TODO: add engine as arg to make this available for repl?
 pub fn _start_repl_eval() {
     let input = stdin();
     let env = Environment::new();
     let macro_env = Environment::new();
     loop {
-        // TODO: add history? will require tty raw mode
         let mut buf = String::new();
         print!("{PROMPT}");
         let _ = std::io::stdout().flush();
@@ -110,14 +108,14 @@ fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> 
 
     compiler.soft_reset();
     if let Err(e) = compiler.compile_program(&program) {
-        println!("Whoops! Compilation failed:\n {e:?}");
+        println!("Whoops! Compilation failed:\n {e}");
         return None;
     }
 
     vm.soft_reset(compiler.bytecode());
     match vm.run() {
         Err(e) => {
-            println!("Whoops! Executing bytecode failed:\n {e:?}");
+            println!("Whoops! Executing bytecode failed:\n {e}");
             None
         }
         Ok(v) => Some(v),

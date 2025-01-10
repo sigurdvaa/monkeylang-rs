@@ -1,4 +1,5 @@
 use super::Object;
+use std::io::{stdout, Write};
 use std::rc::Rc;
 
 pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
@@ -124,13 +125,13 @@ fn push(args: &[Rc<Object>]) -> Rc<Object> {
 }
 
 fn puts(args: &[Rc<Object>]) -> Rc<Object> {
+    let mut out = stdout().lock();
     for arg in args {
-        match arg.as_ref() {
-            Object::String(_) => {
-                print!("{arg}");
-            }
-            _ => print!("{}", arg.inspect()),
-        }
+        _ = match arg.as_ref() {
+            Object::String(_) => write!(out, "{arg}"),
+            _ => write!(out, "{}", arg.inspect()),
+        };
+        _ = out.flush();
     }
     Rc::new(Object::None)
 }
