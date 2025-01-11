@@ -1,4 +1,4 @@
-use super::{eval_block_statement, eval_expression, Env, Environment};
+use super::{Env, Environment, Eval};
 use crate::ast::{
     modify::{modify_expression, modify_program, ModifierFunc},
     BooleanLiteral, CallExpression, Expression, IntegerLiteral, Program, Statement, StringLiteral,
@@ -28,6 +28,7 @@ fn convert_object_to_expression(obj: Rc<Object>, expr: &Expression) -> Expressio
 
 fn eval_unquote_calls(expr: &mut Expression, env: &Env) {
     let unquote_calls = |expr: &mut Expression, env: &Env| {
+        let eval = Eval::new();
         let call = match expr {
             Expression::Call(expr) if expr.token.literal == "unquote" => expr,
             _ => return,
@@ -35,8 +36,10 @@ fn eval_unquote_calls(expr: &mut Expression, env: &Env) {
         if call.arguments.len() != 1 {
             return;
         }
-        *expr =
-            convert_object_to_expression(eval_expression(&call.arguments[0], env.clone()), expr);
+        *expr = convert_object_to_expression(
+            eval.eval_expression(&call.arguments[0], env.clone()),
+            expr,
+        );
     };
 
     modify_expression(expr, unquote_calls, env);
@@ -93,6 +96,7 @@ fn extend_macro_env(macr: &FunctionObj, args: Vec<Rc<Object>>) -> Env {
 
 pub fn expand_macros(prog: &mut Program, env: Env) {
     let expand: ModifierFunc = |expr: &mut Expression, env: &Env| {
+        let eval = Eval::new();
         let call = match expr {
             Expression::Call(expr) => expr,
             _ => return,
@@ -116,7 +120,7 @@ pub fn expand_macros(prog: &mut Program, env: Env) {
         let args = quote_args(call);
         let eval_env = extend_macro_env(macr, args);
 
-        let eval = eval_block_statement(&macr.body, eval_env);
+        let eval = eval.eval_block_statement(&macr.body, eval_env);
         let new_expr = match eval.as_ref() {
             Object::Quote(expr) => expr,
             _ => panic!("returning AST expressions only supported from macros"),

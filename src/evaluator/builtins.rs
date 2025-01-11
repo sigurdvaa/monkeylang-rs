@@ -1,4 +1,4 @@
-use super::apply_function;
+use super::Eval;
 use crate::object::{self, Object};
 use std::rc::Rc;
 
@@ -9,6 +9,7 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
 }
 
 fn map(args: &[Rc<Object>]) -> Rc<Object> {
+    let eval = Eval::new();
     if args.len() != 2 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments, got={}, want=2",
@@ -20,7 +21,7 @@ fn map(args: &[Rc<Object>]) -> Rc<Object> {
         (Object::Array(value), Object::Function(_)) => {
             let new = value
                 .iter()
-                .map(|i| apply_function(&args[1], &[i.clone()]))
+                .map(|i| eval.apply_function(&args[1], &[i.clone()]))
                 .collect();
             Object::Array(new)
         }

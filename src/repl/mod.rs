@@ -1,7 +1,7 @@
 use crate::compiler::Compiler;
 use crate::evaluator::{
-    eval_program,
     r#macro::{define_macros, expand_macros},
+    Eval,
 };
 use crate::evaluator::{Env, Environment};
 use crate::lexer::Lexer;
@@ -55,6 +55,7 @@ fn repl_eval(input: Peekable<Chars<'_>>, env: Env, macro_env: Env) -> Rc<Object>
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
+    let eval = Eval::new();
 
     if !parser.errors.is_empty() {
         print_parser_errors(&parser.errors);
@@ -64,7 +65,7 @@ fn repl_eval(input: Peekable<Chars<'_>>, env: Env, macro_env: Env) -> Rc<Object>
     define_macros(&mut program, macro_env.clone());
     expand_macros(&mut program, macro_env);
 
-    eval_program(&program, env.clone())
+    eval.eval_program(&program, env.clone())
 }
 
 pub fn run_repl_eval(input: Peekable<Chars<'_>>) -> Rc<Object> {

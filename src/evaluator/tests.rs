@@ -7,7 +7,8 @@ pub fn test_eval(input: &str) -> Rc<Object> {
     let lexer = Lexer::new(None, input.chars().peekable());
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
-    eval_program(&program, env)
+    let eval = Eval::new();
+    eval.eval_program(&program, env)
 }
 
 #[test]
