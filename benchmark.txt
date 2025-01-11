@@ -45,3 +45,7 @@ engine=vm, result=9227465, duration=5.603322416s
 version 0.2.6 (laptop: dell precision intel i9) - refactor env into eval struct
 engine=eval, result=9227465, duration=21.225688633s
 engine=vm, result=9227465, duration=5.442873112s
+
+version 0.2.6 (desktop: AMD Ryzen 9 5900X)
+engine=eval, result=9227465, duration=7.845084603s
+engine=vm, result=9227465, duration=2.17252229s
