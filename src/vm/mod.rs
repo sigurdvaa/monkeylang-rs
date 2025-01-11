@@ -11,9 +11,9 @@ use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
 
-const STACK_SIZE: usize = 2048;
+const STACK_SIZE: usize = 32768;
 const GLOBALS_SIZE: usize = 65536;
-const FRAMES_SIZE: usize = 1024;
+const FRAMES_SIZE: usize = STACK_SIZE / 2;
 
 #[derive(Debug, PartialEq)]
 pub enum VmError {
