@@ -11,6 +11,7 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
         ("push", Rc::new(const { Object::Builtin(push) })),
         ("puts", Rc::new(const { Object::Builtin(puts) })),
         ("string", Rc::new(const { Object::Builtin(string) })),
+        ("insert", Rc::new(const { Object::Builtin(insert) })),
     ]
 }
 
@@ -92,7 +93,7 @@ fn rest(args: &[Rc<Object>]) -> Rc<Object> {
 fn push(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 2 && args.len() != 3 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments, got={}, want=2 or 3",
+            "wrong number of arguments, got={}, want=2",
             args.len()
         )));
     }
@@ -100,20 +101,35 @@ fn push(args: &[Rc<Object>]) -> Rc<Object> {
     Rc::new(match &*args[0] {
         Object::Array(value) => {
             let mut new = value.clone();
-            if args.len() == 3 {
-                // if 3 args, insert value in array with 3rd arg as index
-                // TODO: replace with insert builtin?
-                match &*args[2] {
-                    Object::Integer(i) => new.insert(i.value as usize, args[1].clone()),
-                    _ => {
-                        return Rc::new(Object::Error(format!(
-                            "3rd argument to \"push\" not supported, got {}, want=INTEGER",
-                            args[2].kind()
-                        )))
-                    }
+            new.push(args[1].clone());
+            Object::Array(new)
+        }
+        _ => Object::Error(format!(
+            "arguments to \"push\" not supported, got {}",
+            args.iter().map(|v| v.kind()).collect::<Vec<_>>().join(", ")
+        )),
+    })
+}
+
+fn insert(args: &[Rc<Object>]) -> Rc<Object> {
+    if args.len() != 3 {
+        return Rc::new(Object::Error(format!(
+            "wrong number of arguments, got={}, want=3",
+            args.len()
+        )));
+    }
+
+    Rc::new(match &*args[0] {
+        Object::Array(value) => {
+            let mut new = value.clone();
+            match &*args[1] {
+                Object::Integer(i) => new.insert(i.value as usize, args[2].clone()),
+                _ => {
+                    return Rc::new(Object::Error(format!(
+                        "2nd argument to \"push\" not supported, got {}, want=INTEGER",
+                        args[1].kind()
+                    )))
                 }
-            } else {
-                new.push(args[1].clone());
             }
             Object::Array(new)
         }

@@ -426,6 +426,16 @@ fn test_builtin_functions() {
             1,
             Object::Error("arguments to \"push\" not supported, got INTEGER, INTEGER".into()),
         ),
+        (
+            "let list = [1,2,3]; insert(list, 1, 9)",
+            2,
+            Object::Array(vec![
+                Rc::new(Object::new_integer(1)),
+                Rc::new(Object::new_integer(9)),
+                Rc::new(Object::new_integer(2)),
+                Rc::new(Object::new_integer(3)),
+            ]),
+        ),
     ];
     for (test_input, test_stmts, test_value) in tests {
         run_vm_test(test_input, test_stmts, test_value);
