@@ -178,10 +178,8 @@ impl Vm {
         if self.sp >= STACK_SIZE {
             return Err(VmError::StackOverflow(obj));
         }
-
         self.stack[self.sp].replace(obj);
         self.sp += 1;
-
         Ok(())
     }
 
@@ -197,10 +195,8 @@ impl Vm {
         if self.fp >= FRAMES_SIZE {
             return Err(VmError::FramesOverflow(frame));
         }
-
         self.frames[self.fp].replace(frame);
         self.fp += 1;
-
         Ok(())
     }
 
@@ -375,7 +371,6 @@ impl Vm {
         let obj = match (left.as_ref(), idx.as_ref()) {
             (Object::Array(obj), Object::Integer(idx)) => self.execute_array_index(obj, idx),
             (Object::Hash(obj), _) => {
-                // TODO: does the cache still work?
                 let hash_key = idx.hash_key().map_err(VmError::InvalidHashKey)?;
                 self.execute_hash_index(obj, &hash_key)
             }
@@ -542,18 +537,16 @@ impl Vm {
                 Opcode::GetLocal => {
                     let idx = ins[frame.ip + 1] as usize;
                     frame.ip += 2;
-                    let bp = frame.bp;
-                    match &self.stack[bp + idx] {
+                    match &self.stack[frame.bp + idx] {
                         Some(obj) => self.push_stack(obj.clone())?,
-                        _ => return Err(VmError::InvalidStackAccess(bp + idx)),
+                        _ => return Err(VmError::InvalidStackAccess(frame.bp + idx)),
                     }
                 }
                 Opcode::SetLocal => {
                     let idx = ins[frame.ip + 1] as usize;
                     frame.ip += 2;
-                    let bp = frame.bp;
                     let obj = self.pop_stack()?;
-                    self.stack[bp + idx].replace(obj);
+                    self.stack[frame.bp + idx].replace(obj);
                 }
                 Opcode::GetBuiltin => {
                     let idx = ins[frame.ip + 1] as usize;
@@ -592,15 +585,13 @@ impl Vm {
                 }
                 Opcode::Return => {
                     self.sp = frame.bp;
-                    self.pop_stack()?;
-                    self.push_stack(self.obj_null.clone())?;
+                    self.stack[self.sp - 1].replace(self.obj_null.clone());
                     frame = self.pop_frame()?;
                 }
                 Opcode::ReturnValue => {
                     let value = self.pop_stack()?;
                     self.sp = frame.bp;
-                    self.pop_stack()?;
-                    self.push_stack(value)?;
+                    self.stack[self.sp - 1].replace(value);
                     frame = self.pop_frame()?;
                 }
                 Opcode::GetFree => {
