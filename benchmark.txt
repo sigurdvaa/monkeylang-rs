@@ -41,3 +41,7 @@ engine=vm, result=9227465, duration=5.597200354s
 version 0.2.5 (laptop: dell precision intel i9) - alloc some obj only once in eval
 engine=eval, result=9227465, duration=23.52189162s
 engine=vm, result=9227465, duration=5.603322416s
+
+version 0.2.6 (laptop: dell precision intel i9) - refactor env into eval struct
+engine=eval, result=9227465, duration=21.225688633s
+engine=vm, result=9227465, duration=5.442873112s

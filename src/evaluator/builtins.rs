@@ -9,7 +9,7 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
 }
 
 fn map(args: &[Rc<Object>]) -> Rc<Object> {
-    let eval = Eval::new();
+    let mut eval = Eval::new();
     if args.len() != 2 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments, got={}, want=2",

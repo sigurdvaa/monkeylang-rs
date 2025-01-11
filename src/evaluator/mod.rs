@@ -5,22 +5,16 @@ pub mod r#macro;
 pub mod tests;
 
 use crate::ast::{
-    BlockStatement, Expression, HashLiteral, IdentifierLiteral, IfExpression, Operator, Program,
-    Statement,
+    BlockStatement, Expression, HashLiteral, IfExpression, Operator, Program, Statement,
 };
-use crate::object::{
-    Array, BooleanObj, FunctionObj, HashKeyData, HashObj, Integer, IntegerObj, Object, StringObj,
-};
+use crate::object::{BooleanObj, FunctionObj, IntegerObj, Object, StringObj};
 pub use environment::{Env, Environment};
-use r#macro::quote;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-// TODO: allocate only one Rc<Object> per bool, null, and none. Add to env? or introduce a struct
-// for eval?
 pub struct Eval {
-    // TODO move env into struct
-    // env: Env,
+    envs: Vec<Env>,
+    ep: usize,
     obj_true: Rc<Object>,
     obj_false: Rc<Object>,
     obj_null: Rc<Object>,
@@ -30,6 +24,8 @@ pub struct Eval {
 impl Eval {
     pub fn new() -> Self {
         Self {
+            envs: vec![Environment::new()],
+            ep: 0,
             obj_true: Rc::new(Object::new_boolean(true)),
             obj_false: Rc::new(Object::new_boolean(false)),
             obj_null: Rc::new(Object::Null),
@@ -44,15 +40,7 @@ impl Eval {
         }
     }
 
-    fn extend_function_env(&self, function: &FunctionObj, args: &[Rc<Object>]) -> Env {
-        let env = Environment::new_enclosed(&function.env);
-        for (i, param) in function.parameters.iter().enumerate() {
-            env.set(param.value.to_owned(), args[i].clone());
-        }
-        env
-    }
-
-    fn apply_function(&self, function: &Rc<Object>, args: &[Rc<Object>]) -> Rc<Object> {
+    fn apply_function(&mut self, function: &Rc<Object>, args: &[Rc<Object>]) -> Rc<Object> {
         match &**function {
             Object::Function(func) => {
                 if func.parameters.len() != args.len() {
@@ -63,8 +51,19 @@ impl Eval {
                     )));
                 }
 
-                let extended_env = self.extend_function_env(func, args);
-                let eval = self.eval_block_statement(&func.body, extended_env);
+                let extended_env = Environment::new_enclosed(func.env.clone());
+                for (i, param) in func.parameters.iter().enumerate() {
+                    extended_env.set(param.value.to_owned(), args[i].clone());
+                }
+
+                self.envs.push(extended_env);
+                self.ep += 1;
+
+                let eval = self.eval_block_statement(&func.body);
+
+                self.envs.pop();
+                self.ep -= 1;
+
                 match &*eval {
                     Object::Return(value) => value.clone(),
                     _ => eval,
@@ -78,41 +77,21 @@ impl Eval {
         }
     }
 
-    fn eval_identifier(&self, identifier: &IdentifierLiteral, env: Env) -> Rc<Object> {
-        if let Some(value) = env.get(&identifier.value) {
-            return value;
-        }
-
-        Rc::new(Object::Error(format!(
-            "identifier not found: {}",
-            identifier.value
-        )))
-    }
-
-    fn eval_array_index_expression(&self, left: &Array, index: &Integer) -> Rc<Object> {
-        left.get(index.value as usize)
-            .unwrap_or(&Rc::new(Object::Null))
-            .clone()
-    }
-
-    fn eval_hash_index_expression(&self, left: &HashObj, index: &HashKeyData) -> Rc<Object> {
-        match left.get(index) {
-            Some((_key, value)) => value.clone(),
-            None => Rc::new(Object::Null),
-        }
-    }
-
     fn eval_index_expression(&self, left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
         match (&*left, &*index) {
-            (Object::Array(left), Object::Integer(index)) => {
-                self.eval_array_index_expression(left, index)
-            }
+            (Object::Array(left), Object::Integer(index)) => match left.get(index.value as usize) {
+                Some(value) => value.clone(),
+                None => self.obj_null.clone(),
+            },
             (Object::Hash(left), _) => {
                 let hash_key = match index.hash_key() {
                     Ok(hash_key) => hash_key,
                     Err(err) => return Rc::new(Object::Error(err.to_string())),
                 };
-                self.eval_hash_index_expression(left, &hash_key)
+                match left.get(&hash_key) {
+                    Some((_key, value)) => value.clone(),
+                    None => self.obj_null.clone(),
+                }
             }
             _ => Rc::new(Object::Error(format!(
                 "index operator not supported for: {}",
@@ -133,12 +112,10 @@ impl Eval {
             Object::Null => self.get_obj_bool(true),
             Object::Integer(obj) => self.get_obj_bool(obj.value < 1),
             Object::Boolean(obj) => self.get_obj_bool(!obj.value),
-            _ => {
-                return Rc::new(Object::Error(format!(
-                    "unknown operator: !{}",
-                    right.kind()
-                )))
-            }
+            _ => Rc::new(Object::Error(format!(
+                "unknown operator: !{}",
+                right.kind()
+            ))),
         }
     }
 
@@ -206,11 +183,11 @@ impl Eval {
         }
     }
 
-    fn eval_hash_literal(&self, expr: &HashLiteral, env: Env) -> Rc<Object> {
+    fn eval_hash_literal(&mut self, expr: &HashLiteral) -> Rc<Object> {
         let mut pairs = HashMap::new();
 
         for (key_expr, value_expr) in &expr.pairs {
-            let key = self.eval_expression(key_expr, env.clone());
+            let key = self.eval_expression(key_expr);
             if let Object::Error(_) = *key {
                 return key;
             }
@@ -220,7 +197,7 @@ impl Eval {
                 Err(err) => return Rc::new(Object::Error(err.to_string())),
             };
 
-            let value = self.eval_expression(value_expr, env.clone());
+            let value = self.eval_expression(value_expr);
             if let Object::Error(_) = *value {
                 return value;
             }
@@ -274,25 +251,25 @@ impl Eval {
         }
     }
 
-    fn eval_if_expression(&self, expression: &IfExpression, env: Env) -> Rc<Object> {
-        let condition = self.eval_expression(&expression.condition, env.clone());
+    fn eval_if_expression(&mut self, expression: &IfExpression) -> Rc<Object> {
+        let condition = self.eval_expression(&expression.condition);
         if let Object::Error(_) = *condition {
             return condition;
         }
 
         match condition.is_truthy() {
-            true => self.eval_block_statement(&expression.consequence, env),
+            true => self.eval_block_statement(&expression.consequence),
             false => match &expression.alternative {
-                Some(alt) => self.eval_block_statement(alt, env),
+                Some(alt) => self.eval_block_statement(alt),
                 None => Rc::new(Object::Null),
             },
         }
     }
 
-    fn eval_expressions(&self, expressions: &[Expression], env: Env) -> Vec<Rc<Object>> {
+    fn eval_expressions(&mut self, expressions: &[Expression]) -> Vec<Rc<Object>> {
         let mut result = vec![];
         for expr in expressions {
-            let eval = self.eval_expression(expr, env.clone());
+            let eval = self.eval_expression(expr);
             match *eval {
                 Object::Error(_) => return vec![eval],
                 _ => result.push(eval),
@@ -301,22 +278,22 @@ impl Eval {
         result
     }
 
-    fn eval_expression(&self, expression: &Expression, env: Env) -> Rc<Object> {
+    fn eval_expression(&mut self, expression: &Expression) -> Rc<Object> {
         match expression {
             Expression::Boolean(expr) => self.get_obj_bool(expr.value),
             Expression::Null(_token) => self.obj_null.clone(),
             Expression::Call(expr) => {
                 // TODO: replace with tokenkind? will have to add TokenKind::Quote
                 if expr.token.literal == "quote" {
-                    return quote(expr.arguments[0].clone(), &env);
+                    return self.quote(expr.arguments[0].clone());
                 }
 
-                let func = self.eval_expression(&expr.function, env.clone());
+                let func = self.eval_expression(&expr.function);
                 if let Object::Error(_) = *func {
                     return func;
                 }
 
-                let args = self.eval_expressions(&expr.arguments, env);
+                let args = self.eval_expressions(&expr.arguments);
                 if args.len() == 1 {
                     if let Object::Error(_) = *args[0] {
                         return args[0].clone();
@@ -328,20 +305,26 @@ impl Eval {
             Expression::Function(expr) => Rc::new(Object::Function(FunctionObj {
                 parameters: expr.parameters.clone(),
                 body: expr.body.clone(),
-                env: env.clone(),
+                env: self.envs[self.ep].clone(),
             })),
             Expression::Macro(expr) => {
                 panic!("found Macro expression during evaluation: {:?}", expr)
             }
-            Expression::Identifier(expr) => self.eval_identifier(expr, env),
-            Expression::If(expr) => self.eval_if_expression(expr, env),
+            Expression::Identifier(expr) => match self.envs[self.ep].get(&expr.value) {
+                Some(value) => value.clone(),
+                None => Rc::new(Object::Error(format!(
+                    "identifier not found: {}",
+                    expr.value
+                ))),
+            },
+            Expression::If(expr) => self.eval_if_expression(expr),
             Expression::Infix(expr) => {
-                let left = self.eval_expression(&expr.left, env.clone());
+                let left = self.eval_expression(&expr.left);
                 if let Object::Error(_) = *left {
                     return left;
                 }
 
-                let right = self.eval_expression(&expr.right, env);
+                let right = self.eval_expression(&expr.right);
                 if let Object::Error(_) = *right {
                     return right;
                 }
@@ -352,7 +335,7 @@ impl Eval {
                 expr.value.try_into().expect("integer too large"),
             )),
             Expression::Prefix(expr) => {
-                let right = self.eval_expression(&expr.right, env);
+                let right = self.eval_expression(&expr.right);
                 match *right {
                     Object::Error(_) => right,
                     _ => self.eval_prefix_expression(&expr.operator, right),
@@ -360,7 +343,7 @@ impl Eval {
             }
             Expression::String(expr) => Rc::new(Object::new_string(expr.value.to_owned())),
             Expression::Array(expr) => {
-                let array = self.eval_expressions(&expr.elements, env);
+                let array = self.eval_expressions(&expr.elements);
                 if array.len() == 1 {
                     if let Object::Error(_) = *array[0] {
                         return array[0].clone();
@@ -369,47 +352,47 @@ impl Eval {
                 Rc::new(Object::Array(array))
             }
             Expression::Index(expr) => {
-                let left = self.eval_expression(&expr.left, env.clone());
+                let left = self.eval_expression(&expr.left);
                 if let Object::Error(_) = *left {
                     return left;
                 }
 
-                let index = self.eval_expression(&expr.index, env);
+                let index = self.eval_expression(&expr.index);
                 if let Object::Error(_) = *index {
                     return index;
                 }
 
                 self.eval_index_expression(left, index)
             }
-            Expression::Hash(expr) => self.eval_hash_literal(expr, env),
+            Expression::Hash(expr) => self.eval_hash_literal(expr),
         }
     }
 
-    fn eval_statement(&self, statement: &Statement, env: Env) -> Rc<Object> {
+    fn eval_statement(&mut self, statement: &Statement) -> Rc<Object> {
         match statement {
             Statement::Let(expr) => {
-                let value = self.eval_expression(&expr.value, env.clone());
+                let value = self.eval_expression(&expr.value);
                 if let Object::Error(_) = *value {
                     return value;
                 }
-                env.set(expr.name.value.clone(), value);
+                self.envs[self.ep].set(expr.name.value.clone(), value);
                 Rc::new(Object::None)
             }
             Statement::Return(expr) => {
-                let eval = self.eval_expression(&expr.value, env);
+                let eval = self.eval_expression(&expr.value);
                 match *eval {
                     Object::Error(_) => eval,
                     _ => Rc::new(Object::Return(eval)),
                 }
             }
-            Statement::Expression(expr) => self.eval_expression(&expr.value, env),
+            Statement::Expression(expr) => self.eval_expression(&expr.value),
         }
     }
 
-    fn eval_block_statement(&self, block: &BlockStatement, env: Env) -> Rc<Object> {
+    fn eval_block_statement(&mut self, block: &BlockStatement) -> Rc<Object> {
         let mut result = self.obj_null.clone();
         for stmt in &block.statements {
-            result = self.eval_statement(stmt, env.clone());
+            result = self.eval_statement(stmt);
             if let Object::Return(_) | Object::Error(_) = *result {
                 return result;
             }
@@ -417,10 +400,10 @@ impl Eval {
         result
     }
 
-    pub fn eval_program(&self, program: &Program, env: Env) -> Rc<Object> {
+    pub fn eval_program(&mut self, program: &Program) -> Rc<Object> {
         let mut result = self.obj_none.clone();
         for stmt in &program.statements {
-            result = self.eval_statement(stmt, env.clone());
+            result = self.eval_statement(stmt);
             match result.as_ref() {
                 Object::Return(value) => return value.clone(),
                 Object::Error(_) => return result,

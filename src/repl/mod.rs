@@ -1,9 +1,5 @@
 use crate::compiler::Compiler;
-use crate::evaluator::{
-    r#macro::{define_macros, expand_macros},
-    Eval,
-};
-use crate::evaluator::{Env, Environment};
+use crate::evaluator::Eval;
 use crate::lexer::Lexer;
 use crate::object::Object;
 use crate::parser::{Parser, ParserError};
@@ -51,40 +47,39 @@ fn print_parser_errors(errors: &[ParserError]) {
     }
 }
 
-fn repl_eval(input: Peekable<Chars<'_>>, env: Env, macro_env: Env) -> Rc<Object> {
+fn repl_eval(input: Peekable<Chars<'_>>, eval: &mut Eval, macro_eval: &mut Eval) -> Rc<Object> {
     let lexer = Lexer::new(None, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
-    let eval = Eval::new();
 
     if !parser.errors.is_empty() {
         print_parser_errors(&parser.errors);
         return Rc::new(Object::None);
     }
 
-    define_macros(&mut program, macro_env.clone());
-    expand_macros(&mut program, macro_env);
+    macro_eval.define_macros(&mut program);
+    macro_eval.expand_macros(&mut program);
 
-    eval.eval_program(&program, env.clone())
+    eval.eval_program(&program)
 }
 
 pub fn run_repl_eval(input: Peekable<Chars<'_>>) -> Rc<Object> {
-    let env = Environment::new();
-    let macro_env = Environment::new();
-    repl_eval(input, env, macro_env)
+    let mut eval = Eval::new();
+    let mut macro_eval = Eval::new();
+    repl_eval(input, &mut eval, &mut macro_eval)
 }
 
 pub fn _start_repl_eval() {
     let input = stdin();
-    let env = Environment::new();
-    let macro_env = Environment::new();
+    let mut eval = Eval::new();
+    let mut macro_eval = Eval::new();
     loop {
         let mut buf = String::new();
         print!("{PROMPT}");
         let _ = std::io::stdout().flush();
 
         input.read_line(&mut buf).expect("reading input failed");
-        let eval = repl_eval(buf.chars().peekable(), env.clone(), macro_env.clone());
+        let eval = repl_eval(buf.chars().peekable(), &mut eval, &mut macro_eval);
 
         match *eval {
             Object::None => (),
@@ -103,9 +98,9 @@ fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> 
         return None;
     }
 
-    let macro_env = Environment::new();
-    define_macros(&mut program, macro_env.clone());
-    expand_macros(&mut program, macro_env);
+    let mut macro_eval = Eval::new();
+    macro_eval.define_macros(&mut program);
+    macro_eval.expand_macros(&mut program);
 
     compiler.soft_reset();
     if let Err(e) = compiler.compile_program(&program) {

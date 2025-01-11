@@ -3,12 +3,11 @@ use crate::lexer::Lexer;
 use crate::parser::Parser;
 
 pub fn test_eval(input: &str) -> Rc<Object> {
-    let env = Environment::new();
     let lexer = Lexer::new(None, input.chars().peekable());
     let mut parser = Parser::new(lexer);
     let program = parser.parse_program();
-    let eval = Eval::new();
-    eval.eval_program(&program, env)
+    let mut eval = Eval::new();
+    eval.eval_program(&program)
 }
 
 #[test]

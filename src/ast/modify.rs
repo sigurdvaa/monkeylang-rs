@@ -1,45 +1,45 @@
 use crate::ast::{Expression, Program, Statement};
-use crate::evaluator::Env;
+use crate::evaluator::Eval;
 use std::collections::BTreeMap;
 
-pub type ModifierFunc = fn(&mut Expression, &Env);
+pub type ModifierFunc = fn(&mut Expression, &mut Eval);
 
-pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, env: &Env) {
+pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, eval: &mut Eval) {
     match expr {
         Expression::If(expr) => {
-            modify_expression(&mut expr.condition, func, env);
-            modify_statements(&mut expr.consequence.statements, func, env);
+            modify_expression(&mut expr.condition, func, eval);
+            modify_statements(&mut expr.consequence.statements, func, eval);
             if let Some(alt) = &mut expr.alternative {
-                modify_statements(&mut alt.statements, func, env);
+                modify_statements(&mut alt.statements, func, eval);
             }
         }
         Expression::Infix(expr) => {
-            modify_expression(&mut expr.left, func, env);
-            modify_expression(&mut expr.right, func, env);
+            modify_expression(&mut expr.left, func, eval);
+            modify_expression(&mut expr.right, func, eval);
         }
         Expression::Prefix(expr) => {
-            modify_expression(&mut expr.right, func, env);
+            modify_expression(&mut expr.right, func, eval);
         }
         Expression::Call(expr) => {
-            modify_expression(&mut expr.function, func, env);
-            modify_expressions(&mut expr.arguments, func, env);
+            modify_expression(&mut expr.function, func, eval);
+            modify_expressions(&mut expr.arguments, func, eval);
         }
         Expression::Function(expr) => {
-            modify_statements(&mut expr.body.statements, func, env);
+            modify_statements(&mut expr.body.statements, func, eval);
         }
         Expression::Array(expr) => {
-            modify_expressions(&mut expr.elements, func, env);
+            modify_expressions(&mut expr.elements, func, eval);
         }
         Expression::Index(expr) => {
-            modify_expression(&mut expr.left, func, env);
-            modify_expression(&mut expr.index, func, env);
+            modify_expression(&mut expr.left, func, eval);
+            modify_expression(&mut expr.index, func, eval);
         }
         Expression::Hash(expr) => {
             let mut new_pairs = BTreeMap::new();
             for (key, value) in expr.pairs.iter_mut() {
                 let mut key = key.clone();
-                modify_expression(&mut key, func, env);
-                modify_expression(value, func, env);
+                modify_expression(&mut key, func, eval);
+                modify_expression(value, func, eval);
                 new_pairs.insert(key, value.to_owned());
             }
             expr.pairs = new_pairs;
@@ -51,38 +51,37 @@ pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, env: &Env) {
         | Expression::Macro(_)
         | Expression::Null(_) => (),
     }
-    func(expr, env);
+    func(expr, eval);
 }
 
-pub fn modify_expressions(exprs: &mut [Expression], func: ModifierFunc, env: &Env) {
+pub fn modify_expressions(exprs: &mut [Expression], func: ModifierFunc, eval: &mut Eval) {
     for expr in exprs {
-        modify_expression(expr, func, env);
+        modify_expression(expr, func, eval);
     }
 }
 
-pub fn modify_statement(stmt: &mut Statement, func: ModifierFunc, env: &Env) {
+pub fn modify_statement(stmt: &mut Statement, func: ModifierFunc, eval: &mut Eval) {
     match stmt {
-        Statement::Let(stmt) => modify_expression(&mut stmt.value, func, env),
-        Statement::Return(stmt) => modify_expression(&mut stmt.value, func, env),
-        Statement::Expression(stmt) => modify_expression(&mut stmt.value, func, env),
+        Statement::Let(stmt) => modify_expression(&mut stmt.value, func, eval),
+        Statement::Return(stmt) => modify_expression(&mut stmt.value, func, eval),
+        Statement::Expression(stmt) => modify_expression(&mut stmt.value, func, eval),
     }
 }
 
-pub fn modify_statements(stmts: &mut [Statement], func: ModifierFunc, env: &Env) {
+pub fn modify_statements(stmts: &mut [Statement], func: ModifierFunc, eval: &mut Eval) {
     for stmt in stmts {
-        modify_statement(stmt, func, env);
+        modify_statement(stmt, func, eval);
     }
 }
 
-pub fn modify_program(prog: &mut Program, func: ModifierFunc, env: &Env) {
-    modify_statements(&mut prog.statements, func, env);
+pub fn modify_program(prog: &mut Program, func: ModifierFunc, eval: &mut Eval) {
+    modify_statements(&mut prog.statements, func, eval);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ast::*;
-    use crate::evaluator::Environment;
     use crate::token::{Token, TokenKind};
 
     fn create_token(kind: TokenKind) -> Token {
@@ -233,8 +232,8 @@ mod tests {
 
     #[test]
     fn test_modify() {
-        let env = Environment::new();
-        let turn_one_into_two: ModifierFunc = |expr: &mut Expression, _env: &Env| {
+        let mut eval = Eval::new();
+        let turn_one_into_two: ModifierFunc = |expr: &mut Expression, _eval: &mut Eval| {
             let int = match expr {
                 Expression::Integer(int) => int,
                 _ => return,
@@ -262,7 +261,7 @@ mod tests {
         ];
 
         for (mut test_input, test_value) in tests {
-            modify_program(&mut test_input, turn_one_into_two, &env);
+            modify_program(&mut test_input, turn_one_into_two, &mut eval);
             assert_eq!(test_input, test_value);
         }
     }

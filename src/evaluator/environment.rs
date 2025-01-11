@@ -23,10 +23,10 @@ impl Environment {
         })
     }
 
-    pub fn new_enclosed(env: &Env) -> Env {
+    pub fn new_enclosed(env: Env) -> Env {
         Rc::new(Self {
             store: RefCell::new(HashMap::new()),
-            outer: Some(env.clone()),
+            outer: Some(env),
         })
     }
 
