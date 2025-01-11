@@ -40,12 +40,17 @@ impl From<&TokenKind> for Precedence {
 
 #[derive(Debug)]
 pub enum ParserError {
+    // TODO: improve errors by including token, show line and char pos
     Expect(String),
     Expression(String),
     ParseInt(String),
     ParsePrefix(String),
     ParseInfix(String),
+    QuoteWrongNumArgs(usize),
+    UnquoteWrongNumArgs(usize),
 }
+
+impl std::error::Error for ParserError {}
 
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -55,6 +60,14 @@ impl fmt::Display for ParserError {
             Self::ParseInt(err) => write!(f, "{}", err),
             Self::ParsePrefix(err) => write!(f, "{}", err),
             Self::ParseInfix(err) => write!(f, "{}", err),
+            Self::QuoteWrongNumArgs(args_len) => write!(
+                f,
+                "wrong number of arguments for \"quote\", want=1, got={args_len}"
+            ),
+            Self::UnquoteWrongNumArgs(args_len) => write!(
+                f,
+                "wrong number of arguments for \"unquote\", want=1, got={args_len}"
+            ),
         }
     }
 }
@@ -124,6 +137,12 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::Macro, Parser::parse_fn_macro_literal);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Quote, Parser::parse_fn_quote_expression);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Unquote, Parser::parse_fn_unquote_expression);
 
         parser
             .infix_parse_fns
@@ -446,6 +465,34 @@ impl<'a> Parser<'a> {
         Ok(Expression::Call(CallExpression {
             token,
             function,
+            arguments,
+        }))
+    }
+
+    fn parse_fn_quote_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+        parser.next_tokens();
+        let arguments = parser.parse_expression_list(TokenKind::Rparen)?;
+        if arguments.len() != 1 {
+            return Err(ParserError::QuoteWrongNumArgs(arguments.len()));
+        }
+        Ok(Expression::Quote(CallExpression {
+            token: token.clone(),
+            function: Box::new(Expression::Null(token)),
+            arguments,
+        }))
+    }
+
+    fn parse_fn_unquote_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+        parser.next_tokens();
+        let arguments = parser.parse_expression_list(TokenKind::Rparen)?;
+        if arguments.len() != 1 {
+            return Err(ParserError::UnquoteWrongNumArgs(arguments.len()));
+        }
+        Ok(Expression::Unquote(CallExpression {
+            token: token.clone(),
+            function: Box::new(Expression::Null(token)),
             arguments,
         }))
     }

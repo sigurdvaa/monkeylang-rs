@@ -30,12 +30,9 @@ impl Eval {
     fn eval_unquote_calls(&mut self, expr: &mut Expression) {
         let unquote_calls = |expr: &mut Expression, eval: &mut Eval| {
             let call = match expr {
-                Expression::Call(expr) if expr.token.literal == "unquote" => expr,
+                Expression::Unquote(expr) => expr,
                 _ => return,
             };
-            if call.arguments.len() != 1 {
-                return;
-            }
             *expr =
                 Eval::convert_object_to_expression(eval.eval_expression(&call.arguments[0]), expr);
         };

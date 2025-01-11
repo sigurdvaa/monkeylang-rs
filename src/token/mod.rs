@@ -43,8 +43,9 @@ pub enum TokenKind {
     True,
     False,
     Macro,
+    Quote,
+    Unquote,
     // TODO: loop
-    // TODO: quote / unquote
 }
 
 impl fmt::Display for TokenKind {

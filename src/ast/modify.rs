@@ -20,7 +20,7 @@ pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, eval: &mut E
         Expression::Prefix(expr) => {
             modify_expression(&mut expr.right, func, eval);
         }
-        Expression::Call(expr) => {
+        Expression::Call(expr) | Expression::Quote(expr) | Expression::Unquote(expr) => {
             modify_expression(&mut expr.function, func, eval);
             modify_expressions(&mut expr.arguments, func, eval);
         }

@@ -328,6 +328,14 @@ impl Compiler {
             Expression::Macro(_expr) => {
                 unreachable!("macros must be evaluated before generating bytecode")
             }
+            Expression::Quote(_expr) => {
+                unreachable!("\"quote\" must be evaluated before generating bytecode")
+            }
+            Expression::Unquote(_expr) => {
+                unreachable!(
+                    "Unquote must be evaluated inside \"quote\" before generating bytecode"
+                )
+            }
         };
         Ok(())
     }

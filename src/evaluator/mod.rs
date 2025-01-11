@@ -283,11 +283,6 @@ impl Eval {
             Expression::Boolean(expr) => self.get_obj_bool(expr.value),
             Expression::Null(_token) => self.obj_null.clone(),
             Expression::Call(expr) => {
-                // TODO: replace with tokenkind? will have to add TokenKind::Quote
-                if expr.token.literal == "quote" {
-                    return self.quote(expr.arguments[0].clone());
-                }
-
                 let func = self.eval_expression(&expr.function);
                 if let Object::Error(_) = *func {
                     return func;
@@ -301,6 +296,13 @@ impl Eval {
                 }
 
                 self.apply_function(&func, &args)
+            }
+            Expression::Quote(expr) => self.quote(expr.arguments[0].clone()),
+            Expression::Unquote(expr) => {
+                panic!(
+                    "\"unquote\" can't be used outside of \"quote\": {}",
+                    expr.token
+                )
             }
             Expression::Function(expr) => Rc::new(Object::Function(FunctionObj {
                 parameters: expr.parameters.clone(),

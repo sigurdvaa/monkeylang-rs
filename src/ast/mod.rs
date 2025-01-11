@@ -149,6 +149,8 @@ pub enum Expression {
     Index(IndexExpression),
     Hash(HashLiteral),
     Macro(FunctionLiteral),
+    Quote(CallExpression),
+    Unquote(CallExpression),
 }
 
 impl fmt::Display for Expression {
@@ -156,7 +158,7 @@ impl fmt::Display for Expression {
         match self {
             Self::Boolean(expr) => write!(f, "{}", expr.value),
             Self::Null(_token) => write!(f, "null"),
-            Self::Call(expr) => write!(
+            Self::Call(expr) | Self::Quote(expr) | Self::Unquote(expr) => write!(
                 f,
                 "{}({})",
                 expr.function,
@@ -239,6 +241,8 @@ impl Expression {
             Self::Array(expr) => &expr.token,
             Self::Index(expr) => &expr.token,
             Self::Hash(expr) => &expr.token,
+            Self::Quote(expr) => &expr.token,
+            Self::Unquote(expr) => &expr.token,
         }
     }
 }

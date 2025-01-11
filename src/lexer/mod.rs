@@ -51,6 +51,8 @@ impl<'a> Lexer<'a> {
             "false" => self.new_token(TokenKind::False, literal),
             "null" => self.new_token(TokenKind::Null, literal),
             "macro" => self.new_token(TokenKind::Macro, literal),
+            "quote" => self.new_token(TokenKind::Quote, literal),
+            "unquote" => self.new_token(TokenKind::Unquote, literal),
             _ => self.new_token(TokenKind::Ident, literal),
         }
     }
