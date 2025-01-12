@@ -233,7 +233,7 @@ impl Vm {
     fn pop_stack(&mut self) -> Result<Rc<Object>, VmError> {
         self.sp -= 1;
         match self.stack[self.sp].take() {
-            Some(obj) => Ok(obj.clone()),
+            Some(obj) => Ok(obj),
             None => Err(VmError::InvalidStackAccess(self.sp)),
         }
     }
@@ -261,7 +261,7 @@ impl Vm {
                 let mut free = Vec::with_capacity(num_free);
                 for idx in self.sp - num_free..self.sp {
                     match self.stack[idx].take() {
-                        Some(obj) => free.push(obj.clone()),
+                        Some(obj) => free.push(obj),
                         None => return Err(VmError::InvalidStackAccess(idx)),
                     };
                 }
@@ -497,7 +497,7 @@ impl Vm {
         let mut args = vec![];
         for idx in self.sp - num_args..self.sp {
             match self.stack[idx].take() {
-                Some(obj) => args.push(obj.clone()),
+                Some(obj) => args.push(obj),
                 None => return Err(VmError::InvalidStackAccess(idx)),
             }
         }
