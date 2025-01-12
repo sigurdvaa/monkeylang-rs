@@ -12,6 +12,7 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
         ("puts", Rc::new(const { Object::Builtin(puts) })),
         ("string", Rc::new(const { Object::Builtin(string) })),
         ("insert", Rc::new(const { Object::Builtin(insert) })),
+        ("replace", Rc::new(const { Object::Builtin(replace) })),
     ]
 }
 
@@ -129,7 +130,16 @@ fn insert(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
         Object::Array(value) => {
             let mut new = value.clone();
             match &*args[1] {
-                Object::Integer(i) => new.insert(i.value as usize, args[2].clone()),
+                Object::Integer(i) => {
+                    if i.value as usize >= value.len() {
+                        return Rc::new(Object::Error(format!(
+                            "2nd argument to \"insert\" is out of range, got {}, length is {}",
+                            i.value,
+                            value.len()
+                        )));
+                    }
+                    new.insert(i.value as usize, args[2].clone());
+                }
                 _ => {
                     return Rc::new(Object::Error(format!(
                         "2nd argument to \"insert\" not supported, got {}, want=INTEGER",
@@ -141,6 +151,44 @@ fn insert(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
         }
         _ => Object::Error(format!(
             "arguments to \"insert\" not supported, got {}",
+            args.iter().map(|v| v.kind()).collect::<Vec<_>>().join(", ")
+        )),
+    })
+}
+
+fn replace(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
+    if args.len() != 3 {
+        return Rc::new(Object::Error(format!(
+            "wrong number of arguments \"replace\", got={}, want=3",
+            args.len()
+        )));
+    }
+
+    Rc::new(match &*args[0] {
+        Object::Array(value) => {
+            let mut new = value.clone();
+            match &*args[1] {
+                Object::Integer(i) => {
+                    if i.value as usize >= value.len() {
+                        return Rc::new(Object::Error(format!(
+                            "2nd argument to \"replace\" is out of range, got {}, length is {}",
+                            i.value,
+                            value.len()
+                        )));
+                    }
+                    new[i.value as usize] = args[2].clone();
+                }
+                _ => {
+                    return Rc::new(Object::Error(format!(
+                        "2nd argument to \"replace\" not supported, got {}, want=INTEGER",
+                        args[1].kind()
+                    )))
+                }
+            }
+            Object::Array(new)
+        }
+        _ => Object::Error(format!(
+            "arguments to \"replace\" not supported, got {}",
             args.iter().map(|v| v.kind()).collect::<Vec<_>>().join(", ")
         )),
     })

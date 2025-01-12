@@ -46,6 +46,7 @@ pub enum Opcode {
     Closure,
     GetFree,
     CurrentClosure,
+    Exit,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -84,6 +85,7 @@ impl TryFrom<u8> for Opcode {
             28 if 28 == Self::Closure as u8 => Ok(Self::Closure),
             29 if 29 == Self::GetFree as u8 => Ok(Self::GetFree),
             30 if 30 == Self::CurrentClosure as u8 => Ok(Self::CurrentClosure),
+            31 if 31 == Self::Exit as u8 => Ok(Self::Exit),
             _ => Err(OpcodeError(op)),
         }
     }
@@ -163,7 +165,7 @@ pub mod tests {
                 let op = Opcode::try_from(self[i])
                     .unwrap_or_else(|e| panic!("ERROR: failed to print instructions, {e}"));
                 let def = op.widths();
-                let (operands, read) = read_operands(&def, &self[i + 1..]);
+                let (operands, read) = read_operands(def, &self[i + 1..]);
                 buffer.push_str(&format!("{i:0>4} {op:?}",));
                 if !operands.is_empty() {
                     buffer.push(' ');
@@ -262,7 +264,7 @@ pub mod tests {
         for (test_opcode, test_operands, test_read) in tests {
             let ins = make_ins(test_opcode.clone(), &test_operands);
             let def = test_opcode.widths();
-            let (operands_read, bytes_read) = read_operands(&def, ins[1..].into());
+            let (operands_read, bytes_read) = read_operands(def, ins[1..].into());
             assert_eq!(bytes_read, test_read);
             assert_eq!(operands_read, test_operands);
         }

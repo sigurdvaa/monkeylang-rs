@@ -90,6 +90,7 @@ impl<'a> Lexer<'a> {
                 '\\' => {
                     match self.input.next() {
                         Some('n') => buffer.push('\n'),
+                        Some('t') => buffer.push('\t'),
                         Some('"') => buffer.push('"'),
                         Some('\\') => buffer.push('\\'),
                         Some(c) => {

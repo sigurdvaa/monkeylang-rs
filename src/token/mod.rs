@@ -46,6 +46,7 @@ pub enum TokenKind {
     Macro,
     Quote,
     Unquote,
+    // TODO: exit
     // TODO: loop
 }
 

@@ -138,12 +138,20 @@ impl Engine for Vm {
             }
         }
         match func.as_ref() {
-            Object::Function(_obj) => {
-                todo!();
-                // add opcode for array to stack
-                // add opcode for calling
-                // emit ins for collecting return values into Object:Array
-                // return Object::Null?
+            Object::Closure(_) => {
+                // TODO: can some of this be more constant?
+                let func = Rc::new(CompiledFunctionObj {
+                    instructions: vec![Opcode::Call as u8, args.len() as u8, Opcode::Exit as u8],
+                    num_locals: 0,
+                    num_parameters: 0,
+                });
+                let closure = Rc::new(ClosureObj { func, free: vec![] });
+                let frame = Frame::new(closure, self.sp - args.len());
+                if let Err(e) = self.push_frame(frame) {
+                    return Rc::new(Object::Error(e.to_string()));
+                }
+                self.run()
+                    .unwrap_or_else(|e| Rc::new(Object::Error(e.to_string())))
             }
             Object::Builtin(func) => {
                 if let Err(e) = self.call_builtin(*func, args.len()) {
@@ -217,7 +225,7 @@ impl Vm {
         if self.sp >= STACK_SIZE {
             return Err(VmError::StackOverflow(obj));
         }
-        self.stack[self.sp].replace(obj);
+        self.stack[self.sp].replace(obj.clone());
         self.sp += 1;
         Ok(())
     }
@@ -225,7 +233,7 @@ impl Vm {
     fn pop_stack(&mut self) -> Result<Rc<Object>, VmError> {
         self.sp -= 1;
         match self.stack[self.sp].take() {
-            Some(obj) => Ok(obj),
+            Some(obj) => Ok(obj.clone()),
             None => Err(VmError::InvalidStackAccess(self.sp)),
         }
     }
@@ -253,7 +261,7 @@ impl Vm {
                 let mut free = Vec::with_capacity(num_free);
                 for idx in self.sp - num_free..self.sp {
                     match self.stack[idx].take() {
-                        Some(obj) => free.push(obj),
+                        Some(obj) => free.push(obj.clone()),
                         None => return Err(VmError::InvalidStackAccess(idx)),
                     };
                 }
@@ -410,6 +418,7 @@ impl Vm {
     fn execute_index_expression(&mut self) -> Result<(), VmError> {
         let idx = self.pop_stack()?;
         let left = self.pop_stack()?;
+        // dbg!(&left, &idx);
         let obj = match (left.as_ref(), idx.as_ref()) {
             (Object::Array(obj), Object::Integer(idx)) => self.execute_array_index(obj, idx),
             (Object::Hash(obj), _) => {
@@ -479,9 +488,8 @@ impl Vm {
                 num_args,
             ));
         }
-
         let new_frame = Frame::new(closure.clone(), self.sp - num_args);
-        self.sp += closure.func.num_locals;
+        self.sp = new_frame.bp + closure.func.num_locals;
         self.push_frame(frame)?;
         Ok(new_frame)
     }
@@ -490,18 +498,20 @@ impl Vm {
         let mut args = vec![];
         for idx in self.sp - num_args..self.sp {
             match self.stack[idx].take() {
-                Some(obj) => args.push(obj),
+                Some(obj) => args.push(obj.clone()),
                 None => return Err(VmError::InvalidStackAccess(idx)),
             }
         }
-        self.sp -= num_args + 1;
+        self.sp -= num_args;
+        // TODO: Object::Error doesn't bubble up, convert to VmError?
         let result = func(&args, self);
-        self.push_stack(result)
+        self.stack[self.sp - 1].replace(result); // replaces called func with result
+        Ok(())
     }
 
     pub fn run(&mut self) -> Result<Rc<Object>, VmError> {
         let mut last_pop = self.obj_none.clone();
-        let mut frame: Frame = self.frames[0].take().expect("main frame missing");
+        let mut frame = self.pop_frame()?;
         loop {
             let ins = &frame.closure.func.instructions;
             if frame.ip >= ins.len() {
@@ -576,6 +586,7 @@ impl Vm {
                 Opcode::GetLocal => {
                     let idx = ins[frame.ip + 1] as usize;
                     frame.ip += 2;
+                    // TODO: invalid access here
                     match &self.stack[frame.bp + idx] {
                         Some(obj) => self.push_stack(obj.clone())?,
                         _ => return Err(VmError::InvalidStackAccess(frame.bp + idx)),
@@ -643,6 +654,9 @@ impl Vm {
                     frame.ip += 1;
                     let closure = frame.closure.clone();
                     self.push_stack(Rc::new(Object::Closure(closure)))?;
+                }
+                Opcode::Exit => {
+                    return self.pop_stack();
                 }
             }
         }

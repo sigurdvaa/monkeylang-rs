@@ -7,6 +7,7 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
     all
 }
 
+// TODO: move to object/builtins?
 fn map(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 2 {
         return Rc::new(Object::Error(format!(

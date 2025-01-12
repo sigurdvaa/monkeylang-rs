@@ -345,6 +345,8 @@ impl Compiler {
             Statement::Let(expr) => {
                 // TODO: defining sym beforehand cause issues when shadowing parameters and using the same name
                 // on the right side of a let statement inside a fn.
+                // see examples/shadow.ml
+                // there's also examples/fib_recursive_cache.ml
                 let sym = self.symbols.define(expr.name.value.clone());
                 self.compile_expression(&expr.value)?;
                 match sym.scope {

@@ -1,12 +1,12 @@
 let fib = fn(n) {
     let init_cache = fn(c, cache) {
-        if (c < n) {
-            let cache = push(cache, null);
-            return init_cache(c + 1, cache);
+        if (c > -1) {
+            let new_cache = push(cache, null);
+            return init_cache(c - 1, new_cache);
         }
         return cache;
     };
-    let cache = init_cache(0, []);
+    let cache = init_cache(n, []);
 
     let fib_cache = fn(n, cache) {
         if (n < 1) {
@@ -18,7 +18,8 @@ let fib = fn(n) {
         if (cache[n] == null) {
             let a = fib_cache(n - 1, cache);
             let b = fib_cache(n - 2, a[1]);
-            let cache = push(b[1], a[0] + b[0], n);
+            let cache = replace(b[1], n, a[0] + b[0]);
+            return [cache[n], cache];
         }
         return [cache[n], cache];
     };
