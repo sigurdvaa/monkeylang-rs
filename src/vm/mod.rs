@@ -1,10 +1,11 @@
+mod builtins;
 #[cfg(test)]
 mod tests;
 
 use crate::code::{read_u16_as_usize, Opcode, OpcodeError};
 use crate::compiler::Bytecode;
 use crate::object::{
-    builtins, Array, BuiltinFunction, ClosureObj, CompiledFunctionObj, HashKeyData, HashKeyError,
+    Array, BuiltinFunction, ClosureObj, CompiledFunctionObj, Engine, HashKeyData, HashKeyError,
     HashObj, Integer, Object,
 };
 use std::collections::HashMap;
@@ -124,6 +125,23 @@ pub struct Vm {
     obj_false: Rc<Object>,
     obj_null: Rc<Object>,
     obj_none: Rc<Object>,
+}
+
+impl Engine for Vm {
+    fn call_func(&mut self, _func: Rc<Object>, _args: &[Rc<Object>]) -> Rc<Object> {
+        todo!();
+        // emit ins for calling closure
+        // emit ins for collecting return values into Object:Array
+        // return Object::Null?
+    }
+
+    fn get_null(&self) -> Rc<Object> {
+        self.obj_null.clone()
+    }
+
+    fn get_none(&self) -> Rc<Object> {
+        self.obj_none.clone()
+    }
 }
 
 impl Vm {
@@ -315,7 +333,10 @@ impl Vm {
             Opcode::NotEq => !truth,
             _ => return Err(VmError::InvalidNullOperator(op.clone())),
         };
-        self.push_stack(Rc::new(Object::new_boolean(value)))
+        match value {
+            true => self.push_stack(self.obj_true.clone()),
+            false => self.push_stack(self.obj_false.clone()),
+        }
     }
 
     fn execute_comparison(&mut self, op: Opcode) -> Result<(), VmError> {
@@ -455,7 +476,7 @@ impl Vm {
             }
         }
         self.sp -= num_args + 1;
-        let result = func(&args);
+        let result = func(&args, self);
         self.push_stack(result)?;
         Ok(frame)
     }

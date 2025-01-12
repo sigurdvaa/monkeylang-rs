@@ -1,7 +1,7 @@
 use crate::compiler::Compiler;
 use crate::evaluator::Eval;
 use crate::lexer::Lexer;
-use crate::object::Object;
+use crate::object::{Engine, Object};
 use crate::parser::{Parser, ParserError};
 use crate::vm::Vm;
 use std::fmt::Display;
@@ -26,12 +26,12 @@ const MONKEY_FACE: &str = concat!(
 );
 
 #[derive(Debug)]
-pub enum Engine {
+pub enum EngineKind {
     Eval,
     Vm,
 }
 
-impl Display for Engine {
+impl Display for EngineKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Eval => write!(f, "eval"),
@@ -54,7 +54,7 @@ fn repl_eval(input: Peekable<Chars<'_>>, eval: &mut Eval, macro_eval: &mut Eval)
 
     if !parser.errors.is_empty() {
         print_parser_errors(&parser.errors);
-        return Rc::new(Object::None);
+        return eval.get_none();
     }
 
     macro_eval.define_macros(&mut program);

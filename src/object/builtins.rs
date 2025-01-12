@@ -1,4 +1,4 @@
-use super::Object;
+use super::{Engine, Object};
 use std::io::{stdout, Write};
 use std::rc::Rc;
 
@@ -15,7 +15,7 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
     ]
 }
 
-fn len(args: &[Rc<Object>]) -> Rc<Object> {
+fn len(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments to \"len\". got={}, want=1",
@@ -33,7 +33,7 @@ fn len(args: &[Rc<Object>]) -> Rc<Object> {
     })
 }
 
-fn first(args: &[Rc<Object>]) -> Rc<Object> {
+fn first(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments to \"first\". got={}, want=1",
@@ -42,7 +42,10 @@ fn first(args: &[Rc<Object>]) -> Rc<Object> {
     }
 
     match &*args[0] {
-        Object::Array(value) => value.first().unwrap_or(&Rc::new(Object::Null)).clone(),
+        Object::Array(value) => match value.first() {
+            Some(value) => value.clone(),
+            None => engine.get_null(),
+        },
         _ => Rc::new(Object::Error(format!(
             "argument to \"first\" not supported, got {}",
             args[0].kind()
@@ -50,7 +53,7 @@ fn first(args: &[Rc<Object>]) -> Rc<Object> {
     }
 }
 
-fn last(args: &[Rc<Object>]) -> Rc<Object> {
+fn last(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments to \"last\". got={}, want=1",
@@ -59,7 +62,10 @@ fn last(args: &[Rc<Object>]) -> Rc<Object> {
     }
 
     match &*args[0] {
-        Object::Array(value) => value.last().unwrap_or(&Rc::new(Object::Null)).clone(),
+        Object::Array(value) => match value.last() {
+            Some(value) => value.clone(),
+            None => engine.get_null(),
+        },
         _ => Rc::new(Object::Error(format!(
             "argument to \"last\" not supported, got {}",
             args[0].kind()
@@ -67,7 +73,7 @@ fn last(args: &[Rc<Object>]) -> Rc<Object> {
     }
 }
 
-fn rest(args: &[Rc<Object>]) -> Rc<Object> {
+fn rest(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments to \"rest\". got={}, want=1",
@@ -75,22 +81,22 @@ fn rest(args: &[Rc<Object>]) -> Rc<Object> {
         )));
     }
 
-    Rc::new(match &*args[0] {
+    match &*args[0] {
         Object::Array(value) => {
             if value.is_empty() {
-                Object::Null
+                engine.get_null()
             } else {
-                Object::Array(value.iter().skip(1).cloned().collect())
+                Rc::new(Object::Array(value.iter().skip(1).cloned().collect()))
             }
         }
-        _ => Object::Error(format!(
+        _ => Rc::new(Object::Error(format!(
             "argument to \"rest\" not supported, got {}",
             args[0].kind()
-        )),
-    })
+        ))),
+    }
 }
 
-fn push(args: &[Rc<Object>]) -> Rc<Object> {
+fn push(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 2 && args.len() != 3 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments to \"push\", got={}, want=2",
@@ -111,7 +117,7 @@ fn push(args: &[Rc<Object>]) -> Rc<Object> {
     })
 }
 
-fn insert(args: &[Rc<Object>]) -> Rc<Object> {
+fn insert(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 3 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments \"insert\", got={}, want=3",
@@ -140,7 +146,7 @@ fn insert(args: &[Rc<Object>]) -> Rc<Object> {
     })
 }
 
-fn puts(args: &[Rc<Object>]) -> Rc<Object> {
+fn puts(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     let mut out = stdout().lock();
     for arg in args {
         _ = match arg.as_ref() {
@@ -149,10 +155,10 @@ fn puts(args: &[Rc<Object>]) -> Rc<Object> {
         };
         _ = out.flush();
     }
-    Rc::new(Object::None)
+    engine.get_none()
 }
 
-fn string(args: &[Rc<Object>]) -> Rc<Object> {
+fn string(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments to \"string\", got={}, want=1",

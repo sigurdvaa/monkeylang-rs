@@ -8,8 +8,14 @@ use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::rc::Rc;
 
+pub trait Engine {
+    fn call_func(&mut self, func: Rc<Object>, args: &[Rc<Object>]) -> Rc<Object>;
+    fn get_null(&self) -> Rc<Object>;
+    fn get_none(&self) -> Rc<Object>;
+}
+
 pub type Integer = IntegerObj;
-pub type BuiltinFunction = fn(&[Rc<Object>]) -> Rc<Object>;
+pub type BuiltinFunction = fn(&[Rc<Object>], &mut dyn Engine) -> Rc<Object>;
 pub type Array = Vec<Rc<Object>>;
 pub type HashObj = HashMap<HashKeyData, (Rc<Object>, Rc<Object>)>;
 type HashKey = RefCell<Option<HashKeyData>>;

@@ -7,7 +7,7 @@ pub mod tests;
 use crate::ast::{
     BlockStatement, Expression, HashLiteral, IfExpression, Operator, Program, Statement,
 };
-use crate::object::{BooleanObj, FunctionObj, IntegerObj, Object, StringObj};
+use crate::object::{BooleanObj, Engine, FunctionObj, IntegerObj, Object, StringObj};
 pub use environment::{Env, Environment};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -21,27 +21,9 @@ pub struct Eval {
     obj_none: Rc<Object>,
 }
 
-impl Eval {
-    pub fn new() -> Self {
-        Self {
-            envs: vec![Environment::new()],
-            ep: 0,
-            obj_true: Rc::new(Object::new_boolean(true)),
-            obj_false: Rc::new(Object::new_boolean(false)),
-            obj_null: Rc::new(Object::Null),
-            obj_none: Rc::new(Object::None),
-        }
-    }
-
-    fn get_obj_bool(&self, value: bool) -> Rc<Object> {
-        match value {
-            true => self.obj_true.clone(),
-            false => self.obj_false.clone(),
-        }
-    }
-
-    fn apply_function(&mut self, function: &Rc<Object>, args: &[Rc<Object>]) -> Rc<Object> {
-        match &**function {
+impl Engine for Eval {
+    fn call_func(&mut self, func: Rc<Object>, args: &[Rc<Object>]) -> Rc<Object> {
+        match func.as_ref() {
             Object::Function(func) => {
                 if func.parameters.len() != args.len() {
                     return Rc::new(Object::Error(format!(
@@ -69,11 +51,36 @@ impl Eval {
                     _ => eval,
                 }
             }
-            Object::Builtin(func) => func(args),
-            _ => Rc::new(Object::Error(format!(
-                "not a function: {}",
-                function.kind()
-            ))),
+            Object::Builtin(func) => func(args, self),
+            _ => Rc::new(Object::Error(format!("not a function: {}", func.kind()))),
+        }
+    }
+
+    fn get_null(&self) -> Rc<Object> {
+        self.obj_null.clone()
+    }
+
+    fn get_none(&self) -> Rc<Object> {
+        self.obj_none.clone()
+    }
+}
+
+impl Eval {
+    pub fn new() -> Self {
+        Self {
+            envs: vec![Environment::new()],
+            ep: 0,
+            obj_true: Rc::new(Object::new_boolean(true)),
+            obj_false: Rc::new(Object::new_boolean(false)),
+            obj_null: Rc::new(Object::Null),
+            obj_none: Rc::new(Object::None),
+        }
+    }
+
+    fn get_obj_bool(&self, value: bool) -> Rc<Object> {
+        match value {
+            true => self.obj_true.clone(),
+            false => self.obj_false.clone(),
         }
     }
 
@@ -261,7 +268,7 @@ impl Eval {
             true => self.eval_block_statement(&expression.consequence),
             false => match &expression.alternative {
                 Some(alt) => self.eval_block_statement(alt),
-                None => Rc::new(Object::Null),
+                None => self.obj_null.clone(),
             },
         }
     }
@@ -295,7 +302,7 @@ impl Eval {
                     }
                 }
 
-                self.apply_function(&func, &args)
+                self.call_func(func, &args)
             }
             Expression::Quote(expr) => self.quote(expr.arguments[0].clone()),
             Expression::Unquote(expr) => {
@@ -378,7 +385,7 @@ impl Eval {
                     return value;
                 }
                 self.envs[self.ep].set(expr.name.value.clone(), value);
-                Rc::new(Object::None)
+                self.obj_none.clone()
             }
             Statement::Return(expr) => {
                 let eval = self.eval_expression(&expr.value);

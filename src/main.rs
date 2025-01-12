@@ -10,7 +10,7 @@ mod repl;
 mod token;
 mod vm;
 
-use repl::Engine;
+use repl::EngineKind;
 
 const VERSION: &str = "0.2.5";
 
@@ -49,8 +49,8 @@ fn main() {
         2 => run_with_file_input(&args),
         3 => match args[1].as_str() {
             "benchmark" => match args[2].as_str() {
-                "eval" => benchmark::run(Engine::Eval),
-                "vm" => benchmark::run(Engine::Vm),
+                "eval" => benchmark::run(EngineKind::Eval),
+                "vm" => benchmark::run(EngineKind::Vm),
                 _ => usage(&args),
             },
             "run" => run_with_file_input(&args),

@@ -236,6 +236,22 @@ fn test_builtin_functions() {
             "len(\"one\", \"two\")",
             Object::Error("wrong number of arguments to \"len\". got=2, want=1".into()),
         ),
+        (
+            "let list = [1, 2, 3]; map(list, string)",
+            Object::Array(vec![
+                Rc::new(Object::new_string("1".into())),
+                Rc::new(Object::new_string("2".into())),
+                Rc::new(Object::new_string("3".into())),
+            ]),
+        ),
+        (
+            "let double = fn(x) { x * 2 }; let list = [1, 2, 3]; map(list, double)",
+            Object::Array(vec![
+                Rc::new(Object::new_integer(2)),
+                Rc::new(Object::new_integer(4)),
+                Rc::new(Object::new_integer(6)),
+            ]),
+        ),
     ];
     for (test_input, test_value) in tests {
         assert_eq!(*test_eval(test_input), test_value);

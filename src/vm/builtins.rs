@@ -10,7 +10,7 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
 fn map(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 2 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments, got={}, want=2",
+            "wrong number of arguments to \"map\", got={}, want=2",
             args.len()
         )));
     }

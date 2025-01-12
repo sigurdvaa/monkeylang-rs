@@ -1,4 +1,4 @@
-use crate::repl::{run_repl_eval, run_repl_vm, Engine};
+use crate::repl::{run_repl_eval, run_repl_vm, EngineKind};
 use std::time::Instant;
 
 const TEST: &str = concat!(
@@ -16,11 +16,11 @@ const TEST: &str = concat!(
     "fibonacci(35);\n",
 );
 
-pub fn run(engine: Engine) {
+pub fn run(engine: EngineKind) {
     let start = Instant::now();
     let result = match engine {
-        Engine::Eval => run_repl_eval(TEST.chars().peekable()).inspect(),
-        Engine::Vm => run_repl_vm(TEST.chars().peekable()).unwrap().inspect(),
+        EngineKind::Eval => run_repl_eval(TEST.chars().peekable()).inspect(),
+        EngineKind::Vm => run_repl_vm(TEST.chars().peekable()).unwrap().inspect(),
     };
     let duration = start.elapsed();
     println!(
