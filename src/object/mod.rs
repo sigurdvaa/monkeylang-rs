@@ -10,8 +10,8 @@ use std::rc::Rc;
 
 pub trait Engine {
     fn call_func(&mut self, func: Rc<Object>, args: &[Rc<Object>]) -> Rc<Object>;
-    fn get_null(&self) -> Rc<Object>;
-    fn get_none(&self) -> Rc<Object>;
+    fn get_obj_null(&self) -> Rc<Object>;
+    fn get_obj_none(&self) -> Rc<Object>;
 }
 
 pub type Integer = IntegerObj;

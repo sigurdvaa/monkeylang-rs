@@ -44,7 +44,7 @@ fn first(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     match &*args[0] {
         Object::Array(value) => match value.first() {
             Some(value) => value.clone(),
-            None => engine.get_null(),
+            None => engine.get_obj_null(),
         },
         _ => Rc::new(Object::Error(format!(
             "argument to \"first\" not supported, got {}",
@@ -64,7 +64,7 @@ fn last(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     match &*args[0] {
         Object::Array(value) => match value.last() {
             Some(value) => value.clone(),
-            None => engine.get_null(),
+            None => engine.get_obj_null(),
         },
         _ => Rc::new(Object::Error(format!(
             "argument to \"last\" not supported, got {}",
@@ -84,7 +84,7 @@ fn rest(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     match &*args[0] {
         Object::Array(value) => {
             if value.is_empty() {
-                engine.get_null()
+                engine.get_obj_null()
             } else {
                 Rc::new(Object::Array(value.iter().skip(1).cloned().collect()))
             }
@@ -155,7 +155,7 @@ fn puts(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
         };
         _ = out.flush();
     }
-    engine.get_none()
+    engine.get_obj_none()
 }
 
 fn string(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {

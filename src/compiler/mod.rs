@@ -2,12 +2,12 @@ mod symbol;
 #[cfg(test)]
 mod tests;
 
-use std::fmt::Display;
-use std::rc::Rc;
-
 use crate::ast::{Expression, Operator, Program, Statement};
 use crate::code::{make_ins, Instruction, Opcode};
-use crate::object::{builtins, CompiledFunctionObj, Object};
+use crate::object::{CompiledFunctionObj, Object};
+use crate::vm::builtins;
+use std::fmt::Display;
+use std::rc::Rc;
 use symbol::Symbol;
 pub use symbol::{SymbolScope, SymbolTable, Symbols};
 
@@ -343,6 +343,8 @@ impl Compiler {
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompilerError> {
         match stmt {
             Statement::Let(expr) => {
+                // TODO: defining sym beforehand cause issues when shadowing parameters and using the same name
+                // on the right side of a let statement inside a fn.
                 let sym = self.symbols.define(expr.name.value.clone());
                 self.compile_expression(&expr.value)?;
                 match sym.scope {

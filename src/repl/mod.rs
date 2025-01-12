@@ -54,7 +54,7 @@ fn repl_eval(input: Peekable<Chars<'_>>, eval: &mut Eval, macro_eval: &mut Eval)
 
     if !parser.errors.is_empty() {
         print_parser_errors(&parser.errors);
-        return eval.get_none();
+        return eval.get_obj_none();
     }
 
     macro_eval.define_macros(&mut program);

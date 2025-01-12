@@ -56,11 +56,11 @@ impl Engine for Eval {
         }
     }
 
-    fn get_null(&self) -> Rc<Object> {
+    fn get_obj_null(&self) -> Rc<Object> {
         self.obj_null.clone()
     }
 
-    fn get_none(&self) -> Rc<Object> {
+    fn get_obj_none(&self) -> Rc<Object> {
         self.obj_none.clone()
     }
 }

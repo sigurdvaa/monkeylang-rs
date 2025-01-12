@@ -1,4 +1,4 @@
-mod builtins;
+pub mod builtins;
 #[cfg(test)]
 mod tests;
 
@@ -128,18 +128,39 @@ pub struct Vm {
 }
 
 impl Engine for Vm {
-    fn call_func(&mut self, _func: Rc<Object>, _args: &[Rc<Object>]) -> Rc<Object> {
-        todo!();
-        // emit ins for calling closure
-        // emit ins for collecting return values into Object:Array
-        // return Object::Null?
+    fn call_func(&mut self, func: Rc<Object>, args: &[Rc<Object>]) -> Rc<Object> {
+        if let Err(e) = self.push_stack(func.clone()) {
+            return Rc::new(Object::Error(e.to_string()));
+        }
+        for arg in args {
+            if let Err(e) = self.push_stack(arg.clone()) {
+                return Rc::new(Object::Error(e.to_string()));
+            }
+        }
+        match func.as_ref() {
+            Object::Function(_obj) => {
+                todo!();
+                // add opcode for array to stack
+                // add opcode for calling
+                // emit ins for collecting return values into Object:Array
+                // return Object::Null?
+            }
+            Object::Builtin(func) => {
+                if let Err(e) = self.call_builtin(*func, args.len()) {
+                    return Rc::new(Object::Error(e.to_string()));
+                }
+                self.pop_stack()
+                    .unwrap_or_else(|e| Rc::new(Object::Error(e.to_string())))
+            }
+            _ => unreachable!(),
+        }
     }
 
-    fn get_null(&self) -> Rc<Object> {
+    fn get_obj_null(&self) -> Rc<Object> {
         self.obj_null.clone()
     }
 
-    fn get_none(&self) -> Rc<Object> {
+    fn get_obj_none(&self) -> Rc<Object> {
         self.obj_none.clone()
     }
 }
@@ -433,7 +454,10 @@ impl Vm {
         match &self.stack[self.sp - 1 - num_args] {
             Some(obj) => match obj.as_ref() {
                 Object::Closure(closure) => self.call_closure(frame, closure.clone(), num_args),
-                Object::Builtin(func) => self.call_builtin(frame, *func, num_args),
+                Object::Builtin(func) => {
+                    self.call_builtin(*func, num_args)?;
+                    Ok(frame)
+                }
                 _ => Err(VmError::InvalidFunctionCall(
                     self.sp - 1 - num_args,
                     obj.clone(),
@@ -462,23 +486,17 @@ impl Vm {
         Ok(new_frame)
     }
 
-    fn call_builtin(
-        &mut self,
-        frame: Frame,
-        func: BuiltinFunction,
-        num_args: usize,
-    ) -> Result<Frame, VmError> {
+    fn call_builtin(&mut self, func: BuiltinFunction, num_args: usize) -> Result<(), VmError> {
         let mut args = vec![];
         for idx in self.sp - num_args..self.sp {
-            match &self.stack[idx] {
-                Some(obj) => args.push(obj.clone()),
+            match self.stack[idx].take() {
+                Some(obj) => args.push(obj),
                 None => return Err(VmError::InvalidStackAccess(idx)),
             }
         }
         self.sp -= num_args + 1;
         let result = func(&args, self);
-        self.push_stack(result)?;
-        Ok(frame)
+        self.push_stack(result)
     }
 
     pub fn run(&mut self) -> Result<Rc<Object>, VmError> {
