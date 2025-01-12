@@ -388,7 +388,7 @@ fn test_builtin_functions() {
         (
             r#"len("one", "two")"#,
             1,
-            Object::Error("wrong number of arguments. got=2, want=1".into()),
+            Object::Error("wrong number of arguments to \"len\". got=2, want=1".into()),
         ),
         ("len([1, 2, 3])", 1, Object::new_integer(3)),
         ("len([])", 1, Object::new_integer(0)),

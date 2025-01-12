@@ -18,7 +18,7 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
 fn len(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments. got={}, want=1",
+            "wrong number of arguments to \"len\". got={}, want=1",
             args.len()
         )));
     }
@@ -36,7 +36,7 @@ fn len(args: &[Rc<Object>]) -> Rc<Object> {
 fn first(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments. got={}, want=1",
+            "wrong number of arguments to \"first\". got={}, want=1",
             args.len()
         )));
     }
@@ -53,7 +53,7 @@ fn first(args: &[Rc<Object>]) -> Rc<Object> {
 fn last(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments. got={}, want=1",
+            "wrong number of arguments to \"last\". got={}, want=1",
             args.len()
         )));
     }
@@ -70,7 +70,7 @@ fn last(args: &[Rc<Object>]) -> Rc<Object> {
 fn rest(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments. got={}, want=1",
+            "wrong number of arguments to \"rest\". got={}, want=1",
             args.len()
         )));
     }
@@ -93,7 +93,7 @@ fn rest(args: &[Rc<Object>]) -> Rc<Object> {
 fn push(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 2 && args.len() != 3 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments, got={}, want=2",
+            "wrong number of arguments to \"push\", got={}, want=2",
             args.len()
         )));
     }
@@ -114,7 +114,7 @@ fn push(args: &[Rc<Object>]) -> Rc<Object> {
 fn insert(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 3 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments, got={}, want=3",
+            "wrong number of arguments \"insert\", got={}, want=3",
             args.len()
         )));
     }
@@ -126,7 +126,7 @@ fn insert(args: &[Rc<Object>]) -> Rc<Object> {
                 Object::Integer(i) => new.insert(i.value as usize, args[2].clone()),
                 _ => {
                     return Rc::new(Object::Error(format!(
-                        "2nd argument to \"push\" not supported, got {}, want=INTEGER",
+                        "2nd argument to \"insert\" not supported, got {}, want=INTEGER",
                         args[1].kind()
                     )))
                 }
@@ -134,7 +134,7 @@ fn insert(args: &[Rc<Object>]) -> Rc<Object> {
             Object::Array(new)
         }
         _ => Object::Error(format!(
-            "arguments to \"push\" not supported, got {}",
+            "arguments to \"insert\" not supported, got {}",
             args.iter().map(|v| v.kind()).collect::<Vec<_>>().join(", ")
         )),
     })
@@ -155,7 +155,7 @@ fn puts(args: &[Rc<Object>]) -> Rc<Object> {
 fn string(args: &[Rc<Object>]) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
-            "wrong number of arguments, got={}, want=1",
+            "wrong number of arguments to \"string\", got={}, want=1",
             args.len()
         )));
     }

@@ -234,7 +234,7 @@ fn test_builtin_functions() {
         ),
         (
             "len(\"one\", \"two\")",
-            Object::Error("wrong number of arguments. got=2, want=1".into()),
+            Object::Error("wrong number of arguments to \"len\". got=2, want=1".into()),
         ),
     ];
     for (test_input, test_value) in tests {
