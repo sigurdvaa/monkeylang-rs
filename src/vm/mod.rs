@@ -418,7 +418,6 @@ impl Vm {
     fn execute_index_expression(&mut self) -> Result<(), VmError> {
         let idx = self.pop_stack()?;
         let left = self.pop_stack()?;
-        // dbg!(&left, &idx);
         let obj = match (left.as_ref(), idx.as_ref()) {
             (Object::Array(obj), Object::Integer(idx)) => self.execute_array_index(obj, idx),
             (Object::Hash(obj), _) => {
