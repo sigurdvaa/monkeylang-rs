@@ -1,4 +1,3 @@
-mod builtins;
 mod environment;
 pub mod r#macro;
 #[cfg(test)]
@@ -7,7 +6,7 @@ pub mod tests;
 use crate::ast::{
     BlockStatement, Expression, HashLiteral, IfExpression, Operator, Program, Statement,
 };
-use crate::object::{BooleanObj, Engine, FunctionObj, IntegerObj, Object, StringObj};
+use crate::object::{builtins, BooleanObj, Engine, FunctionObj, IntegerObj, Object, StringObj};
 pub use environment::{Env, Environment};
 use std::collections::HashMap;
 use std::rc::Rc;

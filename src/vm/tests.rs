@@ -380,33 +380,13 @@ fn test_builtin_functions() {
         ("len(\"\")", 1, Object::new_integer(0)),
         ("len(\"four\")", 1, Object::new_integer(4)),
         ("len(\"hello world\")", 1, Object::new_integer(11)),
-        (
-            "len(1)",
-            1,
-            Object::Error("argument to \"len\" not supported, got INTEGER".into()),
-        ),
-        (
-            r#"len("one", "two")"#,
-            1,
-            Object::Error("wrong number of arguments to \"len\". got=2, want=1".into()),
-        ),
         ("len([1, 2, 3])", 1, Object::new_integer(3)),
         ("len([])", 1, Object::new_integer(0)),
         (r#"puts("")"#, 1, Object::None),
         ("first([1, 2, 3])", 1, Object::new_integer(1)),
         ("first([])", 1, Object::Null),
-        (
-            "first(1)",
-            1,
-            Object::Error("argument to \"first\" not supported, got INTEGER".into()),
-        ),
         ("last([1, 2, 3])", 1, Object::new_integer(3)),
         ("last([])", 1, Object::Null),
-        (
-            "last(1)",
-            1,
-            Object::Error("argument to \"last\" not supported, got INTEGER".into()),
-        ),
         (
             "rest([1, 2, 3])",
             1,
@@ -422,11 +402,6 @@ fn test_builtin_functions() {
             Object::Array(vec![Rc::new(Object::new_integer(1))]),
         ),
         (
-            "push(1, 1)",
-            1,
-            Object::Error("arguments to \"push\" not supported, got INTEGER, INTEGER".into()),
-        ),
-        (
             "let list = [1,2,3]; insert(list, 1, 9)",
             2,
             Object::Array(vec![
@@ -435,6 +410,50 @@ fn test_builtin_functions() {
                 Rc::new(Object::new_integer(2)),
                 Rc::new(Object::new_integer(3)),
             ]),
+        ),
+        (
+            "let list = [1,2,3]; map(list, string)",
+            2,
+            Object::Array(vec![
+                Rc::new(Object::new_string("1".into())),
+                Rc::new(Object::new_string("2".into())),
+                Rc::new(Object::new_string("3".into())),
+            ]),
+        ),
+    ];
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, test_value);
+    }
+}
+
+#[test]
+#[should_panic(expected = "vm error")]
+fn test_builtin_functions_error() {
+    let tests = [
+        (
+            "len(1)",
+            1,
+            Object::Error("argument to \"len\" not supported, got INTEGER".into()),
+        ),
+        (
+            r#"len("one", "two")"#,
+            1,
+            Object::Error("wrong number of arguments to \"len\". got=2, want=1".into()),
+        ),
+        (
+            "first(1)",
+            1,
+            Object::Error("argument to \"first\" not supported, got INTEGER".into()),
+        ),
+        (
+            "last(1)",
+            1,
+            Object::Error("argument to \"last\" not supported, got INTEGER".into()),
+        ),
+        (
+            "push(1, 1)",
+            1,
+            Object::Error("arguments to \"push\" not supported, got INTEGER, INTEGER".into()),
         ),
     ];
     for (test_input, test_stmts, test_value) in tests {

@@ -4,8 +4,7 @@ mod tests;
 
 use crate::ast::{Expression, Operator, Program, Statement};
 use crate::code::{make_ins, Instruction, Opcode};
-use crate::object::{CompiledFunctionObj, Object};
-use crate::vm::builtins;
+use crate::object::{builtins, CompiledFunctionObj, Object};
 use std::fmt::Display;
 use std::rc::Rc;
 use symbol::Symbol;

@@ -13,10 +13,9 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
         ("string", Rc::new(const { Object::Builtin(string) })),
         ("insert", Rc::new(const { Object::Builtin(insert) })),
         ("replace", Rc::new(const { Object::Builtin(replace) })),
+        ("map", Rc::new(const { Object::Builtin(map) })),
     ]
 }
-
-// TODO: is dyn Engine slowing down? can we use Enum instead?
 
 fn len(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
@@ -231,4 +230,28 @@ fn string(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
             args[0].kind()
         )),
     })
+}
+
+fn map(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
+    if args.len() != 2 {
+        return Rc::new(Object::Error(format!(
+            "wrong number of arguments to \"map\", got={}, want=2",
+            args.len()
+        )));
+    }
+
+    match (&*args[0], &*args[1]) {
+        (Object::Array(values), Object::Function(_) | Object::Closure(_) | Object::Builtin(_)) => {
+            let new = values
+                .iter()
+                .map(|i| engine.call_func(args[1].clone(), &[i.clone()]))
+                .collect();
+            Rc::new(Object::Array(new))
+        }
+        _ => Rc::new(Object::Error(format!(
+            "argument to \"map\" not supported, got {} and {}",
+            args[0].kind(),
+            args[1].kind()
+        ))),
+    }
 }

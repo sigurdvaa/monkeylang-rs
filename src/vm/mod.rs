@@ -1,12 +1,11 @@
-pub mod builtins;
 #[cfg(test)]
 mod tests;
 
 use crate::code::{read_u16_as_usize, Opcode, OpcodeError};
 use crate::compiler::Bytecode;
 use crate::object::{
-    Array, BuiltinFunction, ClosureObj, CompiledFunctionObj, Engine, HashKeyData, HashKeyError,
-    HashObj, Integer, Object,
+    builtins, Array, BuiltinFunction, ClosureObj, CompiledFunctionObj, Engine, HashKeyData,
+    HashKeyError, HashObj, Integer, Object,
 };
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -36,6 +35,7 @@ pub enum VmError {
     InvalidFunctionCall(usize, Rc<Object>),
     InvalidClosure(usize, Rc<Object>),
     WrongNumberArguments(usize, usize),
+    BuiltinFunction(String),
 }
 
 impl std::error::Error for VmError {}
@@ -91,6 +91,9 @@ impl Display for VmError {
             }
             Self::WrongNumberArguments(want, got) => {
                 write!(f, "wrong number of arguments, want={want}, got={got}",)
+            }
+            Self::BuiltinFunction(err) => {
+                write!(f, "{err}",)
             }
         }
     }
@@ -184,7 +187,6 @@ impl Vm {
             stack: [const { None }; STACK_SIZE],
             sp: 0,
             globals: vec![None; GLOBALS_SIZE],
-            // TODO: create builtins module for VM, with "map"?
             builtins: builtins::get_all(),
             frames: [const { None }; FRAMES_SIZE],
             fp: 1,
@@ -502,8 +504,11 @@ impl Vm {
             }
         }
         self.sp -= num_args;
-        // TODO: Object::Error doesn't bubble up, convert to VmError?
         let result = func(&args, self);
+        if let Object::Error(err) = result.as_ref() {
+            return Err(VmError::BuiltinFunction(err.clone()));
+        }
+
         self.stack[self.sp - 1].replace(result); // replaces called func with result
         Ok(())
     }
@@ -585,7 +590,6 @@ impl Vm {
                 Opcode::GetLocal => {
                     let idx = ins[frame.ip + 1] as usize;
                     frame.ip += 2;
-                    // TODO: invalid access here
                     match &self.stack[frame.bp + idx] {
                         Some(obj) => self.push_stack(obj.clone())?,
                         _ => return Err(VmError::InvalidStackAccess(frame.bp + idx)),
