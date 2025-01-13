@@ -242,10 +242,14 @@ fn map(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
 
     match (&*args[0], &*args[1]) {
         (Object::Array(values), Object::Function(_) | Object::Closure(_) | Object::Builtin(_)) => {
-            let new = values
-                .iter()
-                .map(|i| engine.call_func(args[1].clone(), &[i.clone()]))
-                .collect();
+            let mut new = vec![];
+            for value in values {
+                let result = engine.call_func(args[1].clone(), &[value.clone()]);
+                match result.as_ref() {
+                    Object::Error(_) => return result,
+                    _ => new.push(result),
+                }
+            }
             Rc::new(Object::Array(new))
         }
         _ => Rc::new(Object::Error(format!(

@@ -177,6 +177,19 @@ fn test_index_expressions() {
     }
 }
 
+// TODO: use test
+// #[test]
+// fn test_exit() {
+//     let tests = [
+//         ("1; exit; 2", 3),
+//         ("if (true) { 1; exit; return 2; }; 3", 2),
+//         ("let f = fn(x) { x; exit; }; f(1); 2", 3),
+//     ];
+//     for (test_input, test_stmts) in tests {
+//         run_vm_test(test_input, test_stmts, Object::None);
+//     }
+// }
+
 #[test]
 fn test_calling_functions_without_arguments() {
     let tests = [

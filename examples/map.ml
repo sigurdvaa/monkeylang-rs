@@ -1,7 +1,9 @@
-let double = fn(x) { x * 2 };
 let arr = [1, 2, 3];
-let mapped = map(arr, double);
-let stringed= map(mapped, string);
 puts("original: ", arr, "\n")
-puts("doubled:  ", mapped, "\n");
+
+let double = fn(x) { x * 2 };
+let doubled= map(arr, double);
+puts("doubled:  ", doubled, "\n");
+
+let stringed= map(doubled, string);
 puts("stringed: ", stringed, "\n");

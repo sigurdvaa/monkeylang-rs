@@ -288,6 +288,8 @@ impl Eval {
         match expression {
             Expression::Boolean(expr) => self.get_obj_bool(expr.value),
             Expression::Null(_token) => self.obj_null.clone(),
+            // TODO: how to handle early exit
+            Expression::Exit(_token) => todo!(),
             Expression::Call(expr) => {
                 let func = self.eval_expression(&expr.function);
                 if let Object::Error(_) = *func {

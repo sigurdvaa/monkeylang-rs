@@ -49,6 +49,7 @@ pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, eval: &mut E
         | Expression::String(_)
         | Expression::Identifier(_)
         | Expression::Macro(_)
+        | Expression::Exit(_)
         | Expression::Null(_) => (),
     }
     func(expr, eval);

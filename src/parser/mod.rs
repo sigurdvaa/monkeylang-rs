@@ -118,6 +118,9 @@ impl<'a> Parser<'a> {
             .insert(TokenKind::Null, Parser::parse_fn_null_literal);
         parser
             .prefix_parse_fns
+            .insert(TokenKind::Exit, Parser::parse_fn_exit_literal);
+        parser
+            .prefix_parse_fns
             .insert(TokenKind::Lparen, Parser::parse_fn_grouped_expression);
         parser
             .prefix_parse_fns
@@ -310,6 +313,10 @@ impl<'a> Parser<'a> {
 
     fn parse_fn_null_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
         Ok(Expression::Null(parser.curr_token.clone()))
+    }
+
+    fn parse_fn_exit_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
+        Ok(Expression::Exit(parser.curr_token.clone()))
     }
 
     fn parse_fn_function_literal(parser: &mut Parser) -> Result<Expression, ParserError> {

@@ -144,7 +144,7 @@ impl Engine for Vm {
             Object::Closure(_) => {
                 // TODO: can some of this be more constant?
                 let func = Rc::new(CompiledFunctionObj {
-                    instructions: vec![Opcode::Call as u8, args.len() as u8, Opcode::Exit as u8],
+                    instructions: vec![Opcode::Call as u8, args.len() as u8],
                     num_locals: 0,
                     num_parameters: 0,
                 });
@@ -153,7 +153,10 @@ impl Engine for Vm {
                 if let Err(e) = self.push_frame(frame) {
                     return Rc::new(Object::Error(e.to_string()));
                 }
-                self.run()
+                if let Err(err) = self.run() {
+                    return Rc::new(Object::Error(err.to_string()));
+                }
+                self.pop_stack()
                     .unwrap_or_else(|e| Rc::new(Object::Error(e.to_string())))
             }
             Object::Builtin(func) => {
@@ -657,9 +660,6 @@ impl Vm {
                     frame.ip += 1;
                     let closure = frame.closure.clone();
                     self.push_stack(Rc::new(Object::Closure(closure)))?;
-                }
-                Opcode::Exit => {
-                    return self.pop_stack();
                 }
             }
         }

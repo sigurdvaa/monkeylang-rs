@@ -262,6 +262,8 @@ impl Compiler {
                 self.emit(Opcode::Hash, &[expr.pairs.len() * 2])
             }
             Expression::Null(_expr) => self.emit(Opcode::Null, &[]),
+            // TODO: how to handle early exit
+            Expression::Exit(_expr) => todo!(),
             Expression::Infix(expr) => {
                 self.compile_expression(&expr.left)?;
                 self.compile_expression(&expr.right)?;

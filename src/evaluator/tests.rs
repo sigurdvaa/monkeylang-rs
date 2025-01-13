@@ -149,6 +149,20 @@ fn test_error_handling() {
     }
 }
 
+// TODO: use test
+// #[test]
+// fn test_exit() {
+//     let tests = [
+//         "1; exit; 2",
+//         "if (true) { exit; return 1; }; 2",
+//         "let f = fn() { exit; }; f(); 1",
+//         "exit;",
+//     ];
+//     for test_input in tests {
+//         assert_eq!(*test_eval(test_input), Object::Error("exit".into()));
+//     }
+// }
+
 #[test]
 fn test_let_statements() {
     let tests = [
@@ -235,6 +249,15 @@ fn test_builtin_functions() {
         (
             "len(\"one\", \"two\")",
             Object::Error("wrong number of arguments to \"len\". got=2, want=1".into()),
+        ),
+        (
+            "let list = [1, 2, 3]; insert(list, 1, 9)",
+            Object::Array(vec![
+                Rc::new(Object::new_integer(1)),
+                Rc::new(Object::new_integer(9)),
+                Rc::new(Object::new_integer(2)),
+                Rc::new(Object::new_integer(3)),
+            ]),
         ),
         (
             "let list = [1, 2, 3]; map(list, string)",
