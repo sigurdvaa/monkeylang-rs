@@ -16,6 +16,8 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
     ]
 }
 
+// TODO: is dyn Engine slowing down? can we use Enum instead?
+
 fn len(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
         return Rc::new(Object::Error(format!(
