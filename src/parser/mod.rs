@@ -155,6 +155,9 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::Unquote, Parser::parse_fn_unquote_expression);
+        parser
+            .prefix_parse_fns
+            .insert(TokenKind::Loop, Parser::parse_fn_loop_expression);
 
         parser
             .infix_parse_fns
@@ -448,6 +451,15 @@ impl<'a> Parser<'a> {
             consequence,
             alternative,
         }))
+    }
+
+    fn parse_fn_loop_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
+        let token = parser.curr_token.clone();
+
+        parser.expect_token(TokenKind::Lbrace)?;
+        let body = parser.parse_block_statement()?;
+
+        Ok(Expression::Loop(LoopExpression { token, body }))
     }
 
     fn parse_fn_prefix_expression(parser: &mut Parser) -> Result<Expression, ParserError> {

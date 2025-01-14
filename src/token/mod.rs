@@ -46,7 +46,8 @@ pub enum TokenKind {
     Quote,
     Unquote,
     Exit,
-    // TODO: loop
+    Loop,
+    Break,
 }
 
 impl fmt::Display for TokenKind {

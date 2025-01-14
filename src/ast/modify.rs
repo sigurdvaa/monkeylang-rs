@@ -27,6 +27,9 @@ pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, eval: &mut E
         Expression::Function(expr) => {
             modify_statements(&mut expr.body.statements, func, eval);
         }
+        Expression::Loop(expr) => {
+            modify_statements(&mut expr.body.statements, func, eval);
+        }
         Expression::Array(expr) => {
             modify_expressions(&mut expr.elements, func, eval);
         }

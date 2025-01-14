@@ -335,35 +335,36 @@ impl Compiler {
                     "Unquote must be evaluated inside \"quote\" before generating bytecode"
                 )
             }
+            Expression::Loop(expr) => todo!(),
         };
         Ok(())
     }
 
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompilerError> {
         match stmt {
-            Statement::Let(expr) => {
+            Statement::Let(stmt) => {
                 // TODO: defining sym beforehand cause issues when shadowing parameters and using the same name
                 // on the right side of a let statement inside a fn.
                 // see examples/shadow.ml
                 // there's also examples/fib_recursive_cache.ml
-                let sym = self.symbols.define(expr.name.value.clone());
-                self.compile_expression(&expr.value)?;
+                let sym = self.symbols.define(stmt.name.value.clone());
+                self.compile_expression(&stmt.value)?;
                 match sym.scope {
                     SymbolScope::Global => self.emit(Opcode::SetGlobal, &[sym.index]),
                     SymbolScope::Local => self.emit(Opcode::SetLocal, &[sym.index]),
                     _ => unreachable!(),
                 };
             }
-            Statement::Return(expr) => {
-                self.compile_expression(&expr.value)?;
+            Statement::Return(stmt) => {
+                self.compile_expression(&stmt.value)?;
                 self.emit(Opcode::ReturnValue, &[]);
             }
-            Statement::Expression(expr) => {
-                self.compile_expression(&expr.value)?;
+            Statement::Expression(stmt) => {
+                self.compile_expression(&stmt.value)?;
                 self.emit(Opcode::Pop, &[]);
             }
-            Statement::Exit(expr) => {
-                self.compile_expression(&expr.value)?;
+            Statement::Exit(stmt) => {
+                self.compile_expression(&stmt.value)?;
                 self.emit(Opcode::Exit, &[]);
             }
         }

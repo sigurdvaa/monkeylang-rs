@@ -833,3 +833,33 @@ fn test_function_literal_with_name() {
 
     assert_eq!(expr.name, Some("myFunction".into()));
 }
+
+#[test]
+fn test_loop_expression() {
+    let input = "loop { x }";
+    let program = parse_program(input, 1);
+
+    for stmt in &program.statements {
+        let expr = match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::Loop);
+                assert_eq!(stmt.token.literal, "loop");
+                &stmt.value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let expr = match &expr {
+            Expression::Loop(expr) => expr,
+            _ => panic!("not a valid loop expression, got: {expr}"),
+        };
+
+        assert_eq!(expr.body.statements.len(), 1);
+        match &expr.body.statements[0] {
+            Statement::Expression(stmt) => {
+                assert_literal(&stmt.value, &Literal::Ident("x"));
+            }
+            _ => panic!("not valid expression statement"),
+        }
+    }
+}

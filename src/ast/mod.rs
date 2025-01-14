@@ -100,6 +100,12 @@ pub struct IfExpression {
 }
 
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
+pub struct LoopExpression {
+    pub token: Token,
+    pub body: BlockStatement,
+}
+
+#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
 pub struct FunctionLiteral {
     pub token: Token,
     pub parameters: Vec<IdentifierLiteral>,
@@ -151,6 +157,7 @@ pub enum Expression {
     Macro(FunctionLiteral),
     Quote(CallExpression),
     Unquote(CallExpression),
+    Loop(LoopExpression),
 }
 
 impl fmt::Display for Expression {
@@ -172,6 +179,7 @@ impl fmt::Display for Expression {
             Self::Integer(expr) => write!(f, "{}", expr.value),
             Self::Prefix(expr) => write!(f, "({}{})", expr.operator, expr.right),
             Self::Infix(expr) => write!(f, "({} {} {})", expr.left, expr.operator, expr.right),
+            Self::Loop(expr) => write!(f, "loop {{ {} }}", expr.body),
             Self::If(expr) => {
                 if let Some(alternative) = &expr.alternative {
                     write!(
@@ -243,6 +251,7 @@ impl Expression {
             Self::Hash(expr) => &expr.token,
             Self::Quote(expr) => &expr.token,
             Self::Unquote(expr) => &expr.token,
+            Self::Loop(expr) => &expr.token,
         }
     }
 }
@@ -294,6 +303,7 @@ pub enum Statement {
     Return(ReturnStatement),
     Expression(ExpressionStatement),
     Exit(ExitStatement),
+    // TODO: break statement?
 }
 
 impl fmt::Display for Statement {
@@ -310,7 +320,7 @@ impl fmt::Display for Statement {
                 write!(f, "{} {};", stmt.token.literal, stmt.value)
             }
             Statement::Expression(stmt) => write!(f, "{}", stmt.value),
-            Statement::Exit(stmt) => write!(f, "{} {}", stmt.token.literal, stmt.value),
+            Statement::Exit(stmt) => write!(f, "{} {};", stmt.token.literal, stmt.value),
         }
     }
 }

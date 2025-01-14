@@ -373,6 +373,7 @@ impl Eval {
                 self.eval_index_expression(left, index)
             }
             Expression::Hash(expr) => self.eval_hash_literal(expr),
+            Expression::Loop(expr) => todo!(),
         }
     }
 
