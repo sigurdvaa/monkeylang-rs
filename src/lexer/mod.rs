@@ -85,7 +85,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn read_comment(&mut self) {
-        while let Some(c) = self.input.next() {
+        for c in self.input.by_ref() {
             if c == '\n' {
                 self.next_line += 1;
                 self.curr_line = self.next_line;
@@ -97,7 +97,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn read_string(&mut self) -> Token {
-        let mut buffer = vec![];
+        let mut buffer = String::new();
         while let Some(c) = self.input.next() {
             match c {
                 '\\' => {
@@ -136,7 +136,7 @@ impl<'a> Lexer<'a> {
             }
             self.next_col += 1;
         }
-        self.new_token(TokenKind::String, buffer.into_iter().collect())
+        self.new_token(TokenKind::String, buffer)
     }
 
     pub fn next_token(&mut self) -> Token {
