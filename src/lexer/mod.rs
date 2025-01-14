@@ -231,6 +231,7 @@ mod tests {
             "[1, 2];\n",
             "{\"foo\": \"bar\"}\n",
             "macro(x, y) { x + y; };\n",
+            "exit 0;\n"
         );
 
         let mut lexer = Lexer::new(None, input.chars().peekable());
@@ -344,8 +345,11 @@ mod tests {
             create_token(28, 20, TokenKind::Semicolon, ";"),
             create_token(28, 22, TokenKind::Rbrace, "}"),
             create_token(28, 23, TokenKind::Semicolon, ";"),
-            create_token(29, 1, TokenKind::EndOfFile, ""),
-            create_token(29, 1, TokenKind::EndOfFile, ""),
+            create_token(29, 1, TokenKind::Exit, "exit"),
+            create_token(29, 6, TokenKind::Int, "0"),
+            create_token(29, 7, TokenKind::Semicolon, ";"),
+            create_token(30, 1, TokenKind::EndOfFile, ""),
+            create_token(30, 1, TokenKind::EndOfFile, ""),
         ];
 
         for token in tests {
