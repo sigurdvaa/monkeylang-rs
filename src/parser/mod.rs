@@ -48,6 +48,8 @@ pub enum ParserError {
     ParseInfix(String),
     QuoteWrongNumArgs(usize),
     UnquoteWrongNumArgs(usize),
+    InvalidReturnStatement(Token),
+    InvalidExitStatement(Token),
 }
 
 impl std::error::Error for ParserError {}
@@ -67,6 +69,16 @@ impl fmt::Display for ParserError {
             Self::UnquoteWrongNumArgs(args_len) => write!(
                 f,
                 "wrong number of arguments for \"unquote\", want=1, got={args_len}"
+            ),
+            Self::InvalidReturnStatement(token) => write!(
+                f,
+                "{}: invalid return statement missing expression",
+                token.loc()
+            ),
+            Self::InvalidExitStatement(token) => write!(
+                f,
+                "{}: invalid exit statement missing expression",
+                token.loc()
             ),
         }
     }
@@ -116,9 +128,6 @@ impl<'a> Parser<'a> {
         parser
             .prefix_parse_fns
             .insert(TokenKind::Null, Parser::parse_fn_null_literal);
-        parser
-            .prefix_parse_fns
-            .insert(TokenKind::Exit, Parser::parse_fn_exit_literal);
         parser
             .prefix_parse_fns
             .insert(TokenKind::Lparen, Parser::parse_fn_grouped_expression);
@@ -225,6 +234,12 @@ impl<'a> Parser<'a> {
     fn parse_return_statement(&mut self) -> Result<ReturnStatement, ParserError> {
         let token = self.curr_token.clone();
 
+        if self.next_token.kind == TokenKind::EndOfFile
+            || self.next_token.kind == TokenKind::Semicolon
+        {
+            return Err(ParserError::InvalidReturnStatement(self.curr_token.clone()));
+        }
+
         self.next_tokens();
         let value = self.parse_expression(Precedence::Lowest)?;
 
@@ -233,6 +248,25 @@ impl<'a> Parser<'a> {
         }
 
         Ok(ReturnStatement { token, value })
+    }
+
+    fn parse_exit_statement(&mut self) -> Result<ExitStatement, ParserError> {
+        let token = self.curr_token.clone();
+
+        if self.next_token.kind == TokenKind::EndOfFile
+            || self.next_token.kind == TokenKind::Semicolon
+        {
+            return Err(ParserError::InvalidExitStatement(self.curr_token.clone()));
+        }
+
+        self.next_tokens();
+        let value = self.parse_expression(Precedence::Lowest)?;
+
+        if self.next_token.kind == TokenKind::Semicolon {
+            self.next_tokens();
+        }
+
+        Ok(ExitStatement { token, value })
     }
 
     fn parse_function_parameters(&mut self) -> Result<Vec<IdentifierLiteral>, ParserError> {
@@ -313,10 +347,6 @@ impl<'a> Parser<'a> {
 
     fn parse_fn_null_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
         Ok(Expression::Null(parser.curr_token.clone()))
-    }
-
-    fn parse_fn_exit_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
-        Ok(Expression::Exit(parser.curr_token.clone()))
     }
 
     fn parse_fn_function_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
@@ -577,6 +607,7 @@ impl<'a> Parser<'a> {
         match self.curr_token.kind {
             TokenKind::Let => Ok(Statement::Let(self.parse_let_statement()?)),
             TokenKind::Return => Ok(Statement::Return(self.parse_return_statement()?)),
+            TokenKind::Exit => Ok(Statement::Exit(self.parse_exit_statement()?)),
             _ => Ok(Statement::Expression(self.parse_expression_statement()?)),
         }
     }

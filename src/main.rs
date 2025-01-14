@@ -10,7 +10,7 @@ mod repl;
 mod token;
 mod vm;
 
-use repl::EngineKind;
+use repl::{run_repl_vm, start_repl_eval, start_repl_vm, EngineKind};
 
 const VERSION: &str = "0.2.6";
 
@@ -22,6 +22,7 @@ fn usage(args: &[String]) {
             "  (none)\t\tstart repl\n",
             "  <file>\t\texecute file\n",
             "  run <file>\t\texecute file\n",
+            "  repr <eval|vm>\trun repl with specified engine\n",
             "  benchmark <eval|vm>\trun benchmark with specified engine\n",
         ),
         args[0]
@@ -35,22 +36,33 @@ fn run_with_file_input(args: &[String]) {
         println!("Error reading file '{file_path}': {err}");
         std::process::exit(1);
     });
-    // repl::run_repl_eval(input.chars().peekable());
-    repl::run_repl_vm(input.chars().peekable());
+    run_repl_vm(input.chars().peekable());
 }
 
 fn main() {
+    let welcome = format!("Monkeylang {VERSION}.\npress ctrl-c to exit.");
     let args: Vec<String> = std::env::args().collect();
     match args.len() {
         1 => {
-            println!("Monkeylang {VERSION}.\npress ctrl-c to exit.");
-            repl::start_repl_vm();
+            println!("{welcome}");
+            start_repl_vm();
         }
         2 => run_with_file_input(&args),
         3 => match args[1].as_str() {
             "benchmark" => match args[2].as_str() {
                 "eval" => benchmark::run(EngineKind::Eval),
                 "vm" => benchmark::run(EngineKind::Vm),
+                _ => usage(&args),
+            },
+            "repl" => match args[2].as_str() {
+                "eval" => {
+                    println!("{welcome}");
+                    start_repl_eval()
+                }
+                "vm" => {
+                    println!("{welcome}");
+                    start_repl_vm()
+                }
                 _ => usage(&args),
             },
             "run" => run_with_file_input(&args),

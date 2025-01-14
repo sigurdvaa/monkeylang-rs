@@ -49,7 +49,6 @@ pub fn modify_expression(expr: &mut Expression, func: ModifierFunc, eval: &mut E
         | Expression::String(_)
         | Expression::Identifier(_)
         | Expression::Macro(_)
-        | Expression::Exit(_)
         | Expression::Null(_) => (),
     }
     func(expr, eval);
@@ -66,6 +65,7 @@ pub fn modify_statement(stmt: &mut Statement, func: ModifierFunc, eval: &mut Eva
         Statement::Let(stmt) => modify_expression(&mut stmt.value, func, eval),
         Statement::Return(stmt) => modify_expression(&mut stmt.value, func, eval),
         Statement::Expression(stmt) => modify_expression(&mut stmt.value, func, eval),
+        Statement::Exit(stmt) => modify_expression(&mut stmt.value, func, eval),
     }
 }
 

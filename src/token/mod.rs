@@ -70,3 +70,12 @@ impl fmt::Display for Token {
         write!(f, "{:?}", self)
     }
 }
+
+impl Token {
+    pub fn loc(&self) -> String {
+        match &self.file {
+            Some(file) => format!("{file}:{}:{}", self.line, self.col),
+            None => format!("{}:{}", self.line, self.col),
+        }
+    }
+}

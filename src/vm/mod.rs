@@ -32,6 +32,7 @@ pub enum VmError {
     InvalidComparisonTypes(&'static str, &'static str),
     InvalidIndexTypes(&'static str, &'static str),
     InvalidPrefixType(&'static str),
+    InvalidExitCode(Rc<Object>),
     InvalidFunctionCall(usize, Rc<Object>),
     InvalidClosure(usize, Rc<Object>),
     WrongNumberArguments(usize, usize),
@@ -75,7 +76,10 @@ impl Display for VmError {
                 write!(f, "unsupported types for index operation: {left}[{idx}]")
             }
             Self::InvalidPrefixType(operand) => {
-                write!(f, "unsupported type for minus prefix operator: {operand}",)
+                write!(f, "unsupported type for minus prefix operator: {operand}")
+            }
+            Self::InvalidExitCode(operand) => {
+                write!(f, "invalid exit code: {operand} ({})", operand.kind())
             }
             Self::InvalidFunctionCall(sp, obj) => {
                 write!(
@@ -406,6 +410,16 @@ impl Vm {
         }
     }
 
+    fn execute_exit(&mut self) -> Result<(), VmError> {
+        let operand = self.pop_stack()?;
+        match operand.as_ref() {
+            Object::Integer(obj) if i32::try_from(obj.value).is_ok() => {
+                std::process::exit(obj.value as i32)
+            }
+            _ => Err(VmError::InvalidExitCode(operand)),
+        }
+    }
+
     fn execute_array_index(&self, left: &Array, index: &Integer) -> Rc<Object> {
         match left.get(index.value as usize) {
             Some(value) => value.clone(),
@@ -661,6 +675,7 @@ impl Vm {
                     let closure = frame.closure.clone();
                     self.push_stack(Rc::new(Object::Closure(closure)))?;
                 }
+                Opcode::Exit => self.execute_exit()?,
             }
         }
         Ok(last_pop)

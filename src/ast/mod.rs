@@ -151,7 +151,6 @@ pub enum Expression {
     Macro(FunctionLiteral),
     Quote(CallExpression),
     Unquote(CallExpression),
-    Exit(Token),
 }
 
 impl fmt::Display for Expression {
@@ -159,7 +158,6 @@ impl fmt::Display for Expression {
         match self {
             Self::Boolean(expr) => write!(f, "{}", expr.value),
             Self::Null(_token) => write!(f, "null"),
-            Self::Exit(_token) => write!(f, "exit"),
             Self::Call(expr) | Self::Quote(expr) | Self::Unquote(expr) => write!(
                 f,
                 "{}({})",
@@ -235,7 +233,6 @@ impl Expression {
             Self::Function(expr) | Self::Macro(expr) => &expr.token,
             Self::Identifier(expr) => &expr.token,
             Self::Null(token) => token,
-            Self::Exit(token) => token,
             Self::If(expr) => &expr.token,
             Self::Infix(expr) => &expr.token,
             Self::Integer(expr) => &expr.token,
@@ -269,6 +266,12 @@ pub struct ExpressionStatement {
     pub value: Expression,
 }
 
+#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
+pub struct ExitStatement {
+    pub token: Token,
+    pub value: Expression,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BlockStatement {
     pub token: Token,
@@ -290,6 +293,7 @@ pub enum Statement {
     Let(LetStatement),
     Return(ReturnStatement),
     Expression(ExpressionStatement),
+    Exit(ExitStatement),
 }
 
 impl fmt::Display for Statement {
@@ -306,6 +310,7 @@ impl fmt::Display for Statement {
                 write!(f, "{} {};", stmt.token.literal, stmt.value)
             }
             Statement::Expression(stmt) => write!(f, "{}", stmt.value),
+            Statement::Exit(stmt) => write!(f, "{} {}", stmt.token.literal, stmt.value),
         }
     }
 }

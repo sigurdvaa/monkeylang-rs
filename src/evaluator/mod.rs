@@ -288,8 +288,6 @@ impl Eval {
         match expression {
             Expression::Boolean(expr) => self.get_obj_bool(expr.value),
             Expression::Null(_token) => self.obj_null.clone(),
-            // TODO: how to handle early exit
-            Expression::Exit(_token) => todo!(),
             Expression::Call(expr) => {
                 let func = self.eval_expression(&expr.function);
                 if let Object::Error(_) = *func {
@@ -380,22 +378,35 @@ impl Eval {
 
     fn eval_statement(&mut self, statement: &Statement) -> Rc<Object> {
         match statement {
-            Statement::Let(expr) => {
-                let value = self.eval_expression(&expr.value);
+            Statement::Let(stmt) => {
+                let value = self.eval_expression(&stmt.value);
                 if let Object::Error(_) = *value {
                     return value;
                 }
-                self.envs[self.ep].set(expr.name.value.clone(), value);
+                self.envs[self.ep].set(stmt.name.value.clone(), value);
                 self.obj_none.clone()
             }
-            Statement::Return(expr) => {
-                let eval = self.eval_expression(&expr.value);
+            Statement::Return(stmt) => {
+                let eval = self.eval_expression(&stmt.value);
                 match *eval {
                     Object::Error(_) => eval,
                     _ => Rc::new(Object::Return(eval)),
                 }
             }
-            Statement::Expression(expr) => self.eval_expression(&expr.value),
+            Statement::Expression(stmt) => self.eval_expression(&stmt.value),
+            Statement::Exit(stmt) => {
+                let obj = self.eval_expression(&stmt.value);
+                match obj.as_ref() {
+                    Object::Error(_) => obj,
+                    Object::Integer(obj) if i32::try_from(obj.value).is_ok() => {
+                        std::process::exit(obj.value as i32)
+                    }
+                    _ => Rc::new(Object::Error(format!(
+                        "invalid exit code: {obj} ({})",
+                        obj.kind()
+                    ))),
+                }
+            }
         }
     }
 

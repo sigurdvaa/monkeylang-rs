@@ -149,20 +149,6 @@ fn test_error_handling() {
     }
 }
 
-// TODO: use test
-// #[test]
-// fn test_exit() {
-//     let tests = [
-//         "1; exit; 2",
-//         "if (true) { exit; return 1; }; 2",
-//         "let f = fn() { exit; }; f(); 1",
-//         "exit;",
-//     ];
-//     for test_input in tests {
-//         assert_eq!(*test_eval(test_input), Object::Error("exit".into()));
-//     }
-// }
-
 #[test]
 fn test_let_statements() {
     let tests = [

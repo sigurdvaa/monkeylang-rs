@@ -46,6 +46,7 @@ pub enum Opcode {
     Closure,
     GetFree,
     CurrentClosure,
+    Exit,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -84,6 +85,7 @@ impl TryFrom<u8> for Opcode {
             28 if 28 == Self::Closure as u8 => Ok(Self::Closure),
             29 if 29 == Self::GetFree as u8 => Ok(Self::GetFree),
             30 if 30 == Self::CurrentClosure as u8 => Ok(Self::CurrentClosure),
+            31 if 31 == Self::Exit as u8 => Ok(Self::Exit),
             _ => Err(OpcodeError(op)),
         }
     }

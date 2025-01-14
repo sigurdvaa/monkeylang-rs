@@ -43,7 +43,7 @@ impl Display for EngineKind {
 fn print_parser_errors(errors: &[ParserError]) {
     println!("{MONKEY_FACE}Woops! We ran into some monkey business here!\n parser errors:");
     for err in errors {
-        println!("\t{err}");
+        println!("  {err}");
     }
 }
 
@@ -69,7 +69,7 @@ pub fn run_repl_eval(input: Peekable<Chars<'_>>) -> Rc<Object> {
     repl_eval(input, &mut eval, &mut macro_eval)
 }
 
-pub fn _start_repl_eval() {
+pub fn start_repl_eval() {
     let input = stdin();
     let mut eval = Eval::new();
     let mut macro_eval = Eval::new();
