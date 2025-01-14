@@ -84,6 +84,18 @@ impl<'a> Lexer<'a> {
         self.new_token(TokenKind::Int, literal)
     }
 
+    fn read_comment(&mut self) {
+        while let Some(c) = self.input.next() {
+            if c == '\n' {
+                self.next_line += 1;
+                self.curr_line = self.next_line;
+                self.curr_col = 1;
+                self.next_col = 1;
+                break;
+            }
+        }
+    }
+
     fn read_string(&mut self) -> Token {
         let mut buffer = vec![];
         while let Some(c) = self.input.next() {
@@ -104,7 +116,7 @@ impl<'a> Lexer<'a> {
                             return self.new_token(
                                 TokenKind::Illegal,
                                 format!(
-                                    "unterminated character literal, line {}, col {}",
+                                    "{}:{}: unterminated character literal",
                                     self.next_line, self.next_col
                                 ),
                             )
@@ -117,6 +129,7 @@ impl<'a> Lexer<'a> {
                 }
                 '\n' => {
                     self.next_line += 1;
+                    self.next_col = 1;
                     buffer.push(c);
                 }
                 _ => buffer.push(c),
@@ -164,7 +177,13 @@ impl<'a> Lexer<'a> {
                     }
                 }
                 '*' => self.new_token(TokenKind::Asterisk, c.into()),
-                '/' => self.new_token(TokenKind::Slash, c.into()),
+                '/' => match self.input.peek() {
+                    Some('/') => {
+                        self.read_comment();
+                        self.next_token()
+                    }
+                    _ => self.new_token(TokenKind::Slash, c.into()),
+                },
                 '<' => self.new_token(TokenKind::Lt, c.into()),
                 '>' => self.new_token(TokenKind::Gt, c.into()),
                 '\n' => {
@@ -231,7 +250,8 @@ mod tests {
             "[1, 2];\n",
             "{\"foo\": \"bar\"}\n",
             "macro(x, y) { x + y; };\n",
-            "exit 0;\n"
+            "// a comment\n",
+            "exit 0;\n",
         );
 
         let mut lexer = Lexer::new(None, input.chars().peekable());
@@ -314,7 +334,7 @@ mod tests {
             create_token(20, 1, TokenKind::String, "foo bar"),
             create_token(20, 9, TokenKind::Semicolon, ";"),
             create_token(21, 1, TokenKind::String, "foo\nbar"),
-            create_token(22, 9, TokenKind::Semicolon, ";"),
+            create_token(22, 5, TokenKind::Semicolon, ";"),
             create_token(23, 1, TokenKind::String, "foo\"bar"),
             create_token(23, 10, TokenKind::Semicolon, ";"),
             create_token(24, 1, TokenKind::String, "foo\nbar"),
@@ -345,11 +365,12 @@ mod tests {
             create_token(28, 20, TokenKind::Semicolon, ";"),
             create_token(28, 22, TokenKind::Rbrace, "}"),
             create_token(28, 23, TokenKind::Semicolon, ";"),
-            create_token(29, 1, TokenKind::Exit, "exit"),
-            create_token(29, 6, TokenKind::Int, "0"),
-            create_token(29, 7, TokenKind::Semicolon, ";"),
-            create_token(30, 1, TokenKind::EndOfFile, ""),
-            create_token(30, 1, TokenKind::EndOfFile, ""),
+            // line 29: a comment
+            create_token(30, 1, TokenKind::Exit, "exit"),
+            create_token(30, 6, TokenKind::Int, "0"),
+            create_token(30, 7, TokenKind::Semicolon, ";"),
+            create_token(31, 1, TokenKind::EndOfFile, ""),
+            create_token(31, 1, TokenKind::EndOfFile, ""),
         ];
 
         for token in tests {

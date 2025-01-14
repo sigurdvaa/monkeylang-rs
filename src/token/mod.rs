@@ -4,7 +4,6 @@ use std::fmt;
 pub enum TokenKind {
     Illegal,
     EndOfFile,
-    // TODO: comment
 
     // Identifiers and literals
     Ident,
