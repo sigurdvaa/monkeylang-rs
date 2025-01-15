@@ -132,7 +132,7 @@ mod tests {
         ];
 
         for (test_input, test_value) in tests {
-            let eval = test_eval(test_input);
+            let eval = test_eval(test_input, 1);
             match eval.as_ref() {
                 Object::Quote(expr) => {
                     assert_eq!(expr.to_string(), test_value);
@@ -145,24 +145,25 @@ mod tests {
     #[test]
     fn test_quote_unquote() {
         let tests = [
-            ("quote(unquote(4))", "4"),
-            ("quote(unquote(4 + 4))", "8"),
-            ("quote(8 + unquote(4 + 4))", "(8 + 8)"),
-            ("quote(unquote(4 + 4) + 8)", "(8 + 8)"),
-            ("let foobar = 8; quote(foobar)", "foobar"),
-            ("let foobar = 8; quote(unquote(foobar))", "8"),
-            ("quote(unquote(true))", "true"),
-            ("quote(unquote(true == false))", "false"),
-            ("quote(unquote(quote(4 + 4)))", "(4 + 4)"),
+            ("quote(unquote(4))", 1, "4"),
+            ("quote(unquote(4 + 4))", 1, "8"),
+            ("quote(8 + unquote(4 + 4))", 1, "(8 + 8)"),
+            ("quote(unquote(4 + 4) + 8)", 1, "(8 + 8)"),
+            ("let foobar = 8; quote(foobar)", 2, "foobar"),
+            ("let foobar = 8; quote(unquote(foobar))", 2, "8"),
+            ("quote(unquote(true))", 1, "true"),
+            ("quote(unquote(true == false))", 1, "false"),
+            ("quote(unquote(quote(4 + 4)))", 1, "(4 + 4)"),
             (
                 "let quotedInfixExpression = quote(4 + 4);
             quote(unquote(4 + 4) + unquote(quotedInfixExpression))",
+                2,
                 "(8 + (4 + 4))",
             ),
         ];
 
-        for (test_input, test_value) in tests {
-            let eval = test_eval(test_input);
+        for (test_input, test_stmts, test_value) in tests {
+            let eval = test_eval(test_input, test_stmts);
             match eval.as_ref() {
                 Object::Quote(expr) => {
                     assert_eq!(expr.to_string(), test_value);

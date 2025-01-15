@@ -82,6 +82,7 @@ pub enum Object {
     Integer(IntegerObj),
     Boolean(BooleanObj),
     Return(Rc<Self>),
+    Break(Rc<Self>),
     Error(String),
     Function(FunctionObj),
     CompiledFunction(Rc<CompiledFunctionObj>),
@@ -145,6 +146,7 @@ impl Object {
             Self::Integer(_) => "INTEGER",
             Self::Boolean(_) => "BOOLEAN",
             Self::Return(_) => "RETURN",
+            Self::Break(_) => "BREAK",
             Self::Error(_) => "ERROR",
             Self::Function(_) => "FUNCTION",
             Self::CompiledFunction(_) => "COMPILED_FUNCTION",
@@ -175,6 +177,7 @@ impl Object {
             Self::Integer(obj) => obj.value.to_string(),
             Self::Boolean(obj) => obj.value.to_string(),
             Self::Return(value) => value.inspect(),
+            Self::Break(value) => value.inspect(),
             Self::Error(value) => format!("ERROR: {value}"),
             Self::Function(func) => format!(
                 "fn({}) {{\n{}\n}}",

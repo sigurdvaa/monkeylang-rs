@@ -676,6 +676,10 @@ impl Vm {
                     self.push_stack(Rc::new(Object::Closure(closure)))?;
                 }
                 Opcode::Exit => self.execute_exit()?,
+                Opcode::Break => {
+                    let pos = read_u16_as_usize(&ins[frame.ip + 1..]);
+                    frame.ip = pos;
+                }
             }
         }
         Ok(last_pop)

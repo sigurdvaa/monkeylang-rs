@@ -623,3 +623,39 @@ fn test_recursive_fibonacci() {
     );
     run_vm_test(input, 2, Object::new_integer(610));
 }
+
+#[test]
+fn test_loop_expression() {
+    let tests = [
+        ("loop { break; }", 1, Object::Null),
+        (
+            "let a = 0; loop { if (a > 5) { break 6; }; let a = a + 1; }",
+            2,
+            Object::new_integer(6),
+        ),
+        // (
+        //     "let a = 0; fn() { loop { if (a > 5) { break 6; }; let a = a + 1; return 2; } }()",
+        //     2,
+        //     Object::new_integer(2),
+        // ),
+        (
+            "let a = 0; loop { if (a > 5) { break \"foo\"; }; let a = a + 1; }",
+            2,
+            Object::new_string("foo".into()),
+        ),
+        (
+            "let a = 0; let b = loop { if (a > 5) { break \"bar\"; }; let a = a + 1; }; b;",
+            3,
+            Object::new_string("bar".into()),
+        ),
+        (
+            "let a = 0; loop { if (a > 5) { break; }; let a = a + 1; }",
+            2,
+            Object::Null,
+        ),
+    ];
+
+    for (test_input, test_stmts, test_value) in tests {
+        run_vm_test(test_input, test_stmts, test_value);
+    }
+}

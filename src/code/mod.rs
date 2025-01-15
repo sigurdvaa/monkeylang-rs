@@ -47,6 +47,7 @@ pub enum Opcode {
     GetFree,
     CurrentClosure,
     Exit,
+    Break,
 }
 
 impl TryFrom<u8> for Opcode {
@@ -86,6 +87,7 @@ impl TryFrom<u8> for Opcode {
             29 if 29 == Self::GetFree as u8 => Ok(Self::GetFree),
             30 if 30 == Self::CurrentClosure as u8 => Ok(Self::CurrentClosure),
             31 if 31 == Self::Exit as u8 => Ok(Self::Exit),
+            32 if 32 == Self::Break as u8 => Ok(Self::Break),
             _ => Err(OpcodeError(op)),
         }
     }
@@ -107,6 +109,7 @@ impl Opcode {
             Self::GetBuiltin => &[1],
             Self::Closure => &[2, 1],
             Self::GetFree => &[1],
+            Self::Break => &[2],
             _ => &[],
         }
     }
@@ -117,7 +120,7 @@ pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
     let ins_len = 1 + def.iter().sum::<u8>();
 
     if def.len() != operands.len() {
-        panic!("Opcode with too many operands, opcode {opcode:?}, operands {operands:?}",);
+        panic!("Opcode with wrong number of operands, opcode {opcode:?}, operands {operands:?}",);
     }
     let mut ins = vec![opcode.clone() as Instruction];
     for (i, operand) in operands.iter().enumerate() {

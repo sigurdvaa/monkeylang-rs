@@ -215,6 +215,7 @@ impl<'a> Parser<'a> {
             expr.name = Some(name.value.clone());
         }
 
+        // TODO: make semicolon required. repl can instead add as last char if missing
         if self.next_token.kind == TokenKind::Semicolon {
             self.next_tokens();
         }
@@ -223,6 +224,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_return_statement(&mut self) -> Result<ExpressionStatement, ParserError> {
+        // TODO: verify we're inside a function
         let token = self.curr_token.clone();
 
         let value = match self.next_token.kind {
@@ -233,6 +235,7 @@ impl<'a> Parser<'a> {
             }
         };
 
+        // TODO: make semicolon required. repl can instead add as last char if missing
         if self.next_token.kind == TokenKind::Semicolon {
             self.next_tokens();
         }
@@ -254,6 +257,7 @@ impl<'a> Parser<'a> {
             }
         };
 
+        // TODO: make semicolon required. repl can instead add as last char if missing
         if self.next_token.kind == TokenKind::Semicolon {
             self.next_tokens();
         }
@@ -262,6 +266,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_break_statement(&mut self) -> Result<ExpressionStatement, ParserError> {
+        // TODO: verify we're inside a loop
         let token = self.curr_token.clone();
 
         let value = match self.next_token.kind {
@@ -272,6 +277,7 @@ impl<'a> Parser<'a> {
             }
         };
 
+        // TODO: make semicolon required. repl can instead add as last char if missing
         if self.next_token.kind == TokenKind::Semicolon {
             self.next_tokens();
         }
@@ -585,11 +591,13 @@ impl<'a> Parser<'a> {
             expression = match self.infix_parse_fns.get(&self.next_token.kind) {
                 Some(infix) => infix(self, Box::new(expression))?,
                 None => {
+                    // TODO: must end with semicolon
                     return Ok(expression);
                 }
             };
         }
 
+        // TODO: must end with semicolon
         Ok(expression)
     }
 

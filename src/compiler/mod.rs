@@ -58,6 +58,8 @@ pub struct Compiler {
     symbols: Symbols,
     scopes: Vec<CompilationScope>,
     scope_idx: usize,
+    loops: Vec<Vec<usize>>,
+    loops_idx: usize,
 }
 
 impl Compiler {
@@ -71,6 +73,8 @@ impl Compiler {
             symbols,
             scopes: vec![CompilationScope::new()],
             scope_idx: 0,
+            loops: vec![],
+            loops_idx: 0,
         }
     }
 
@@ -78,6 +82,8 @@ impl Compiler {
         self.scopes.clear();
         self.scopes.push(CompilationScope::new());
         self.scope_idx = 0;
+        self.loops.clear();
+        self.loops_idx = 0;
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {
@@ -102,6 +108,7 @@ impl Compiler {
         self.scope_idx += 1;
         self.symbols = SymbolTable::new_enclosed(self.symbols.clone());
     }
+
     fn leave_scope(&mut self) -> Vec<Instruction> {
         self.symbols = self
             .symbols
@@ -111,6 +118,16 @@ impl Compiler {
         let ins = self.scopes.pop().expect("popped last scope");
         self.scope_idx -= 1;
         ins.instructions
+    }
+
+    fn enter_loop(&mut self) {
+        self.loops.push(vec![]);
+        self.loops_idx += 1;
+    }
+
+    fn leave_loop(&mut self) -> Vec<usize> {
+        self.loops_idx -= 1;
+        self.loops.pop().expect("popped last loop")
     }
 
     fn set_prev_ins(&mut self, op: Opcode, pos: usize) {
@@ -202,7 +219,7 @@ impl Compiler {
     }
 
     fn compile_expression(&mut self, expr: &Expression) -> Result<(), CompilerError> {
-        let _ = match expr {
+        _ = match expr {
             Expression::Boolean(expr) => match expr.value {
                 true => self.emit(Opcode::True, &[]),
                 false => self.emit(Opcode::False, &[]),
@@ -335,7 +352,20 @@ impl Compiler {
                     "Unquote must be evaluated inside \"quote\" before generating bytecode"
                 )
             }
-            Expression::Loop(expr) => todo!(),
+            Expression::Loop(expr) => {
+                self.enter_loop();
+
+                let loop_start_pos = self.curr_scope_ins_len();
+                self.compile_statements(&expr.body.statements)?;
+                self.remove_last_pop();
+                self.emit(Opcode::Jump, &[loop_start_pos]);
+                let loop_end_pos = self.curr_scope_ins_len();
+
+                for break_pos in self.leave_loop() {
+                    self.change_operand(break_pos, loop_end_pos);
+                }
+                loop_end_pos
+            }
         };
         Ok(())
     }
@@ -343,10 +373,6 @@ impl Compiler {
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompilerError> {
         match stmt {
             Statement::Let(stmt) => {
-                // TODO: defining sym beforehand cause issues when shadowing parameters and using the same name
-                // on the right side of a let statement inside a fn.
-                // see examples/shadow.ml
-                // there's also examples/fib_recursive_cache.ml
                 let sym = self.symbols.define(stmt.name.value.clone());
                 self.compile_expression(&stmt.value)?;
                 match sym.scope {
@@ -367,7 +393,11 @@ impl Compiler {
                 self.compile_expression(&stmt.value)?;
                 self.emit(Opcode::Exit, &[]);
             }
-            Statement::Break(stmt) => todo!(),
+            Statement::Break(stmt) => {
+                self.compile_expression(&stmt.value)?;
+                let pos = self.emit(Opcode::Break, &[0]); // tmp bogus value, replaced by loop expr
+                self.loops[self.loops_idx - 1].push(pos);
+            }
         }
         Ok(())
     }

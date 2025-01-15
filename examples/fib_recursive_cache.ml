@@ -1,8 +1,8 @@
 let fib = fn(n) {
     let init_cache = fn(c, cache) {
         if (c > -1) {
-            let new_cache = push(cache, null);
-            return init_cache(c - 1, new_cache);
+            let cache = push(cache, null);
+            return init_cache(c - 1, cache);
         }
         return cache;
     };

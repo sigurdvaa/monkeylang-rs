@@ -150,6 +150,15 @@ fn insert(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
             }
             Object::Array(new)
         }
+        Object::Hash(value) => {
+            let mut new = value.clone();
+            let key = match args[1].hash_key() {
+                Ok(key) => key,
+                Err(err) => return Rc::new(Object::Error(err.to_string())),
+            };
+            new.insert(key, (args[1].clone(), args[2].clone()));
+            Object::Hash(new)
+        }
         _ => Object::Error(format!(
             "arguments to \"insert\" not supported, got {}",
             args.iter().map(|v| v.kind()).collect::<Vec<_>>().join(", ")

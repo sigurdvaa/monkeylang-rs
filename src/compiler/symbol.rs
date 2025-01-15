@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 use std::rc::Rc;
 
 pub type Symbols = Rc<SymbolTable>;
@@ -59,20 +59,26 @@ impl SymbolTable {
         })
     }
 
+    // TODO: causes issues with shadowing
     pub fn define(&self, name: String) -> Rc<Symbol> {
         let scope = match self.outer {
             Some(_) => SymbolScope::Local,
             None => SymbolScope::Global,
         };
-        let index = self.num_definitions.get();
-        let sym = Rc::new(Symbol {
-            name: name.clone(),
-            index,
-            scope,
-        });
-        self.num_definitions.set(index + 1);
-        self.store.borrow_mut().insert(name, sym.clone());
-        sym
+        match self.store.borrow_mut().entry(name.clone()) {
+            Entry::Occupied(sym) => sym.get().clone(),
+            Entry::Vacant(slot) => {
+                let index = self.num_definitions.get();
+                self.num_definitions.set(index + 1);
+                let sym = Rc::new(Symbol {
+                    name: name.clone(),
+                    index,
+                    scope,
+                });
+                slot.insert(sym.clone());
+                sym
+            }
+        }
     }
 
     pub fn define_free(&self, original: Rc<Symbol>) -> Rc<Symbol> {

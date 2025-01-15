@@ -45,7 +45,7 @@ impl Engine for Eval {
                 self.envs.pop();
                 self.ep -= 1;
 
-                match &*eval {
+                match eval.as_ref() {
                     Object::Return(value) => value.clone(),
                     _ => eval,
                 }
@@ -373,7 +373,14 @@ impl Eval {
                 self.eval_index_expression(left, index)
             }
             Expression::Hash(expr) => self.eval_hash_literal(expr),
-            Expression::Loop(expr) => todo!(),
+            Expression::Loop(expr) => loop {
+                let result = self.eval_loop_block_statement(&expr.body);
+                match result.as_ref() {
+                    Object::Return(_) => return result,
+                    Object::Break(value) => return value.clone(),
+                    _ => (),
+                }
+            },
         }
     }
 
@@ -408,7 +415,13 @@ impl Eval {
                     ))),
                 }
             }
-            Statement::Break(stmt) => todo!(),
+            Statement::Break(stmt) => {
+                let eval = self.eval_expression(&stmt.value);
+                match eval.as_ref() {
+                    Object::Error(_) => eval,
+                    _ => Rc::new(Object::Break(eval)),
+                }
+            }
         }
     }
 
@@ -417,6 +430,17 @@ impl Eval {
         for stmt in &block.statements {
             result = self.eval_statement(stmt);
             if let Object::Return(_) | Object::Error(_) = *result {
+                return result;
+            }
+        }
+        result
+    }
+
+    fn eval_loop_block_statement(&mut self, block: &BlockStatement) -> Rc<Object> {
+        let mut result = self.obj_null.clone();
+        for stmt in &block.statements {
+            result = self.eval_statement(stmt);
+            if let Object::Break(_) | Object::Return(_) | Object::Error(_) = *result {
                 return result;
             }
         }
