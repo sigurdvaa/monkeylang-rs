@@ -48,8 +48,6 @@ pub enum ParserError {
     ParseInfix(String),
     QuoteWrongNumArgs(usize),
     UnquoteWrongNumArgs(usize),
-    InvalidReturnStatement(Token),
-    InvalidExitStatement(Token),
 }
 
 impl std::error::Error for ParserError {}
@@ -69,16 +67,6 @@ impl fmt::Display for ParserError {
             Self::UnquoteWrongNumArgs(args_len) => write!(
                 f,
                 "wrong number of arguments for \"unquote\", want=1, got={args_len}"
-            ),
-            Self::InvalidReturnStatement(token) => write!(
-                f,
-                "{}: invalid return statement missing expression",
-                token.loc()
-            ),
-            Self::InvalidExitStatement(token) => write!(
-                f,
-                "{}: invalid exit statement missing expression",
-                token.loc()
             ),
         }
     }
@@ -234,42 +222,61 @@ impl<'a> Parser<'a> {
         Ok(LetStatement { token, name, value })
     }
 
-    fn parse_return_statement(&mut self) -> Result<ReturnStatement, ParserError> {
+    fn parse_return_statement(&mut self) -> Result<ExpressionStatement, ParserError> {
         let token = self.curr_token.clone();
 
-        if self.next_token.kind == TokenKind::EndOfFile
-            || self.next_token.kind == TokenKind::Semicolon
-        {
-            return Err(ParserError::InvalidReturnStatement(self.curr_token.clone()));
-        }
-
-        self.next_tokens();
-        let value = self.parse_expression(Precedence::Lowest)?;
+        let value = match self.next_token.kind {
+            TokenKind::Semicolon => Expression::Null(token.clone()),
+            _ => {
+                self.next_tokens();
+                self.parse_expression(Precedence::Lowest)?
+            }
+        };
 
         if self.next_token.kind == TokenKind::Semicolon {
             self.next_tokens();
         }
 
-        Ok(ReturnStatement { token, value })
+        Ok(ExpressionStatement { token, value })
     }
 
-    fn parse_exit_statement(&mut self) -> Result<ExitStatement, ParserError> {
+    fn parse_exit_statement(&mut self) -> Result<ExpressionStatement, ParserError> {
         let token = self.curr_token.clone();
 
-        if self.next_token.kind == TokenKind::EndOfFile
-            || self.next_token.kind == TokenKind::Semicolon
-        {
-            return Err(ParserError::InvalidExitStatement(self.curr_token.clone()));
-        }
-
-        self.next_tokens();
-        let value = self.parse_expression(Precedence::Lowest)?;
+        let value = match self.next_token.kind {
+            TokenKind::Semicolon | TokenKind::EndOfFile => Expression::Integer(IntegerLiteral {
+                token: token.clone(),
+                value: 0,
+            }),
+            _ => {
+                self.next_tokens();
+                self.parse_expression(Precedence::Lowest)?
+            }
+        };
 
         if self.next_token.kind == TokenKind::Semicolon {
             self.next_tokens();
         }
 
-        Ok(ExitStatement { token, value })
+        Ok(ExpressionStatement { token, value })
+    }
+
+    fn parse_break_statement(&mut self) -> Result<ExpressionStatement, ParserError> {
+        let token = self.curr_token.clone();
+
+        let value = match self.next_token.kind {
+            TokenKind::Semicolon => Expression::Null(token.clone()),
+            _ => {
+                self.next_tokens();
+                self.parse_expression(Precedence::Lowest)?
+            }
+        };
+
+        if self.next_token.kind == TokenKind::Semicolon {
+            self.next_tokens();
+        }
+
+        Ok(ExpressionStatement { token, value })
     }
 
     fn parse_function_parameters(&mut self) -> Result<Vec<IdentifierLiteral>, ParserError> {
@@ -620,6 +627,7 @@ impl<'a> Parser<'a> {
             TokenKind::Let => Ok(Statement::Let(self.parse_let_statement()?)),
             TokenKind::Return => Ok(Statement::Return(self.parse_return_statement()?)),
             TokenKind::Exit => Ok(Statement::Exit(self.parse_exit_statement()?)),
+            TokenKind::Break => Ok(Statement::Break(self.parse_break_statement()?)),
             _ => Ok(Statement::Expression(self.parse_expression_statement()?)),
         }
     }

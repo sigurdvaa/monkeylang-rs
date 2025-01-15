@@ -148,6 +148,25 @@ fn test_return_statements() {
 }
 
 #[test]
+fn test_return_statements_without_value() {
+    let program = parse_program("return;", 1);
+    match &program.statements[0] {
+        Statement::Return(stmt) => {
+            assert_eq!(stmt.token.kind, TokenKind::Return);
+            assert_eq!(stmt.token.literal, "return");
+            match stmt.value {
+                Expression::Null(_) => (),
+                _ => panic!("not a valid null expression, got {:?}", stmt.value),
+            }
+        }
+        _ => panic!(
+            "not a valid return statement, got: {}",
+            &program.statements[0]
+        ),
+    }
+}
+
+#[test]
 fn test_program_to_string() {
     let program = Program {
         statements: vec![Statement::Let(LetStatement {
@@ -835,8 +854,8 @@ fn test_function_literal_with_name() {
 }
 
 #[test]
-fn test_loop_expression() {
-    let input = "loop { x }";
+fn test_loop_expression_with_value() {
+    let input = "loop { break x; }";
     let program = parse_program(input, 1);
 
     for stmt in &program.statements {
@@ -856,10 +875,41 @@ fn test_loop_expression() {
 
         assert_eq!(expr.body.statements.len(), 1);
         match &expr.body.statements[0] {
-            Statement::Expression(stmt) => {
+            Statement::Break(stmt) => {
                 assert_literal(&stmt.value, &Literal::Ident("x"));
             }
-            _ => panic!("not valid expression statement"),
+            _ => panic!("not a valid expression statement"),
+        }
+    }
+}
+
+#[test]
+fn test_loop_expression_without_value() {
+    let input = "loop { break; }";
+    let program = parse_program(input, 1);
+
+    for stmt in &program.statements {
+        let expr = match stmt {
+            Statement::Expression(stmt) => {
+                assert_eq!(stmt.token.kind, TokenKind::Loop);
+                assert_eq!(stmt.token.literal, "loop");
+                &stmt.value
+            }
+            _ => panic!("not a valid expression statement, got: {stmt}"),
+        };
+
+        let expr = match &expr {
+            Expression::Loop(expr) => expr,
+            _ => panic!("not a valid loop expression, got: {expr}"),
+        };
+
+        assert_eq!(expr.body.statements.len(), 1);
+        match &expr.body.statements[0] {
+            Statement::Break(stmt) => match stmt.value {
+                Expression::Null(_) => (),
+                _ => panic!("not a valid null expression, got {:?}", stmt.value),
+            },
+            _ => panic!("not a valid break statement"),
         }
     }
 }

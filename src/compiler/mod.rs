@@ -367,6 +367,7 @@ impl Compiler {
                 self.compile_expression(&stmt.value)?;
                 self.emit(Opcode::Exit, &[]);
             }
+            Statement::Break(stmt) => todo!(),
         }
         Ok(())
     }

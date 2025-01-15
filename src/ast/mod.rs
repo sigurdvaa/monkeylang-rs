@@ -264,19 +264,7 @@ pub struct LetStatement {
 }
 
 #[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
-pub struct ReturnStatement {
-    pub token: Token,
-    pub value: Expression,
-}
-
-#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
 pub struct ExpressionStatement {
-    pub token: Token,
-    pub value: Expression,
-}
-
-#[derive(Debug, PartialEq, Clone, Eq, PartialOrd, Ord)]
-pub struct ExitStatement {
     pub token: Token,
     pub value: Expression,
 }
@@ -300,10 +288,10 @@ impl fmt::Display for BlockStatement {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Statement {
     Let(LetStatement),
-    Return(ReturnStatement),
+    Return(ExpressionStatement),
     Expression(ExpressionStatement),
-    Exit(ExitStatement),
-    // TODO: break statement?
+    Exit(ExpressionStatement),
+    Break(ExpressionStatement),
 }
 
 impl fmt::Display for Statement {
@@ -321,6 +309,9 @@ impl fmt::Display for Statement {
             }
             Statement::Expression(stmt) => write!(f, "{}", stmt.value),
             Statement::Exit(stmt) => write!(f, "{} {};", stmt.token.literal, stmt.value),
+            Statement::Break(stmt) => {
+                write!(f, "{} {};", stmt.token.literal, stmt.value)
+            }
         }
     }
 }

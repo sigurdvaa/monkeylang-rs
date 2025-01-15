@@ -69,6 +69,7 @@ pub fn modify_statement(stmt: &mut Statement, func: ModifierFunc, eval: &mut Eva
         Statement::Return(stmt) => modify_expression(&mut stmt.value, func, eval),
         Statement::Expression(stmt) => modify_expression(&mut stmt.value, func, eval),
         Statement::Exit(stmt) => modify_expression(&mut stmt.value, func, eval),
+        Statement::Break(stmt) => modify_expression(&mut stmt.value, func, eval),
     }
 }
 
@@ -177,7 +178,7 @@ mod tests {
     fn create_return_program(value: usize) -> Program {
         let token = create_token(TokenKind::Int);
         let value = create_int_expression(token.clone(), value);
-        let statements = vec![Statement::Return(ReturnStatement { token, value })];
+        let statements = vec![Statement::Return(ExpressionStatement { token, value })];
         Program { statements }
     }
 
