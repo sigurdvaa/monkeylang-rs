@@ -11,13 +11,13 @@ Customized with the following:
 - macro (from The Lost Chapter)
 - quote/unquote as tokens
 - loop (and break)
-- comments starting with "//"
-- escape characters with \ (n, t, \, ")
+- comments with "//"
+- escape characters with \\ (n, t, \\, ")
 - puts no longer add newline
 - exit (with exit code)
 - additional builtins:
   - insert:
-    - array: insert object at given index, shifting all elements after it one place over
+    - array: insert object at given index, shifting all elements after
     - hash : insert object at given key
   - replace: replace object in array at the given index
   - string: convert other objects to string object
