@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell};
-use std::collections::{hash_map::Entry, HashMap};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 pub type Symbols = Rc<SymbolTable>;
