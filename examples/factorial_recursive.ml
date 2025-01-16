@@ -5,4 +5,4 @@ let factorial = fn(n) {
     return n * factorial(n - 1);
 }
 let n = 20;
-puts("Factorial of ", n, ": ", factorial(n));
+puts("Factorial of ", n, ": ", factorial(n), "\n");

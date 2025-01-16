@@ -28,4 +28,4 @@ let fib = fn(n) {
     return result[0];
 };
 let n = 92;
-puts("Fibonacci of " + string(n) + ": " + string(fib(n)));
+puts("Fibonacci of " + string(n) + ": " + string(fib(n)), "\n");

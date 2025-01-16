@@ -1,18 +1,22 @@
 let fib = fn(n) {
     if (n < 1) {
         return 0;
-    } 
+    }
     if (n < 3) {
         return 1;
-    } 
-    let loop = fn(c, a, b) {
-        if (c < n) {
-            return loop(c + 1, b, a + b);
-        } else {
+    }
+    let c = 3;
+    let a = 1;
+    let b = 1;
+    loop {
+        if (c > n) {
             return b;
         }
+        let c = c + 1;
+        let tmp = a + b;
+        let a = b;
+        let b = tmp;
     }
-    return loop(2, 1, 1);
 }
 
 let n = 35;

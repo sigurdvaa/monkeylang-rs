@@ -625,7 +625,7 @@ fn test_recursive_fibonacci() {
 }
 
 #[test]
-fn test_loop_expression() {
+fn test_loop_expressions() {
     let tests = [
         ("loop { break; }", 1, Object::Null),
         (
@@ -633,11 +633,11 @@ fn test_loop_expression() {
             2,
             Object::new_integer(6),
         ),
-        // (
-        //     "let a = 0; fn() { loop { if (a > 5) { break 6; }; let a = a + 1; return 2; } }()",
-        //     2,
-        //     Object::new_integer(2),
-        // ),
+        (
+            "let a = 0; fn() { loop { if (a > 5) { break 6; }; let a = a + 1; return 2; } }()",
+            2,
+            Object::new_integer(2),
+        ),
         (
             "let a = 0; loop { if (a > 5) { break \"foo\"; }; let a = a + 1; }",
             2,
@@ -654,7 +654,24 @@ fn test_loop_expression() {
             Object::Null,
         ),
         (
-            "let a = 0; loop { if (a > 5) { break a; }; let b = 0; loop { if (b > 10) { break b; } let b = b + 1; }; let a = a + 1; }",
+            r#"
+            let a = 0;
+            loop {
+                if (a > 5) {
+                    break a;
+                };
+
+                let b = 0
+                loop {
+                    if (b > 10) {
+                        break b;
+                    }
+                    let b = b + 1;
+                };
+
+                let a = a + 1;
+            }
+            "#,
             2,
             Object::new_integer(6),
         ),

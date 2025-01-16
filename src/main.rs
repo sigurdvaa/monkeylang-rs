@@ -36,7 +36,7 @@ fn run_with_file_input(args: &[String]) {
         println!("Error reading file '{file_path}': {err}");
         std::process::exit(1);
     });
-    run_repl_vm(input.chars().peekable());
+    run_repl_vm(Some(file_path.to_string()), input.chars().peekable());
 }
 
 fn main() {

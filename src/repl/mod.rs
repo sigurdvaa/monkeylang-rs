@@ -47,8 +47,13 @@ fn print_parser_errors(errors: &[ParserError]) {
     }
 }
 
-fn repl_eval(input: Peekable<Chars<'_>>, eval: &mut Eval, macro_eval: &mut Eval) -> Rc<Object> {
-    let lexer = Lexer::new(None, input);
+fn repl_eval(
+    file: Option<String>,
+    input: Peekable<Chars<'_>>,
+    eval: &mut Eval,
+    macro_eval: &mut Eval,
+) -> Rc<Object> {
+    let lexer = Lexer::new(file, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
 
@@ -63,10 +68,10 @@ fn repl_eval(input: Peekable<Chars<'_>>, eval: &mut Eval, macro_eval: &mut Eval)
     eval.eval_program(&program)
 }
 
-pub fn run_repl_eval(input: Peekable<Chars<'_>>) -> Rc<Object> {
+pub fn run_repl_eval(file: Option<String>, input: Peekable<Chars<'_>>) -> Rc<Object> {
     let mut eval = Eval::new();
     let mut macro_eval = Eval::new();
-    repl_eval(input, &mut eval, &mut macro_eval)
+    repl_eval(file, input, &mut eval, &mut macro_eval)
 }
 
 pub fn start_repl_eval() {
@@ -79,7 +84,7 @@ pub fn start_repl_eval() {
         let _ = std::io::stdout().flush();
 
         input.read_line(&mut buf).expect("reading input failed");
-        let eval = repl_eval(buf.chars().peekable(), &mut eval, &mut macro_eval);
+        let eval = repl_eval(None, buf.chars().peekable(), &mut eval, &mut macro_eval);
 
         match *eval {
             Object::None => (),
@@ -88,8 +93,13 @@ pub fn start_repl_eval() {
     }
 }
 
-fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> Option<Rc<Object>> {
-    let lexer = Lexer::new(None, input);
+fn repl_vm(
+    file: Option<String>,
+    input: Peekable<Chars<'_>>,
+    compiler: &mut Compiler,
+    vm: &mut Vm,
+) -> Option<Rc<Object>> {
+    let lexer = Lexer::new(file, input);
     let mut parser = Parser::new(lexer);
     let mut program = parser.parse_program();
 
@@ -118,10 +128,10 @@ fn repl_vm(input: Peekable<Chars<'_>>, compiler: &mut Compiler, vm: &mut Vm) -> 
     }
 }
 
-pub fn run_repl_vm(input: Peekable<Chars<'_>>) -> Option<Rc<Object>> {
+pub fn run_repl_vm(file: Option<String>, input: Peekable<Chars<'_>>) -> Option<Rc<Object>> {
     let mut compiler = Compiler::new();
     let mut vm = Vm::new(None);
-    repl_vm(input, &mut compiler, &mut vm)
+    repl_vm(file, input, &mut compiler, &mut vm)
 }
 
 pub fn start_repl_vm() {
@@ -134,7 +144,7 @@ pub fn start_repl_vm() {
         print!("{PROMPT}");
         let _ = std::io::stdout().flush();
         input.read_line(&mut buf).expect("reading input failed");
-        let result = repl_vm(buf.chars().peekable(), &mut compiler, &mut vm);
+        let result = repl_vm(None, buf.chars().peekable(), &mut compiler, &mut vm);
         if let Some(result) = result {
             match *result {
                 Object::None => (),

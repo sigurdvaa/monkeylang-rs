@@ -373,8 +373,11 @@ impl Compiler {
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompilerError> {
         match stmt {
             Statement::Let(stmt) => {
-                let sym = self.symbols.define(stmt.name.value.clone());
+                // defining sym before expression causes invalid stack access when shadowing a global
+                // as local in a function, in a let stmt and using same symbol in the expression on the right side
+                // let sym = self.symbols.define(stmt.name.value.clone());
                 self.compile_expression(&stmt.value)?;
+                let sym = self.symbols.define(stmt.name.value.clone());
                 match sym.scope {
                     SymbolScope::Global => self.emit(Opcode::SetGlobal, &[sym.index]),
                     SymbolScope::Local => self.emit(Opcode::SetLocal, &[sym.index]),

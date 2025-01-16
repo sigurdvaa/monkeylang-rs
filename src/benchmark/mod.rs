@@ -19,8 +19,10 @@ const TEST: &str = concat!(
 pub fn run(engine: EngineKind) {
     let start = Instant::now();
     let result = match engine {
-        EngineKind::Eval => run_repl_eval(TEST.chars().peekable()).inspect(),
-        EngineKind::Vm => run_repl_vm(TEST.chars().peekable()).unwrap().inspect(),
+        EngineKind::Eval => run_repl_eval(None, TEST.chars().peekable()).inspect(),
+        EngineKind::Vm => run_repl_vm(None, TEST.chars().peekable())
+            .unwrap()
+            .inspect(),
     };
     let duration = start.elapsed();
     println!(

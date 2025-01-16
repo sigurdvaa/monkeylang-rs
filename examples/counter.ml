@@ -5,3 +5,4 @@ let counter = fn(x) {
     }
 };
 counter(0);
+puts("\n");
