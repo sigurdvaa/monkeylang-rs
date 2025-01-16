@@ -59,26 +59,28 @@ impl SymbolTable {
         })
     }
 
-    // TODO: causes issues with shadowing
     pub fn define(&self, name: String) -> Rc<Symbol> {
         let scope = match self.outer {
             Some(_) => SymbolScope::Local,
             None => SymbolScope::Global,
         };
-        match self.store.borrow_mut().entry(name.clone()) {
-            Entry::Occupied(sym) => sym.get().clone(),
-            Entry::Vacant(slot) => {
-                let index = self.num_definitions.get();
-                self.num_definitions.set(index + 1);
-                let sym = Rc::new(Symbol {
-                    name: name.clone(),
-                    index,
-                    scope,
-                });
-                slot.insert(sym.clone());
-                sym
+
+        if let Some(sym) = self.store.borrow().get(&name) {
+            if sym.scope == scope {
+                return sym.clone();
             }
         }
+
+        let index = self.num_definitions.get();
+        self.num_definitions.set(index + 1);
+        let sym = Rc::new(Symbol {
+            name: name.clone(),
+            index,
+            scope,
+        });
+
+        self.store.borrow_mut().insert(name, sym.clone());
+        sym
     }
 
     pub fn define_free(&self, original: Rc<Symbol>) -> Rc<Symbol> {

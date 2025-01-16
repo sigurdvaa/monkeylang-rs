@@ -3,4 +3,4 @@ let pusher = fn(arr, obj) {
     let arr = push(arr, obj);
     return arr;
 }
-puts(pusher([], 1));
+puts("pushing 1 into []: ", pusher([], 1));

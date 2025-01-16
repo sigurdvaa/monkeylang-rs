@@ -653,6 +653,11 @@ fn test_loop_expression() {
             2,
             Object::Null,
         ),
+        (
+            "let a = 0; loop { if (a > 5) { break a; }; let b = 0; loop { if (b > 10) { break b; } let b = b + 1; }; let a = a + 1; }",
+            2,
+            Object::new_integer(6),
+        ),
     ];
 
     for (test_input, test_stmts, test_value) in tests {
