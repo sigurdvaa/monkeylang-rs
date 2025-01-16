@@ -3,6 +3,6 @@ let factorial = fn(n) {
         return 1;
     }
     return n * factorial(n - 1);
-}
+};
 let n = 20;
 puts("Factorial of ", n, ": ", factorial(n), "\n");

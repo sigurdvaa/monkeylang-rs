@@ -78,17 +78,18 @@ pub fn start_repl_eval() {
     let input = stdin();
     let mut eval = Eval::new();
     let mut macro_eval = Eval::new();
+    let mut buf = String::new();
     loop {
-        let mut buf = String::new();
         print!("{PROMPT}");
         let _ = std::io::stdout().flush();
-
         input.read_line(&mut buf).expect("reading input failed");
-        let eval = repl_eval(None, buf.chars().peekable(), &mut eval, &mut macro_eval);
-
-        match *eval {
-            Object::None => (),
-            _ => println!("{}", eval.inspect()),
+        if let Some(';') = buf.trim().chars().last() {
+            let eval = repl_eval(None, buf.chars().peekable(), &mut eval, &mut macro_eval);
+            match *eval {
+                Object::None => (),
+                _ => println!("{}", eval.inspect()),
+            }
+            buf.clear();
         }
     }
 }
@@ -138,18 +139,21 @@ pub fn start_repl_vm() {
     let input = stdin();
     let mut compiler = Compiler::new();
     let mut vm = Vm::new(None);
+    let mut buf = String::new();
     loop {
         // TODO: add history? will require tty raw mode
-        let mut buf = String::new();
         print!("{PROMPT}");
         let _ = std::io::stdout().flush();
         input.read_line(&mut buf).expect("reading input failed");
-        let result = repl_vm(None, buf.chars().peekable(), &mut compiler, &mut vm);
-        if let Some(result) = result {
-            match *result {
-                Object::None => (),
-                _ => println!("{}", result.inspect()),
+        if let Some(';') = buf.trim().chars().last() {
+            let result = repl_vm(None, buf.chars().peekable(), &mut compiler, &mut vm);
+            if let Some(result) = result {
+                match *result {
+                    Object::None => (),
+                    _ => println!("{}", result.inspect()),
+                }
             }
+            buf.clear();
         }
     }
 }

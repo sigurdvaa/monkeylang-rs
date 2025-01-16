@@ -295,11 +295,11 @@ fn test_calling_functions_with_bindings() {
                 "let minusOne = fn() {\n",
                 "    let num = 1;\n",
                 "    globalSeed - num;\n",
-                "}\n",
+                "};\n",
                 "let minusTwo = fn() {\n",
                 "    let num = 2;\n",
                 "    globalSeed - num;\n",
-                "}\n",
+                "};\n",
                 "minusOne() + minusTwo();",
             ),
             4,
@@ -507,7 +507,7 @@ fn test_closures() {
                 "        fn(f) { e + f; };\n",
                 "    };\n",
                 "};\n",
-                "let newAdderInner = newAdderOuter(1, 2)\n",
+                "let newAdderInner = newAdderOuter(1, 2);\n",
                 "let adder = newAdderInner(3);\n",
                 "adder(8);\n",
             ),
@@ -522,7 +522,7 @@ fn test_closures() {
                 "        fn(d) { a + b + c + d };\n",
                 "    };\n",
                 "};\n",
-                "let newAdderInner = newAdderOuter(2)\n",
+                "let newAdderInner = newAdderOuter(2);\n",
                 "let adder = newAdderInner(3);\n",
                 "adder(8);\n",
             ),
@@ -661,7 +661,7 @@ fn test_loop_expressions() {
                     break a;
                 };
 
-                let b = 0
+                let b = 0;
                 loop {
                     if (b > 10) {
                         break b;

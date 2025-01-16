@@ -39,6 +39,8 @@ struct CompilationScope {
     instructions: Vec<Instruction>,
     first_prev_ins: Option<EmittedIns>,
     second_prev_ins: Option<EmittedIns>,
+    loops: Vec<Vec<usize>>,
+    loops_idx: usize,
 }
 
 impl CompilationScope {
@@ -58,8 +60,6 @@ pub struct Compiler {
     symbols: Symbols,
     scopes: Vec<CompilationScope>,
     scope_idx: usize,
-    loops: Vec<Vec<usize>>,
-    loops_idx: usize,
 }
 
 impl Compiler {
@@ -73,8 +73,6 @@ impl Compiler {
             symbols,
             scopes: vec![CompilationScope::new()],
             scope_idx: 0,
-            loops: vec![],
-            loops_idx: 0,
         }
     }
 
@@ -82,8 +80,6 @@ impl Compiler {
         self.scopes.clear();
         self.scopes.push(CompilationScope::new());
         self.scope_idx = 0;
-        self.loops.clear();
-        self.loops_idx = 0;
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {
@@ -121,13 +117,21 @@ impl Compiler {
     }
 
     fn enter_loop(&mut self) {
-        self.loops.push(vec![]);
-        self.loops_idx += 1;
+        self.scopes[self.scope_idx].loops.push(vec![]);
+        self.scopes[self.scope_idx].loops_idx += 1;
     }
 
     fn leave_loop(&mut self) -> Vec<usize> {
-        self.loops_idx -= 1;
-        self.loops.pop().expect("popped last loop")
+        self.scopes[self.scope_idx].loops_idx -= 1;
+        self.scopes[self.scope_idx]
+            .loops
+            .pop()
+            .expect("popped last loop")
+    }
+
+    fn push_break(&mut self, pos: usize) {
+        let curr = &mut self.scopes[self.scope_idx];
+        curr.loops[curr.loops_idx - 1].push(pos);
     }
 
     fn set_prev_ins(&mut self, op: Opcode, pos: usize) {
@@ -399,7 +403,7 @@ impl Compiler {
             Statement::Break(stmt) => {
                 self.compile_expression(&stmt.value)?;
                 let pos = self.emit(Opcode::Break, &[0]); // tmp bogus value, replaced by loop expr
-                self.loops[self.loops_idx - 1].push(pos);
+                self.push_break(pos);
             }
         }
         Ok(())

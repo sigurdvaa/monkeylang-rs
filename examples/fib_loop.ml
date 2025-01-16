@@ -17,7 +17,7 @@ let fib = fn(n) {
         let a = b;
         let b = tmp;
     }
-}
+};
 
 let n = 35;
 puts("Fibonacci of " + string(n) + ": " + string(fib(n)), "\n");

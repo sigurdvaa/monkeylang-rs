@@ -488,7 +488,7 @@ fn test_index_expressions() {
 fn test_functions() {
     let tests = [
         TestCase::new(
-            "fn() { return 5 + 10 }",
+            "fn() { return 5 + 10; }",
             1,
             vec![
                 Object::new_integer(5),

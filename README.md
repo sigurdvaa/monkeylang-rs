@@ -22,3 +22,5 @@ Customized with the following:
   - replace: replace object in array at the given index
   - string: convert other objects to string object
   - map: for each object in array, run given function
+- no magic semicolons
+

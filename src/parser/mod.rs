@@ -215,10 +215,7 @@ impl<'a> Parser<'a> {
             expr.name = Some(name.value.clone());
         }
 
-        // TODO: make semicolon required. repl can instead add as last char if missing
-        if self.next_token.kind == TokenKind::Semicolon {
-            self.next_tokens();
-        }
+        self.expect_token(TokenKind::Semicolon)?;
 
         Ok(LetStatement { token, name, value })
     }
@@ -235,10 +232,7 @@ impl<'a> Parser<'a> {
             }
         };
 
-        // TODO: make semicolon required. repl can instead add as last char if missing
-        if self.next_token.kind == TokenKind::Semicolon {
-            self.next_tokens();
-        }
+        self.expect_token(TokenKind::Semicolon)?;
 
         Ok(ExpressionStatement { token, value })
     }
@@ -247,7 +241,7 @@ impl<'a> Parser<'a> {
         let token = self.curr_token.clone();
 
         let value = match self.next_token.kind {
-            TokenKind::Semicolon | TokenKind::EndOfFile => Expression::Integer(IntegerLiteral {
+            TokenKind::Semicolon => Expression::Integer(IntegerLiteral {
                 token: token.clone(),
                 value: 0,
             }),
@@ -257,10 +251,7 @@ impl<'a> Parser<'a> {
             }
         };
 
-        // TODO: make semicolon required. repl can instead add as last char if missing
-        if self.next_token.kind == TokenKind::Semicolon {
-            self.next_tokens();
-        }
+        self.expect_token(TokenKind::Semicolon)?;
 
         Ok(ExpressionStatement { token, value })
     }
@@ -277,10 +268,7 @@ impl<'a> Parser<'a> {
             }
         };
 
-        // TODO: make semicolon required. repl can instead add as last char if missing
-        if self.next_token.kind == TokenKind::Semicolon {
-            self.next_tokens();
-        }
+        self.expect_token(TokenKind::Semicolon)?;
 
         Ok(ExpressionStatement { token, value })
     }
@@ -591,13 +579,11 @@ impl<'a> Parser<'a> {
             expression = match self.infix_parse_fns.get(&self.next_token.kind) {
                 Some(infix) => infix(self, Box::new(expression))?,
                 None => {
-                    // TODO: must end with semicolon
                     return Ok(expression);
                 }
             };
         }
 
-        // TODO: must end with semicolon
         Ok(expression)
     }
 
