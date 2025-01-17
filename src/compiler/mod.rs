@@ -376,7 +376,7 @@ impl Compiler {
     fn compile_statement(&mut self, stmt: &Statement) -> Result<(), CompilerError> {
         match stmt {
             Statement::Let(stmt) => {
-                // defining sym before expression causes invalid stack access when shadowing a global
+                // defining sym before compiling expression causes invalid stack access when shadowing a global
                 // as local in a function in a let stmt and using same symbol in the expression on the right side
                 // let sym = self.symbols.define(stmt.name.value.clone());
                 self.compile_expression(&stmt.value)?;
