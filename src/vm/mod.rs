@@ -146,7 +146,6 @@ impl Engine for Vm {
         }
         match func.as_ref() {
             Object::Closure(_) => {
-                // TODO: can some of this be more constant?
                 let func = Rc::new(CompiledFunctionObj {
                     instructions: vec![Opcode::Call as u8, args.len() as u8],
                     num_locals: 0,
@@ -154,12 +153,15 @@ impl Engine for Vm {
                 });
                 let closure = Rc::new(ClosureObj { func, free: vec![] });
                 let frame = Frame::new(closure, self.sp - args.len());
+
                 if let Err(e) = self.push_frame(frame) {
                     return Rc::new(Object::Error(e.to_string()));
                 }
+
                 if let Err(err) = self.run() {
                     return Rc::new(Object::Error(err.to_string()));
                 }
+
                 self.pop_stack()
                     .unwrap_or_else(|e| Rc::new(Object::Error(e.to_string())))
             }

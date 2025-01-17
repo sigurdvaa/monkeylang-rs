@@ -47,7 +47,7 @@ impl TryFrom<&str> for Operator {
             v if v == Self::Lt.to_string() => Ok(Self::Lt),
             v if v == Self::Eq.to_string() => Ok(Self::Eq),
             v if v == Self::NotEq.to_string() => Ok(Self::NotEq),
-            _ => Err("Unknown operator"),
+            _ => Err("unknown operator"),
         }
     }
 }

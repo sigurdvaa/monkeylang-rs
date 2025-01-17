@@ -361,7 +361,6 @@ impl Compiler {
 
                 let loop_start_pos = self.curr_scope_ins_len();
                 self.compile_statements(&expr.body.statements)?;
-                self.remove_last_pop();
                 self.emit(Opcode::Jump, &[loop_start_pos]);
                 let loop_end_pos = self.curr_scope_ins_len();
 
@@ -378,7 +377,7 @@ impl Compiler {
         match stmt {
             Statement::Let(stmt) => {
                 // defining sym before expression causes invalid stack access when shadowing a global
-                // as local in a function, in a let stmt and using same symbol in the expression on the right side
+                // as local in a function in a let stmt and using same symbol in the expression on the right side
                 // let sym = self.symbols.define(stmt.name.value.clone());
                 self.compile_expression(&stmt.value)?;
                 let sym = self.symbols.define(stmt.name.value.clone());

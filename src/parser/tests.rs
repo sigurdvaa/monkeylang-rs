@@ -29,13 +29,13 @@ pub fn parse_program(input: &str, statements: usize) -> Program {
 }
 
 fn assert_identifier_literal(expr: &IdentifierLiteral, assert_value: &str) {
-    assert_eq!(expr.token.kind, TokenKind::Ident);
+    assert_eq!(expr.token.kind, TokenKind::Identifier);
     assert_eq!(expr.token.literal, assert_value);
     assert_eq!(expr.value, assert_value);
 }
 
 fn assert_integer_literal(expr: &IntegerLiteral, assert_value: &usize) {
-    assert_eq!(expr.token.kind, TokenKind::Int);
+    assert_eq!(expr.token.kind, TokenKind::Integer);
     assert_eq!(expr.token.literal, assert_value.to_string());
     assert_eq!(&expr.value, assert_value);
 }
@@ -211,7 +211,7 @@ fn test_program_to_string() {
                     file: None,
                     col: 0,
                     line: 0,
-                    kind: TokenKind::Ident,
+                    kind: TokenKind::Identifier,
                     literal: "myVar".into(),
                 },
                 value: "myVar".into(),
@@ -221,7 +221,7 @@ fn test_program_to_string() {
                     file: None,
                     col: 0,
                     line: 0,
-                    kind: TokenKind::Ident,
+                    kind: TokenKind::Identifier,
                     literal: "anotherVar".into(),
                 },
                 value: "anotherVar".into(),
@@ -240,7 +240,7 @@ fn test_identifier_expression() {
     for stmt in &program.statements {
         match stmt {
             Statement::Expression(stmt) => {
-                assert_eq!(stmt.token.kind, TokenKind::Ident);
+                assert_eq!(stmt.token.kind, TokenKind::Identifier);
                 assert_eq!(stmt.token.literal, test_value);
                 assert_literal(&stmt.value, &Literal::Ident(test_value));
             }
@@ -257,7 +257,7 @@ fn test_integer_literal_expression() {
     for stmt in &program.statements {
         match stmt {
             Statement::Expression(stmt) => {
-                assert_eq!(stmt.token.kind, TokenKind::Int);
+                assert_eq!(stmt.token.kind, TokenKind::Integer);
                 assert_eq!(stmt.token.literal, test_value.to_string());
                 assert_literal(&stmt.value, &Literal::Int(test_value));
             }
@@ -597,7 +597,7 @@ fn test_call_expression_parsing() {
     for stmt in &program.statements {
         let stmt_expr = match stmt {
             Statement::Expression(stmt) => {
-                assert_eq!(stmt.token.kind, TokenKind::Ident);
+                assert_eq!(stmt.token.kind, TokenKind::Identifier);
                 assert_eq!(stmt.token.literal, "add");
                 &stmt.value
             }
@@ -690,7 +690,7 @@ fn test_parsing_index_expressions() {
 
     let stmt_expr = match &program.statements[0] {
         Statement::Expression(stmt) => {
-            assert_eq!(stmt.token.kind, TokenKind::Ident);
+            assert_eq!(stmt.token.kind, TokenKind::Identifier);
             assert_eq!(stmt.token.literal, "myArray");
             &stmt.value
         }

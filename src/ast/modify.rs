@@ -113,14 +113,14 @@ mod tests {
     }
 
     fn create_int_program(value: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let value = create_int_expression(token.clone(), value);
         let statements = vec![Statement::Expression(ExpressionStatement { token, value })];
         Program { statements }
     }
 
     fn create_infix_program(left: usize, right: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let left = Box::new(create_int_expression(token.clone(), left));
         let operator = Operator::Plus;
         let right = Box::new(create_int_expression(token.clone(), right));
@@ -135,7 +135,7 @@ mod tests {
     }
 
     fn create_prefix_program(right: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let operator = Operator::Minus;
         let right = Box::new(create_int_expression(token.clone(), right));
         let value = Expression::Prefix(PrefixExpression {
@@ -148,7 +148,7 @@ mod tests {
     }
 
     fn create_index_program(left: usize, index: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let left = Box::new(create_int_expression(token.clone(), left));
         let index = Box::new(create_int_expression(token.clone(), index));
         let value = Expression::Index(IndexExpression {
@@ -161,7 +161,7 @@ mod tests {
     }
 
     fn create_if_program(cond: usize, cons: usize, alt: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let condition = Box::new(create_int_expression(token.clone(), cond));
         let consequence = create_block_statement(token.clone(), cons);
         let alternative = Some(create_block_statement(token.clone(), alt));
@@ -176,14 +176,14 @@ mod tests {
     }
 
     fn create_return_program(value: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let value = create_int_expression(token.clone(), value);
         let statements = vec![Statement::Return(ExpressionStatement { token, value })];
         Program { statements }
     }
 
     fn create_let_program(value: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let name = IdentifierLiteral {
             token: token.clone(),
             value: "test".into(),
@@ -194,7 +194,7 @@ mod tests {
     }
 
     fn create_fn_program(value: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let parameters = vec![IdentifierLiteral {
             token: token.clone(),
             value: "test".into(),
@@ -211,7 +211,7 @@ mod tests {
     }
 
     fn create_array_program(value: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let elements = vec![create_int_expression(token.clone(), value)];
         let value = Expression::Array(ArrayLiteral {
             token: token.clone(),
@@ -222,7 +222,7 @@ mod tests {
     }
 
     fn create_hash_program(value: usize) -> Program {
-        let token = create_token(TokenKind::Int);
+        let token = create_token(TokenKind::Integer);
         let pairs = BTreeMap::from_iter([(
             create_int_expression(token.clone(), value),
             create_int_expression(token.clone(), value),

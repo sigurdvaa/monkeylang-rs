@@ -7,6 +7,7 @@ use crate::token::{Token, TokenKind};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::fmt;
+use std::num::ParseIntError;
 
 #[derive(PartialEq, PartialOrd, Debug)]
 pub enum Precedence {
@@ -23,10 +24,10 @@ pub enum Precedence {
 impl From<&TokenKind> for Precedence {
     fn from(value: &TokenKind) -> Self {
         match value {
-            TokenKind::Eq => Self::Equals,
-            TokenKind::NotEq => Self::Equals,
-            TokenKind::Lt => Self::LessGreater,
-            TokenKind::Gt => Self::LessGreater,
+            TokenKind::Equal => Self::Equals,
+            TokenKind::NotEqual => Self::Equals,
+            TokenKind::LessThan => Self::LessGreater,
+            TokenKind::GreaterThan => Self::LessGreater,
             TokenKind::Plus => Self::Sum,
             TokenKind::Minus => Self::Sum,
             TokenKind::Slash => Self::Product,
@@ -46,14 +47,12 @@ pub enum ParserContext {
 
 #[derive(Debug)]
 pub enum ParserError {
-    // TODO: improve errors by including token, show line and char pos
-    Expect(String),
-    Expression(String),
-    ParseInt(String),
-    ParsePrefix(String),
-    ParseInfix(String),
-    QuoteWrongNumArgs(usize),
-    UnquoteWrongNumArgs(usize),
+    ExpectToken(TokenKind, Token),
+    ParseInt(Token, ParseIntError),
+    UnknownOperator(Token),
+    InvalidPrefix(Token),
+    QuoteWrongNumArgs(Token, usize),
+    UnquoteWrongNumArgs(Token, usize),
     InvalidContext(Token, ParserContext, Option<ParserContext>),
     BreakOutsideLoop(Token),
     ReturnOutsideFunction(Token),
@@ -64,25 +63,33 @@ impl std::error::Error for ParserError {}
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Expect(err) => write!(f, "{}", err),
-            Self::Expression(err) => write!(f, "{}", err),
-            Self::ParseInt(err) => write!(f, "{}", err),
-            Self::ParsePrefix(err) => write!(f, "{}", err),
-            Self::ParseInfix(err) => write!(f, "{}", err),
-            Self::QuoteWrongNumArgs(args_len) => write!(
-                f,
-                "wrong number of arguments for \"quote\", want=1, got={args_len}"
-            ),
-            Self::UnquoteWrongNumArgs(args_len) => write!(
-                f,
-                "wrong number of arguments for \"unquote\", want=1, got={args_len}"
-            ),
-            Self::InvalidContext(token, want, got) => {
+            Self::ExpectToken(want, got) => {
+                write!(f, "{}: expected {want}, got \"{}\"", got.loc(), got.literal)
+            }
+            Self::ParseInt(token, err) => {
+                write!(f, "{}: invalid integer, {err}", token.loc())
+            }
+            Self::UnknownOperator(token) => {
+                write!(f, "{}: invalid operator \"{}\"", token.loc(), token.literal)
+            }
+            Self::InvalidPrefix(token) => {
                 write!(
                     f,
-                    "{}: expected context {want:?}, but got {got:?}",
-                    token.loc()
+                    "{}: invalid syntax, unexpected \"{}\"",
+                    token.loc(),
+                    token.literal
                 )
+            }
+            Self::QuoteWrongNumArgs(token, len) => {
+                write!(f, "{}: \"quote\" expect 1 argument, got {len}", token.loc(),)
+            }
+            Self::UnquoteWrongNumArgs(token, len) => write!(
+                f,
+                "{}: \"unquote\" expect 1 argument, got {len}",
+                token.loc(),
+            ),
+            Self::InvalidContext(token, want, got) => {
+                write!(f, "{}: expected context {want:?}, got {got:?}", token.loc())
             }
             Self::BreakOutsideLoop(token) => {
                 write!(f, "{}: \"break\" outside loop", token.loc())
@@ -121,10 +128,10 @@ impl<'a> Parser<'a> {
 
         parser
             .prefix_parse_fns
-            .insert(TokenKind::Ident, Parser::parse_fn_identifier_literal);
+            .insert(TokenKind::Identifier, Parser::parse_fn_identifier_literal);
         parser
             .prefix_parse_fns
-            .insert(TokenKind::Int, Parser::parse_fn_integer_literal);
+            .insert(TokenKind::Integer, Parser::parse_fn_integer_literal);
         parser
             .prefix_parse_fns
             .insert(TokenKind::Bang, Parser::parse_fn_prefix_expression);
@@ -185,16 +192,16 @@ impl<'a> Parser<'a> {
             .insert(TokenKind::Asterisk, Parser::parse_fn_infix_expression);
         parser
             .infix_parse_fns
-            .insert(TokenKind::Eq, Parser::parse_fn_infix_expression);
+            .insert(TokenKind::Equal, Parser::parse_fn_infix_expression);
         parser
             .infix_parse_fns
-            .insert(TokenKind::NotEq, Parser::parse_fn_infix_expression);
+            .insert(TokenKind::NotEqual, Parser::parse_fn_infix_expression);
         parser
             .infix_parse_fns
-            .insert(TokenKind::Lt, Parser::parse_fn_infix_expression);
+            .insert(TokenKind::LessThan, Parser::parse_fn_infix_expression);
         parser
             .infix_parse_fns
-            .insert(TokenKind::Gt, Parser::parse_fn_infix_expression);
+            .insert(TokenKind::GreaterThan, Parser::parse_fn_infix_expression);
         parser
             .infix_parse_fns
             .insert(TokenKind::Lparen, Parser::parse_fn_call_expression);
@@ -215,17 +222,14 @@ impl<'a> Parser<'a> {
             self.next_tokens();
             Ok(())
         } else {
-            Err(ParserError::Expect(format!(
-                "expected next token to be {token:?}, but got: {:?}",
-                self.next_token
-            )))
+            Err(ParserError::ExpectToken(token, self.next_token.clone()))
         }
     }
 
     fn parse_let_statement(&mut self) -> Result<LetStatement, ParserError> {
         let token = self.curr_token.clone();
 
-        self.expect_token(TokenKind::Ident)?;
+        self.expect_token(TokenKind::Identifier)?;
         let name = IdentifierLiteral {
             token: self.curr_token.clone(),
             value: self.curr_token.literal.clone(),
@@ -361,7 +365,7 @@ impl<'a> Parser<'a> {
     fn parse_fn_integer_literal(parser: &mut Parser) -> Result<Expression, ParserError> {
         let value = match parser.curr_token.literal.parse::<usize>() {
             Ok(value) => value,
-            Err(err) => return Err(ParserError::ParseInt(err.to_string())),
+            Err(err) => return Err(ParserError::ParseInt(parser.curr_token.clone(), err)),
         };
         Ok(Expression::Integer(IntegerLiteral {
             token: parser.curr_token.clone(),
@@ -516,7 +520,7 @@ impl<'a> Parser<'a> {
     fn parse_fn_prefix_expression(parser: &mut Parser) -> Result<Expression, ParserError> {
         let token = parser.curr_token.clone();
         let operator = Operator::try_from(token.literal.as_str())
-            .map_err(|err| ParserError::ParsePrefix(format!("{}: {}", err, token)))?;
+            .map_err(|_| ParserError::UnknownOperator(token.clone()))?;
 
         parser.next_tokens();
         let right = Box::new(parser.parse_expression(Precedence::Prefix)?);
@@ -535,7 +539,7 @@ impl<'a> Parser<'a> {
         parser.next_tokens();
         let token = parser.curr_token.clone();
         let operator = Operator::try_from(token.literal.as_str())
-            .map_err(|err| ParserError::ParseInfix(format!("{err}: {token}")))?;
+            .map_err(|_| ParserError::UnknownOperator(token.clone()))?;
 
         parser.next_tokens();
         let right = Box::new(parser.parse_expression(Precedence::from(&token.kind))?);
@@ -574,7 +578,7 @@ impl<'a> Parser<'a> {
         parser.next_tokens();
         let arguments = parser.parse_expression_list(TokenKind::Rparen)?;
         if arguments.len() != 1 {
-            return Err(ParserError::QuoteWrongNumArgs(arguments.len()));
+            return Err(ParserError::QuoteWrongNumArgs(token, arguments.len()));
         }
         Ok(Expression::Quote(CallExpression {
             token: token.clone(),
@@ -588,7 +592,7 @@ impl<'a> Parser<'a> {
         parser.next_tokens();
         let arguments = parser.parse_expression_list(TokenKind::Rparen)?;
         if arguments.len() != 1 {
-            return Err(ParserError::UnquoteWrongNumArgs(arguments.len()));
+            return Err(ParserError::UnquoteWrongNumArgs(token, arguments.len()));
         }
         Ok(Expression::Unquote(CallExpression {
             token: token.clone(),
@@ -616,10 +620,7 @@ impl<'a> Parser<'a> {
         let mut expression = match self.prefix_parse_fns.get(&self.curr_token.kind) {
             Some(prefix) => prefix(self)?,
             None => {
-                return Err(ParserError::Expression(format!(
-                    "no prefix parse function found for {}",
-                    self.curr_token
-                )));
+                return Err(ParserError::InvalidPrefix(self.curr_token.clone()));
             }
         };
 

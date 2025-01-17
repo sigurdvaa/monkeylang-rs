@@ -56,7 +56,7 @@ impl<'a> Lexer<'a> {
             "exit" => self.new_token(TokenKind::Exit, literal),
             "loop" => self.new_token(TokenKind::Loop, literal),
             "break" => self.new_token(TokenKind::Break, literal),
-            _ => self.new_token(TokenKind::Ident, literal),
+            _ => self.new_token(TokenKind::Identifier, literal),
         }
     }
 
@@ -83,7 +83,7 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
-        self.new_token(TokenKind::Int, literal)
+        self.new_token(TokenKind::Integer, literal)
     }
 
     fn read_comment(&mut self) {
@@ -153,7 +153,7 @@ impl<'a> Lexer<'a> {
                     if let Some('=') = self.input.peek() {
                         self.input.next();
                         self.next_col += 1;
-                        self.new_token(TokenKind::Eq, "==".into())
+                        self.new_token(TokenKind::Equal, "==".into())
                     } else {
                         self.new_token(TokenKind::Assign, c.into())
                     }
@@ -173,7 +173,7 @@ impl<'a> Lexer<'a> {
                     if let Some('=') = self.input.peek() {
                         self.input.next();
                         self.next_col += 1;
-                        self.new_token(TokenKind::NotEq, "!=".into())
+                        self.new_token(TokenKind::NotEqual, "!=".into())
                     } else {
                         self.new_token(TokenKind::Bang, c.into())
                     }
@@ -186,8 +186,8 @@ impl<'a> Lexer<'a> {
                     }
                     _ => self.new_token(TokenKind::Slash, c.into()),
                 },
-                '<' => self.new_token(TokenKind::Lt, c.into()),
-                '>' => self.new_token(TokenKind::Gt, c.into()),
+                '<' => self.new_token(TokenKind::LessThan, c.into()),
+                '>' => self.new_token(TokenKind::GreaterThan, c.into()),
                 '\n' => {
                     self.next_line += 1;
                     self.curr_line = self.next_line;
@@ -260,58 +260,58 @@ mod tests {
         let mut lexer = Lexer::new(None, input.chars().peekable());
         let tests = [
             create_token(1, 1, TokenKind::Let, "let"),
-            create_token(1, 5, TokenKind::Ident, "five"),
+            create_token(1, 5, TokenKind::Identifier, "five"),
             create_token(1, 10, TokenKind::Assign, "="),
-            create_token(1, 12, TokenKind::Int, "5"),
+            create_token(1, 12, TokenKind::Integer, "5"),
             create_token(1, 13, TokenKind::Semicolon, ";"),
             create_token(2, 1, TokenKind::Let, "let"),
-            create_token(2, 5, TokenKind::Ident, "ten"),
+            create_token(2, 5, TokenKind::Identifier, "ten"),
             create_token(2, 9, TokenKind::Assign, "="),
-            create_token(2, 11, TokenKind::Int, "10"),
+            create_token(2, 11, TokenKind::Integer, "10"),
             create_token(2, 13, TokenKind::Semicolon, ";"),
             create_token(4, 1, TokenKind::Let, "let"),
-            create_token(4, 5, TokenKind::Ident, "add"),
+            create_token(4, 5, TokenKind::Identifier, "add"),
             create_token(4, 9, TokenKind::Assign, "="),
             create_token(4, 11, TokenKind::Function, "fn"),
             create_token(4, 13, TokenKind::Lparen, "("),
-            create_token(4, 14, TokenKind::Ident, "x"),
+            create_token(4, 14, TokenKind::Identifier, "x"),
             create_token(4, 15, TokenKind::Comma, ","),
-            create_token(4, 17, TokenKind::Ident, "y"),
+            create_token(4, 17, TokenKind::Identifier, "y"),
             create_token(4, 18, TokenKind::Rparen, ")"),
             create_token(4, 20, TokenKind::Lbrace, "{"),
-            create_token(5, 5, TokenKind::Ident, "x"),
+            create_token(5, 5, TokenKind::Identifier, "x"),
             create_token(5, 7, TokenKind::Plus, "+"),
-            create_token(5, 9, TokenKind::Ident, "y"),
+            create_token(5, 9, TokenKind::Identifier, "y"),
             create_token(5, 10, TokenKind::Semicolon, ";"),
             create_token(6, 1, TokenKind::Rbrace, "}"),
             create_token(6, 2, TokenKind::Semicolon, ";"),
             create_token(8, 1, TokenKind::Let, "let"),
-            create_token(8, 5, TokenKind::Ident, "result"),
+            create_token(8, 5, TokenKind::Identifier, "result"),
             create_token(8, 12, TokenKind::Assign, "="),
-            create_token(8, 14, TokenKind::Ident, "add"),
+            create_token(8, 14, TokenKind::Identifier, "add"),
             create_token(8, 17, TokenKind::Lparen, "("),
-            create_token(8, 18, TokenKind::Ident, "five"),
+            create_token(8, 18, TokenKind::Identifier, "five"),
             create_token(8, 22, TokenKind::Comma, ","),
-            create_token(8, 24, TokenKind::Ident, "ten"),
+            create_token(8, 24, TokenKind::Identifier, "ten"),
             create_token(8, 27, TokenKind::Rparen, ")"),
             create_token(8, 28, TokenKind::Semicolon, ";"),
             create_token(9, 1, TokenKind::Bang, "!"),
             create_token(9, 2, TokenKind::Minus, "-"),
             create_token(9, 3, TokenKind::Slash, "/"),
             create_token(9, 4, TokenKind::Asterisk, "*"),
-            create_token(9, 5, TokenKind::Int, "5"),
+            create_token(9, 5, TokenKind::Integer, "5"),
             create_token(9, 6, TokenKind::Semicolon, ";"),
-            create_token(10, 1, TokenKind::Int, "5"),
-            create_token(10, 3, TokenKind::Lt, "<"),
-            create_token(10, 5, TokenKind::Int, "10"),
-            create_token(10, 8, TokenKind::Gt, ">"),
-            create_token(10, 10, TokenKind::Int, "5"),
+            create_token(10, 1, TokenKind::Integer, "5"),
+            create_token(10, 3, TokenKind::LessThan, "<"),
+            create_token(10, 5, TokenKind::Integer, "10"),
+            create_token(10, 8, TokenKind::GreaterThan, ">"),
+            create_token(10, 10, TokenKind::Integer, "5"),
             create_token(10, 11, TokenKind::Semicolon, ";"),
             create_token(12, 1, TokenKind::If, "if"),
             create_token(12, 4, TokenKind::Lparen, "("),
-            create_token(12, 5, TokenKind::Int, "5"),
-            create_token(12, 7, TokenKind::Lt, "<"),
-            create_token(12, 9, TokenKind::Int, "10"),
+            create_token(12, 5, TokenKind::Integer, "5"),
+            create_token(12, 7, TokenKind::LessThan, "<"),
+            create_token(12, 9, TokenKind::Integer, "10"),
             create_token(12, 11, TokenKind::Rparen, ")"),
             create_token(12, 13, TokenKind::Lbrace, "{"),
             create_token(13, 5, TokenKind::Return, "return"),
@@ -324,13 +324,13 @@ mod tests {
             create_token(15, 12, TokenKind::False, "false"),
             create_token(15, 17, TokenKind::Semicolon, ";"),
             create_token(16, 1, TokenKind::Rbrace, "}"),
-            create_token(17, 1, TokenKind::Int, "10"),
-            create_token(17, 4, TokenKind::Eq, "=="),
-            create_token(17, 7, TokenKind::Int, "10"),
+            create_token(17, 1, TokenKind::Integer, "10"),
+            create_token(17, 4, TokenKind::Equal, "=="),
+            create_token(17, 7, TokenKind::Integer, "10"),
             create_token(17, 9, TokenKind::Semicolon, ";"),
-            create_token(18, 1, TokenKind::Int, "10"),
-            create_token(18, 4, TokenKind::NotEq, "!="),
-            create_token(18, 7, TokenKind::Int, "9"),
+            create_token(18, 1, TokenKind::Integer, "10"),
+            create_token(18, 4, TokenKind::NotEqual, "!="),
+            create_token(18, 7, TokenKind::Integer, "9"),
             create_token(18, 8, TokenKind::Semicolon, ";"),
             create_token(19, 1, TokenKind::String, "foobar"),
             create_token(19, 8, TokenKind::Semicolon, ";"),
@@ -345,9 +345,9 @@ mod tests {
             create_token(25, 1, TokenKind::String, "foo\\bar"),
             create_token(25, 10, TokenKind::Semicolon, ";"),
             create_token(26, 1, TokenKind::Lbracket, "["),
-            create_token(26, 2, TokenKind::Int, "1"),
+            create_token(26, 2, TokenKind::Integer, "1"),
             create_token(26, 3, TokenKind::Comma, ","),
-            create_token(26, 5, TokenKind::Int, "2"),
+            create_token(26, 5, TokenKind::Integer, "2"),
             create_token(26, 6, TokenKind::Rbracket, "]"),
             create_token(26, 7, TokenKind::Semicolon, ";"),
             create_token(27, 1, TokenKind::Lbrace, "{"),
@@ -357,20 +357,20 @@ mod tests {
             create_token(27, 12, TokenKind::Rbrace, "}"),
             create_token(28, 1, TokenKind::Macro, "macro"),
             create_token(28, 6, TokenKind::Lparen, "("),
-            create_token(28, 7, TokenKind::Ident, "x"),
+            create_token(28, 7, TokenKind::Identifier, "x"),
             create_token(28, 8, TokenKind::Comma, ","),
-            create_token(28, 10, TokenKind::Ident, "y"),
+            create_token(28, 10, TokenKind::Identifier, "y"),
             create_token(28, 11, TokenKind::Rparen, ")"),
             create_token(28, 13, TokenKind::Lbrace, "{"),
-            create_token(28, 15, TokenKind::Ident, "x"),
+            create_token(28, 15, TokenKind::Identifier, "x"),
             create_token(28, 17, TokenKind::Plus, "+"),
-            create_token(28, 19, TokenKind::Ident, "y"),
+            create_token(28, 19, TokenKind::Identifier, "y"),
             create_token(28, 20, TokenKind::Semicolon, ";"),
             create_token(28, 22, TokenKind::Rbrace, "}"),
             create_token(28, 23, TokenKind::Semicolon, ";"),
             // line 29: a comment
             create_token(30, 1, TokenKind::Exit, "exit"),
-            create_token(30, 6, TokenKind::Int, "0"),
+            create_token(30, 6, TokenKind::Integer, "0"),
             create_token(30, 7, TokenKind::Semicolon, ";"),
             create_token(31, 1, TokenKind::Loop, "loop"),
             create_token(31, 6, TokenKind::Lbrace, "{"),

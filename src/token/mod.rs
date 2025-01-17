@@ -6,8 +6,8 @@ pub enum TokenKind {
     EndOfFile,
 
     // Identifiers and literals
-    Ident,
-    Int,
+    Identifier,
+    Integer,
     String,
     Null,
 
@@ -18,10 +18,10 @@ pub enum TokenKind {
     Bang,
     Asterisk,
     Slash,
-    Lt,
-    Gt,
-    Eq,
-    NotEq,
+    LessThan,
+    GreaterThan,
+    Equal,
+    NotEqual,
 
     // Delimiters
     Comma,
@@ -52,7 +52,16 @@ pub enum TokenKind {
 
 impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
+        match self {
+            Self::Identifier => write!(f, "identifier"),
+            Self::Lparen => write!(f, "opening parenthesis"),
+            Self::Rparen => write!(f, "closing parenthesis"),
+            Self::Lbrace => write!(f, "opening brace"),
+            Self::Rbrace => write!(f, "closing brace"),
+            Self::Lbracket => write!(f, "opening bracket"),
+            Self::Rbracket => write!(f, "closing bracket"),
+            _ => write!(f, "{}", format!("{:?}", self).to_lowercase()),
+        }
     }
 }
 
