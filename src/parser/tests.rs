@@ -126,14 +126,30 @@ fn test_let_statements() {
 #[test]
 fn test_return_statements() {
     let tests = [
-        ("return 5;", Literal::Int(5)),
-        ("return false;", Literal::Bool(false)),
-        ("return foobar;", Literal::Ident("foobar")),
+        ("fn() { return 5; }", Literal::Int(5)),
+        ("fn() { return false; }", Literal::Bool(false)),
+        ("fn() { return foobar; }", Literal::Ident("foobar")),
     ];
 
     for (test_input, test_value) in &tests {
         let program = parse_program(test_input, 1);
-        match &program.statements[0] {
+        let outer_stmt = match &program.statements[0] {
+            Statement::Expression(expr_stmt) => expr_stmt,
+            _ => panic!(
+                "not a valid expression statement, got: {}",
+                &program.statements[0]
+            ),
+        };
+
+        let func = match &outer_stmt.value {
+            Expression::Function(func) => func,
+            _ => panic!(
+                "not a valid function expression, got: {:?}",
+                outer_stmt.value
+            ),
+        };
+
+        match &func.body.statements[0] {
             Statement::Return(stmt) => {
                 assert_eq!(stmt.token.kind, TokenKind::Return);
                 assert_eq!(stmt.token.literal, "return");
@@ -149,8 +165,21 @@ fn test_return_statements() {
 
 #[test]
 fn test_return_statements_without_value() {
-    let program = parse_program("return;", 1);
-    match &program.statements[0] {
+    let program = parse_program("fn() { return; }", 1);
+    let outer_stmt = match &program.statements[0] {
+        Statement::Expression(expr_stmt) => expr_stmt,
+        _ => panic!(
+            "not a valid expression statement, got: {}",
+            &program.statements[0]
+        ),
+    };
+
+    let func = match &outer_stmt.value {
+        Expression::Function(func) => func,
+        _ => panic!("not a valid function expression, got: {}", outer_stmt.value),
+    };
+
+    match &func.body.statements[0] {
         Statement::Return(stmt) => {
             assert_eq!(stmt.token.kind, TokenKind::Return);
             assert_eq!(stmt.token.literal, "return");

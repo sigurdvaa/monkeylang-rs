@@ -108,15 +108,15 @@ fn test_if_else_expression() {
 #[test]
 fn test_return_statements() {
     let tests = [
-        ("return 10;", 1, 10),
-        ("return 10; 9;", 2, 10),
-        ("return 2 * 5; 9;", 2, 10),
-        ("9; return 2 * 5; 9;", 3, 10),
-        ("if (10 > 1) { return 10; } return 1;", 2, 10),
+        ("fn() { return 10; }()", 10),
+        ("fn() { return 10; 9; }()", 10),
+        ("fn() { return 2 * 5; 9; }()", 10),
+        ("fn() { 9; return 2 * 5; 9; }()", 10),
+        ("fn() { if (10 > 1) { return 10; } return 1; }()", 10),
     ];
-    for (test_input, test_stmts, test_value) in tests {
+    for (test_input, test_value) in tests {
         assert_eq!(
-            test_eval(test_input, test_stmts),
+            test_eval(test_input, 1),
             Rc::new(Object::new_integer(test_value))
         );
     }
@@ -136,7 +136,7 @@ fn test_error_handling() {
             "unknown boolean operator: +",
         ),
         (
-            "if (10 > 1) { if (10 > 1) { return true + false; } return 1; }",
+            "fn() { if (10 > 1) { if (10 > 1) { return true + false; } return 1; } }()",
             1,
             "unknown boolean operator: +",
         ),
@@ -423,8 +423,8 @@ fn test_loop_expressions() {
             Object::new_integer(6),
         ),
         (
-            "let a = 0; loop { if (a > 5) { break 6; }; let a = a + 1; return 2; }",
-            2,
+            "fn(x) { let a = x; loop { if (a > 5) { break 6; }; let a = a + 1; return 2; } }(0)",
+            1,
             Object::new_integer(2),
         ),
         (

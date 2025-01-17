@@ -72,10 +72,10 @@ impl fmt::Display for Token {
 }
 
 impl Token {
-    pub fn _loc(&self) -> String {
+    pub fn loc(&self) -> String {
         match &self.file {
             Some(file) => format!("{file}:{}:{}", self.line, self.col),
-            None => format!("{}:{}", self.line, self.col),
+            None => format!("(input):{}:{}", self.line, self.col),
         }
     }
 }

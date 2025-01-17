@@ -38,6 +38,12 @@ impl From<&TokenKind> for Precedence {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParserContext {
+    Function,
+    Loop,
+}
+
 #[derive(Debug)]
 pub enum ParserError {
     // TODO: improve errors by including token, show line and char pos
@@ -48,6 +54,9 @@ pub enum ParserError {
     ParseInfix(String),
     QuoteWrongNumArgs(usize),
     UnquoteWrongNumArgs(usize),
+    InvalidContext(Token, ParserContext, Option<ParserContext>),
+    BreakOutsideLoop(Token),
+    ReturnOutsideFunction(Token),
 }
 
 impl std::error::Error for ParserError {}
@@ -68,6 +77,19 @@ impl fmt::Display for ParserError {
                 f,
                 "wrong number of arguments for \"unquote\", want=1, got={args_len}"
             ),
+            Self::InvalidContext(token, want, got) => {
+                write!(
+                    f,
+                    "{}: expected context {want:?}, but got {got:?}",
+                    token.loc()
+                )
+            }
+            Self::BreakOutsideLoop(token) => {
+                write!(f, "{}: \"break\" outside loop", token.loc())
+            }
+            Self::ReturnOutsideFunction(token) => {
+                write!(f, "{}: \"return\" outside function", token.loc())
+            }
         }
     }
 }
@@ -82,6 +104,7 @@ pub struct Parser<'a> {
     pub errors: Vec<ParserError>,
     prefix_parse_fns: HashMap<TokenKind, PrefixParseFn>,
     infix_parse_fns: HashMap<TokenKind, InfixParseFn>,
+    context: Vec<ParserContext>,
 }
 
 impl<'a> Parser<'a> {
@@ -93,6 +116,7 @@ impl<'a> Parser<'a> {
             errors: vec![],
             prefix_parse_fns: HashMap::new(),
             infix_parse_fns: HashMap::new(),
+            context: vec![],
         };
 
         parser
@@ -221,8 +245,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_return_statement(&mut self) -> Result<ExpressionStatement, ParserError> {
-        // TODO: verify we're inside a function
         let token = self.curr_token.clone();
+        if !self.context.contains(&ParserContext::Function) {
+            return Err(ParserError::ReturnOutsideFunction(token));
+        }
 
         let value = match self.next_token.kind {
             TokenKind::Semicolon => Expression::Null(token.clone()),
@@ -257,8 +283,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_break_statement(&mut self) -> Result<ExpressionStatement, ParserError> {
-        // TODO: verify we're inside a loop
         let token = self.curr_token.clone();
+        if !matches!(self.context.last(), Some(ParserContext::Loop)) {
+            return Err(ParserError::BreakOutsideLoop(token));
+        }
 
         let value = match self.next_token.kind {
             TokenKind::Semicolon => Expression::Null(token.clone()),
@@ -360,7 +388,18 @@ impl<'a> Parser<'a> {
         let parameters = parser.parse_function_parameters()?;
 
         parser.expect_token(TokenKind::Lbrace)?;
+        parser.context.push(ParserContext::Function);
         let body = parser.parse_block_statement()?;
+        match parser.context.pop() {
+            Some(ParserContext::Function) => (),
+            unexpected => {
+                return Err(ParserError::InvalidContext(
+                    token,
+                    ParserContext::Loop,
+                    unexpected,
+                ))
+            }
+        }
 
         Ok(Expression::Function(FunctionLiteral {
             token,
@@ -458,7 +497,18 @@ impl<'a> Parser<'a> {
         let token = parser.curr_token.clone();
 
         parser.expect_token(TokenKind::Lbrace)?;
+        parser.context.push(ParserContext::Loop);
         let body = parser.parse_block_statement()?;
+        match parser.context.pop() {
+            Some(ParserContext::Loop) => (),
+            unexpected => {
+                return Err(ParserError::InvalidContext(
+                    token,
+                    ParserContext::Loop,
+                    unexpected,
+                ))
+            }
+        }
 
         Ok(Expression::Loop(LoopExpression { token, body }))
     }
@@ -617,13 +667,13 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> Result<Statement, ParserError> {
-        match self.curr_token.kind {
-            TokenKind::Let => Ok(Statement::Let(self.parse_let_statement()?)),
-            TokenKind::Return => Ok(Statement::Return(self.parse_return_statement()?)),
-            TokenKind::Exit => Ok(Statement::Exit(self.parse_exit_statement()?)),
-            TokenKind::Break => Ok(Statement::Break(self.parse_break_statement()?)),
-            _ => Ok(Statement::Expression(self.parse_expression_statement()?)),
-        }
+        Ok(match self.curr_token.kind {
+            TokenKind::Let => Statement::Let(self.parse_let_statement()?),
+            TokenKind::Return => Statement::Return(self.parse_return_statement()?),
+            TokenKind::Exit => Statement::Exit(self.parse_exit_statement()?),
+            TokenKind::Break => Statement::Break(self.parse_break_statement()?),
+            _ => Statement::Expression(self.parse_expression_statement()?),
+        })
     }
 
     pub fn parse_program(&mut self) -> Program {
@@ -632,7 +682,14 @@ impl<'a> Parser<'a> {
         while self.curr_token.kind != TokenKind::EndOfFile {
             match self.parse_statement() {
                 Ok(stmt) => prog.statements.push(stmt),
-                Err(err) => self.errors.push(err),
+                Err(err) => {
+                    self.errors.push(err);
+                    while self.curr_token.kind != TokenKind::Semicolon
+                        && self.curr_token.kind != TokenKind::EndOfFile
+                    {
+                        self.next_tokens();
+                    }
+                }
             };
             self.next_tokens();
         }
