@@ -26,7 +26,7 @@ fn len(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     }
 
     Rc::new(match &*args[0] {
-        Object::String(obj) => Object::new_integer(obj.value.len() as isize),
+        Object::String(value) => Object::new_integer(value.len() as isize),
         Object::Array(value) => Object::new_integer(value.len() as isize),
         _ => Object::Error(format!(
             "argument to \"len\" not supported, got {}",
@@ -119,7 +119,7 @@ fn push(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     })
 }
 
-fn insert(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
+fn insert(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 3 {
         return Rc::new(Object::Error(format!(
             "wrong number of arguments \"insert\", got={}, want=3",
@@ -132,14 +132,13 @@ fn insert(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
             let mut new = value.clone();
             match &*args[1] {
                 Object::Integer(i) => {
-                    if i.value as usize >= value.len() {
+                    if *i as usize >= value.len() {
                         return Rc::new(Object::Error(format!(
-                            "2nd argument to \"insert\" is out of range, got {}, length is {}",
-                            i.value,
+                            "2nd argument to \"insert\" is out of range, got {i}, length is {}",
                             value.len()
                         )));
                     }
-                    new.insert(i.value as usize, args[2].clone());
+                    new.insert(*i as usize, args[2].clone());
                 }
                 _ => {
                     return Rc::new(Object::Error(format!(
@@ -152,7 +151,7 @@ fn insert(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
         }
         Object::Hash(value) => {
             let mut new = value.clone();
-            let key = match args[1].hash_key() {
+            let key = match engine.get_objutil().hash_key(args[1].clone()) {
                 Ok(key) => key,
                 Err(err) => return Rc::new(Object::Error(err.to_string())),
             };
@@ -179,14 +178,13 @@ fn replace(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
             let mut new = value.clone();
             match &*args[1] {
                 Object::Integer(i) => {
-                    if i.value as usize >= value.len() {
+                    if *i as usize >= value.len() {
                         return Rc::new(Object::Error(format!(
-                            "2nd argument to \"replace\" is out of range, got {}, length is {}",
-                            i.value,
+                            "2nd argument to \"replace\" is out of range, got {i}, length is {}",
                             value.len()
                         )));
                     }
-                    new[i.value as usize] = args[2].clone();
+                    new[*i as usize] = args[2].clone();
                 }
                 _ => {
                     return Rc::new(Object::Error(format!(
@@ -225,8 +223,8 @@ fn string(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     }
 
     Rc::new(match &*args[0] {
-        Object::String(obj) => Object::new_string(obj.value.clone()),
-        Object::Integer(obj) => Object::new_string(obj.value.to_string()),
+        Object::String(value) => Object::new_string(value.clone()),
+        Object::Integer(value) => Object::new_string(value.to_string()),
         Object::Array(value) => Object::new_string(
             value
                 .iter()

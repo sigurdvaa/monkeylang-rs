@@ -72,7 +72,7 @@ fn test_boolean_expressions() {
         ("!(if (false) { 5; })", true),
     ];
     for (test_input, test_value) in tests {
-        run_vm_test(test_input, 1, Object::new_boolean(test_value));
+        run_vm_test(test_input, 1, Object::Boolean(test_value));
     }
 }
 
@@ -140,6 +140,7 @@ fn test_array_literals() {
 
 #[test]
 fn test_hash_literals() {
+    let mut objutil = ObjectUtil::new();
     let tests = [
         ("{}", vec![]),
         ("{1: 2, 3: 4}", vec![(1, 2), (3, 4)]),
@@ -148,10 +149,12 @@ fn test_hash_literals() {
     for (test_input, test_value) in tests {
         let mut test_hash = HashMap::new();
         for (k, v) in test_value {
-            let key = Object::new_integer(k);
-            let value = Object::new_integer(v);
-            let hash = key.hash_key().expect("couldn't generate hash key");
-            let pair = (Rc::new(key), Rc::new(value));
+            let key = Rc::new(Object::new_integer(k));
+            let value = Rc::new(Object::new_integer(v));
+            let hash = objutil
+                .hash_key(key.clone())
+                .expect("couldn't generate hash key");
+            let pair = (key, value);
             test_hash.insert(hash, pair);
         }
         run_vm_test(test_input, 1, Object::Hash(test_hash));
@@ -167,16 +170,8 @@ fn test_index_expressions() {
         ("[][0]", Object::Null),
         ("[1, 2, 3][99]", Object::Null),
         ("[1][-1]", Object::Null),
-        ("{1: 1, 2: 2}[1]", {
-            let obj = Object::new_integer(1);
-            _ = obj.hash_key();
-            obj
-        }),
-        ("{1: 1, 2: 2}[2]", {
-            let obj = Object::new_integer(2);
-            _ = obj.hash_key();
-            obj
-        }),
+        ("{1: 1, 2: 2}[1]", Object::new_integer(1)),
+        ("{1: 1, 2: 2}[2]", Object::new_integer(2)),
         ("{1: 1}[0]", Object::Null),
         ("{}[0]", Object::Null),
     ];

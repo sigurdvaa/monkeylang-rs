@@ -70,7 +70,7 @@ fn test_eval_boolean_expression() {
         ("\"foo\" == null", false),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(*test_eval(test_input, 1), Object::new_boolean(*test_value));
+        assert_eq!(*test_eval(test_input, 1), Object::Boolean(*test_value));
     }
 }
 
@@ -85,7 +85,7 @@ fn test_bang_operator() {
         ("!!5", true),
     ];
     for (test_input, test_value) in &tests {
-        assert_eq!(*test_eval(test_input, 1), Object::new_boolean(*test_value));
+        assert_eq!(*test_eval(test_input, 1), Object::Boolean(*test_value));
     }
 }
 
@@ -351,34 +351,35 @@ fn test_hash_literals() {
         "  false: 6\n",
         "}\n",
     );
+    let mut objutil = ObjectUtil::new();
+    let one = Rc::new(Object::String("one".into()));
+    let two = Rc::new(Object::String("two".into()));
+    let three = Rc::new(Object::new_string("three".into()));
+    let four = Rc::new(Object::Integer(4));
     let tests = HashMap::from([
         (
-            Object::new_string("one".into()).hash_key().unwrap(),
-            (Object::new_string("one".into()), Object::new_integer(1)),
+            objutil.hash_key(one.clone()).unwrap(),
+            (one, Object::new_integer(1)),
         ),
         (
-            Object::new_string("two".into()).hash_key().unwrap(),
-            (Object::new_string("two".into()), Object::new_integer(2)),
+            objutil.hash_key(two.clone()).unwrap(),
+            (two, Object::new_integer(2)),
         ),
         (
-            Object::new_string("three".into()).hash_key().unwrap(),
-            (Object::new_string("three".into()), Object::new_integer(3)),
+            objutil.hash_key(three.clone()).unwrap(),
+            (three, Object::new_integer(3)),
         ),
         (
-            Object::new_integer(4).hash_key().unwrap(),
-            (Object::new_integer(4), {
-                let obj = Object::new_integer(4);
-                _ = obj.hash_key();
-                obj
-            }),
+            objutil.hash_key(four.clone()).unwrap(),
+            (four, Object::new_integer(4)),
         ),
         (
-            Object::new_boolean(true).hash_key().unwrap(),
-            (Object::new_boolean(true), Object::new_integer(5)),
+            objutil.hash_key(objutil.obj_true.clone()).unwrap(),
+            (objutil.obj_true.clone(), Object::new_integer(5)),
         ),
         (
-            Object::new_boolean(false).hash_key().unwrap(),
-            (Object::new_boolean(false), Object::new_integer(6)),
+            objutil.hash_key(objutil.obj_false.clone()).unwrap(),
+            (objutil.obj_false.clone(), Object::new_integer(6)),
         ),
     ]);
 
@@ -388,8 +389,8 @@ fn test_hash_literals() {
             assert_eq!(hash.len(), 6);
             for (hash, (key, value)) in hash {
                 let (test_key, test_value) = &tests[hash];
-                let _ = test_key.hash_key();
-                assert_eq!(**key, *test_key);
+                let _ = objutil.hash_key(test_key.clone());
+                assert_eq!(key, test_key);
                 assert_eq!(**value, *test_value);
             }
         }
@@ -408,11 +409,7 @@ fn test_hash_index_expressions() {
             Object::new_integer(5),
         ),
         (r#"{}["foo"]"#, 1, Object::Null),
-        (r#"{5: 5}[5]"#, 1, {
-            let obj = Object::new_integer(5);
-            _ = obj.hash_key();
-            obj
-        }),
+        (r#"{5: 5}[5]"#, 1, Object::new_integer(5)),
         (r#"{true: 5}[true]"#, 1, Object::new_integer(5)),
         (r#"{false: 5}[false]"#, 1, Object::new_integer(5)),
     ];

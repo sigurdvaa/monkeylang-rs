@@ -3,18 +3,19 @@ pub mod builtins;
 use crate::ast::{BlockStatement, Expression, IdentifierLiteral};
 use crate::code::Instruction;
 use crate::evaluator::Env;
-use std::cell::{RefCell, RefMut};
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{self, Display};
 use std::rc::Rc;
 
 pub trait Engine {
     fn call_func(&mut self, func: Rc<Object>, args: &[Rc<Object>]) -> Rc<Object>;
+    fn get_objutil(&mut self) -> &mut ObjectUtil;
     fn get_obj_null(&self) -> Rc<Object>;
     fn get_obj_none(&self) -> Rc<Object>;
 }
 
-pub type Integer = IntegerObj;
+pub type Integer = isize;
 pub type BuiltinFunction = fn(&[Rc<Object>], &mut dyn Engine) -> Rc<Object>;
 pub type Array = Vec<Rc<Object>>;
 pub type HashObj = HashMap<HashKeyData, (Rc<Object>, Rc<Object>)>;
@@ -79,14 +80,14 @@ pub struct HashKeyData {
 pub enum Object {
     Null,
     None,
-    Integer(IntegerObj),
-    Boolean(BooleanObj),
+    Integer(Integer),
+    Boolean(bool),
     Return(Rc<Self>),
     Break(Rc<Self>),
     Error(String),
     Function(FunctionObj),
     CompiledFunction(Rc<CompiledFunctionObj>),
-    String(StringObj),
+    String(String),
     Builtin(BuiltinFunction),
     Array(Array),
     Hash(HashObj),
@@ -98,45 +99,19 @@ pub enum Object {
 impl fmt::Display for Object {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::String(obj) => write!(f, "{}", obj.value),
+            Self::String(value) => write!(f, "{}", value),
             _ => write!(f, "{}", self.inspect()),
         }
     }
 }
 
 impl Object {
-    pub fn new_boolean(value: bool) -> Self {
-        match value {
-            true => Object::Boolean(BooleanObj {
-                value: true,
-                hash: RefCell::new(Some(HashKeyData {
-                    kind: "BOOLEAN",
-                    value: 1,
-                })),
-            }),
-
-            false => Object::Boolean(BooleanObj {
-                value: false,
-                hash: RefCell::new(Some(HashKeyData {
-                    kind: "BOOLEAN",
-                    value: 0,
-                })),
-            }),
-        }
-    }
-
     pub fn new_integer(value: isize) -> Self {
-        Self::Integer(IntegerObj {
-            value,
-            hash: RefCell::new(None),
-        })
+        Self::Integer(value)
     }
 
     pub fn new_string(value: String) -> Self {
-        Self::String(StringObj {
-            value,
-            hash: RefCell::new(None),
-        })
+        Self::String(value)
     }
 
     pub fn kind(&self) -> &'static str {
@@ -162,11 +137,11 @@ impl Object {
 
     pub fn is_truthy(&self) -> bool {
         match self {
-            Self::Integer(obj) => obj.value > 0,
-            Self::String(obj) => !obj.value.is_empty(),
+            Self::Integer(value) => *value > 0,
+            Self::String(value) => !value.is_empty(),
             Self::Array(value) => !value.is_empty(),
             Self::Hash(value) => !value.is_empty(),
-            Self::Boolean(obj) => obj.value,
+            Self::Boolean(value) => *value,
             _ => false,
         }
     }
@@ -174,8 +149,8 @@ impl Object {
         match self {
             Self::Null => "null".into(),
             Self::None => "".into(),
-            Self::Integer(obj) => obj.value.to_string(),
-            Self::Boolean(obj) => obj.value.to_string(),
+            Self::Integer(value) => value.to_string(),
+            Self::Boolean(value) => value.to_string(),
             Self::Return(value) => value.inspect(),
             Self::Break(value) => value.inspect(),
             Self::Error(value) => format!("ERROR: {value}"),
@@ -201,7 +176,7 @@ impl Object {
                     .join(", "),
                 &func.body.to_string()
             ),
-            Self::String(obj) => format!("\"{}\"", obj.value.replace("\"", "\\\"")),
+            Self::String(value) => format!("\"{}\"", value.replace("\"", "\\\"")),
             Self::Builtin(_) => "builtin function".into(),
             Self::Array(value) => format!(
                 "[{}]",
@@ -224,45 +199,76 @@ impl Object {
             Self::Quote(expr) => format!("QUOTE({expr})"),
         }
     }
+}
 
-    fn set_hash_key(
-        &self,
-        mut hash: RefMut<Option<HashKeyData>>,
-        kind: &'static str,
-        value: usize,
-    ) -> HashKeyData {
-        let hash_key = HashKeyData { kind, value };
-        *hash = Some(hash_key.clone());
-        hash_key
+pub struct ObjectUtil {
+    pub obj_true: Rc<Object>,
+    pub obj_false: Rc<Object>,
+    pub obj_null: Rc<Object>,
+    pub obj_none: Rc<Object>,
+    hashkey_cache_str: BTreeMap<String, HashKeyData>,
+    hashkey_cache_int: BTreeMap<isize, HashKeyData>,
+    hashkey_true: HashKeyData,
+    hashkey_false: HashKeyData,
+    hashkey_null: HashKeyData,
+}
+
+impl ObjectUtil {
+    pub fn new() -> Self {
+        Self {
+            // TODO: make cache lru, currently grows indefinitely
+            obj_true: Rc::new(Object::Boolean(true)),
+            obj_false: Rc::new(Object::Boolean(false)),
+            obj_null: Rc::new(Object::Null),
+            obj_none: Rc::new(Object::None),
+            hashkey_cache_str: BTreeMap::new(),
+            hashkey_cache_int: BTreeMap::new(),
+            hashkey_true: HashKeyData {
+                kind: Object::Boolean(true).kind(),
+                value: 1,
+            },
+            hashkey_false: HashKeyData {
+                kind: Object::Boolean(false).kind(),
+                value: 0,
+            },
+            hashkey_null: HashKeyData {
+                kind: Object::Null.kind(),
+                value: 0,
+            },
+        }
     }
 
-    pub fn hash_key(&self) -> Result<HashKeyData, HashKeyError> {
-        // TODO: avoid collisions
-        // TODO: improve cache, currently only works with bindings (attached to obj)
-        match self {
-            Self::Boolean(obj) => {
-                if let Some(hash_key) = obj.hash.borrow().as_ref() {
+    pub fn hash_key(&mut self, obj: Rc<Object>) -> Result<HashKeyData, HashKeyError> {
+        match obj.as_ref() {
+            Object::Null => Ok(self.hashkey_null.clone()),
+            Object::Boolean(value) => match value {
+                true => Ok(self.hashkey_true.clone()),
+                false => Ok(self.hashkey_false.clone()),
+            },
+            Object::Integer(value) => {
+                if let Some(hash_key) = self.hashkey_cache_int.get(value) {
                     return Ok(hash_key.clone());
                 }
-                Ok(self.set_hash_key(obj.hash.borrow_mut(), self.kind(), obj.value as usize))
+                let hash_key = HashKeyData {
+                    kind: obj.kind(),
+                    value: *value as usize,
+                };
+                self.hashkey_cache_int.insert(*value, hash_key.clone());
+                Ok(hash_key)
             }
-            Self::Integer(obj) => {
-                if let Some(hash_key) = obj.hash.borrow().as_ref() {
+            Object::String(ref value) => {
+                if let Some(hash_key) = self.hashkey_cache_str.get(value) {
                     return Ok(hash_key.clone());
                 }
-                Ok(self.set_hash_key(obj.hash.borrow_mut(), self.kind(), obj.value as usize))
+                let hash_key = HashKeyData {
+                    kind: obj.kind(),
+                    value: value.chars().map(|c| c as usize).sum(),
+                };
+                self.hashkey_cache_str
+                    .insert(value.to_string(), hash_key.clone());
+                Ok(hash_key)
             }
-            Self::String(obj) => {
-                if let Some(hash_key) = obj.hash.borrow().as_ref() {
-                    return Ok(hash_key.clone());
-                }
-                Ok(self.set_hash_key(
-                    obj.hash.borrow_mut(),
-                    self.kind(),
-                    obj.value.chars().map(|c| c as usize).sum(),
-                ))
-            }
-            _ => Err(HashKeyError(self.kind())),
+            _ => Err(HashKeyError(obj.kind())),
         }
     }
 }
@@ -271,21 +277,17 @@ impl Object {
 mod tests {
     use super::*;
 
-    fn create_str_obj(value: &str) -> Object {
-        let obj = Object::new_string(value.into());
-        let _ = obj.hash_key();
-        obj
-    }
-
     #[test]
     fn test_string_hash_key() {
-        let hello1 = create_str_obj("Hello World!");
-        let hello2 = create_str_obj("Hello World!");
-        let diff1 = create_str_obj("My name is sig");
-        let diff2 = create_str_obj("My name is sig");
+        let hello1 = Rc::new(Object::String("Hello World!".into()));
+        let hello2 = Rc::new(Object::String("Hello World!".into()));
+        let diff1 = Rc::new(Object::String("My name is sig".into()));
+        let diff2 = Rc::new(Object::String("My name is sig".into()));
 
-        assert_eq!(hello1.hash_key(), hello2.hash_key());
-        assert_eq!(diff1.hash_key(), diff2.hash_key());
-        assert_ne!(hello1.hash_key(), diff1.hash_key());
+        let mut objutil = ObjectUtil::new();
+
+        assert_eq!(objutil.hash_key(hello1.clone()), objutil.hash_key(hello2));
+        assert_eq!(objutil.hash_key(diff1.clone()), objutil.hash_key(diff2));
+        assert_ne!(objutil.hash_key(hello1), objutil.hash_key(diff1));
     }
 }

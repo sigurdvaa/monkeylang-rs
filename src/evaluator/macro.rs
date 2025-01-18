@@ -9,17 +9,17 @@ use std::rc::Rc;
 impl Eval {
     fn convert_object_to_expression(obj: Rc<Object>, expr: &Expression) -> Expression {
         match obj.as_ref() {
-            Object::Boolean(obj) => Expression::Boolean(BooleanLiteral {
+            Object::Boolean(value) => Expression::Boolean(BooleanLiteral {
                 token: expr.get_token().clone(),
-                value: obj.value,
+                value: *value,
             }),
-            Object::Integer(obj) => Expression::Integer(IntegerLiteral {
+            Object::Integer(value) => Expression::Integer(IntegerLiteral {
                 token: expr.get_token().clone(),
-                value: obj.value as usize,
+                value: *value as usize,
             }),
-            Object::String(obj) => Expression::String(StringLiteral {
+            Object::String(value) => Expression::String(StringLiteral {
                 token: expr.get_token().clone(),
-                value: obj.value.to_owned(),
+                value: value.clone(),
             }),
             Object::Null => Expression::Null(expr.get_token().clone()),
             Object::Quote(expr) => expr.clone(),
