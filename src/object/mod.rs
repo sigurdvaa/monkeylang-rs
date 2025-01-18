@@ -3,7 +3,6 @@ pub mod builtins;
 use crate::ast::{BlockStatement, Expression, IdentifierLiteral};
 use crate::code::Instruction;
 use crate::evaluator::Env;
-use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{self, Display};
 use std::rc::Rc;
@@ -18,8 +17,7 @@ pub trait Engine {
 pub type Integer = isize;
 pub type BuiltinFunction = fn(&[Rc<Object>], &mut dyn Engine) -> Rc<Object>;
 pub type Array = Vec<Rc<Object>>;
-pub type HashObj = HashMap<HashKeyData, (Rc<Object>, Rc<Object>)>;
-type HashKey = RefCell<Option<HashKeyData>>;
+pub type Hash = HashMap<HashKey, (Rc<Object>, Rc<Object>)>;
 
 #[derive(Debug, PartialEq)]
 pub struct HashKeyError(&'static str);
@@ -30,24 +28,6 @@ impl Display for HashKeyError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "type not supported as hash key: {}", self.0)
     }
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub struct IntegerObj {
-    pub value: isize,
-    hash: HashKey,
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub struct BooleanObj {
-    pub value: bool,
-    pub hash: HashKey,
-}
-
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub struct StringObj {
-    pub value: String,
-    hash: HashKey,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -71,7 +51,7 @@ pub struct ClosureObj {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Clone)]
-pub struct HashKeyData {
+pub struct HashKey {
     pub kind: &'static str,
     pub value: usize,
 }
@@ -85,14 +65,14 @@ pub enum Object {
     Return(Rc<Self>),
     Break(Rc<Self>),
     Error(String),
-    Function(FunctionObj),
+    Function(Box<FunctionObj>),
     CompiledFunction(Rc<CompiledFunctionObj>),
     String(String),
     Builtin(BuiltinFunction),
     Array(Array),
-    Hash(HashObj),
-    Quote(Expression),
-    Macro(FunctionObj),
+    Hash(Hash),
+    Quote(Box<Expression>),
+    Macro(Box<FunctionObj>),
     Closure(Rc<ClosureObj>),
 }
 
@@ -106,6 +86,7 @@ impl fmt::Display for Object {
 }
 
 impl Object {
+    // TODO: remove new*?
     pub fn new_integer(value: isize) -> Self {
         Self::Integer(value)
     }
@@ -206,11 +187,11 @@ pub struct ObjectUtil {
     pub obj_false: Rc<Object>,
     pub obj_null: Rc<Object>,
     pub obj_none: Rc<Object>,
-    hashkey_cache_str: BTreeMap<String, HashKeyData>,
-    hashkey_cache_int: BTreeMap<isize, HashKeyData>,
-    hashkey_true: HashKeyData,
-    hashkey_false: HashKeyData,
-    hashkey_null: HashKeyData,
+    hashkey_cache_str: BTreeMap<String, HashKey>,
+    hashkey_cache_int: BTreeMap<isize, HashKey>,
+    hashkey_true: HashKey,
+    hashkey_false: HashKey,
+    hashkey_null: HashKey,
 }
 
 impl ObjectUtil {
@@ -223,22 +204,22 @@ impl ObjectUtil {
             obj_none: Rc::new(Object::None),
             hashkey_cache_str: BTreeMap::new(),
             hashkey_cache_int: BTreeMap::new(),
-            hashkey_true: HashKeyData {
+            hashkey_true: HashKey {
                 kind: Object::Boolean(true).kind(),
                 value: 1,
             },
-            hashkey_false: HashKeyData {
+            hashkey_false: HashKey {
                 kind: Object::Boolean(false).kind(),
                 value: 0,
             },
-            hashkey_null: HashKeyData {
+            hashkey_null: HashKey {
                 kind: Object::Null.kind(),
                 value: 0,
             },
         }
     }
 
-    pub fn hash_key(&mut self, obj: Rc<Object>) -> Result<HashKeyData, HashKeyError> {
+    pub fn hash_key(&mut self, obj: Rc<Object>) -> Result<HashKey, HashKeyError> {
         match obj.as_ref() {
             Object::Null => Ok(self.hashkey_null.clone()),
             Object::Boolean(value) => match value {
@@ -249,7 +230,7 @@ impl ObjectUtil {
                 if let Some(hash_key) = self.hashkey_cache_int.get(value) {
                     return Ok(hash_key.clone());
                 }
-                let hash_key = HashKeyData {
+                let hash_key = HashKey {
                     kind: obj.kind(),
                     value: *value as usize,
                 };
@@ -260,7 +241,7 @@ impl ObjectUtil {
                 if let Some(hash_key) = self.hashkey_cache_str.get(value) {
                     return Ok(hash_key.clone());
                 }
-                let hash_key = HashKeyData {
+                let hash_key = HashKey {
                     kind: obj.kind(),
                     value: value.chars().map(|c| c as usize).sum(),
                 };

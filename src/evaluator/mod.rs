@@ -295,11 +295,11 @@ impl Eval {
                     expr.token
                 )
             }
-            Expression::Function(expr) => Rc::new(Object::Function(FunctionObj {
+            Expression::Function(expr) => Rc::new(Object::Function(Box::new(FunctionObj {
                 parameters: expr.parameters.clone(),
                 body: expr.body.clone(),
                 env: self.envs[self.ep].clone(),
-            })),
+            }))),
             Expression::Macro(expr) => {
                 panic!("found Macro expression during evaluation: {:?}", expr)
             }

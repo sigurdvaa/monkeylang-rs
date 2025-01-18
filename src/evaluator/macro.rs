@@ -22,7 +22,7 @@ impl Eval {
                 value: value.clone(),
             }),
             Object::Null => Expression::Null(expr.get_token().clone()),
-            Object::Quote(expr) => expr.clone(),
+            Object::Quote(expr) => *expr.clone(),
             _ => panic!("can't convert object to expression: {obj:?}"),
         }
     }
@@ -42,7 +42,7 @@ impl Eval {
 
     pub fn quote(&mut self, mut expr: Expression) -> Rc<Object> {
         self.eval_unquote_calls(&mut expr);
-        Rc::new(Object::Quote(expr))
+        Rc::new(Object::Quote(Box::new(expr)))
     }
 
     pub fn define_macros(&mut self, prog: &mut Program) {
@@ -58,11 +58,11 @@ impl Eval {
                 _ => continue,
             };
 
-            let obj = Object::Macro(FunctionObj {
+            let obj = Object::Macro(Box::new(FunctionObj {
                 parameters: expr.parameters.clone(),
                 body: expr.body.clone(),
                 env: self.envs[self.ep].clone(),
-            });
+            }));
 
             self.envs[self.ep].set(stmt.name.value.to_owned(), Rc::new(obj));
             defs.push(i);
@@ -93,7 +93,7 @@ impl Eval {
             let args: Vec<_> = call
                 .arguments
                 .iter()
-                .map(|a| Rc::new(Object::Quote(a.clone())))
+                .map(|a| Rc::new(Object::Quote(Box::new(a.clone()))))
                 .collect();
 
             let macro_env = Environment::new_enclosed(macr.env.clone());
@@ -110,7 +110,7 @@ impl Eval {
                 Object::Quote(expr) => expr,
                 _ => panic!("returning AST expressions only supported from macros"),
             };
-            *expr = new_expr.to_owned();
+            *expr = *new_expr.clone();
         };
         modify_program(prog, expand, self);
     }
