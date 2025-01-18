@@ -29,7 +29,7 @@ fn test_eval_integer_expression() {
     for (test_input, test_stmts, test_value) in tests {
         assert_eq!(
             *test_eval(test_input, test_stmts),
-            Object::new_integer(test_value)
+            Object::Integer(test_value)
         );
     }
 }
@@ -92,13 +92,13 @@ fn test_bang_operator() {
 #[test]
 fn test_if_else_expression() {
     let tests = [
-        ("if (true) { 10 }", Object::new_integer(10)),
+        ("if (true) { 10 }", Object::Integer(10)),
         ("if (false) { 10 }", Object::Null),
-        ("if (1) { 10 }", Object::new_integer(10)),
-        ("if (1 < 2) { 10 }", Object::new_integer(10)),
+        ("if (1) { 10 }", Object::Integer(10)),
+        ("if (1 < 2) { 10 }", Object::Integer(10)),
         ("if (1 > 2) { 10 }", Object::Null),
-        ("if (1 > 2) { 10 } else { 20 }", Object::new_integer(20)),
-        ("if (1 < 2) { 10 } else { 20 }", Object::new_integer(10)),
+        ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
+        ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
     ];
     for (test_input, test_value) in tests {
         assert_eq!(*test_eval(test_input, 1), test_value);
@@ -117,7 +117,7 @@ fn test_return_statements() {
     for (test_input, test_value) in tests {
         assert_eq!(
             test_eval(test_input, 1),
-            Rc::new(Object::new_integer(test_value))
+            Rc::new(Object::Integer(test_value))
         );
     }
 }
@@ -167,7 +167,7 @@ fn test_let_statements() {
     for (test_input, test_stmts, test_value) in tests {
         assert_eq!(
             *test_eval(test_input, test_stmts),
-            Object::new_integer(test_value)
+            Object::Integer(test_value)
         );
     }
 }
@@ -203,7 +203,7 @@ fn test_function_application() {
     for (test_input, test_stmts, test_value) in tests {
         assert_eq!(
             *test_eval(test_input, test_stmts),
-            Object::new_integer(test_value)
+            Object::Integer(test_value)
         );
     }
 }
@@ -218,33 +218,27 @@ fn test_closures() {
         "let addTwo = newAdder(2);\n",
         "addTwo(2);"
     );
-    assert_eq!(*test_eval(input, 3), Object::new_integer(4));
+    assert_eq!(*test_eval(input, 3), Object::Integer(4));
 }
 
 #[test]
 fn test_string_literal() {
     let (test_input, test_value) = ("\"Hello World!\";", "Hello World!");
-    assert_eq!(
-        *test_eval(test_input, 1),
-        Object::new_string(test_value.into())
-    );
+    assert_eq!(*test_eval(test_input, 1), Object::String(test_value.into()));
 }
 
 #[test]
 fn test_string_concatenation() {
     let (test_input, test_value) = ("\"Hello\" + \" \" + \"World!\";", "Hello World!");
-    assert_eq!(
-        *test_eval(test_input, 1),
-        Object::new_string(test_value.into())
-    );
+    assert_eq!(*test_eval(test_input, 1), Object::String(test_value.into()));
 }
 
 #[test]
 fn test_builtin_functions() {
     let tests = [
-        ("len(\"\")", 1, Object::new_integer(0)),
-        ("len(\"four\")", 1, Object::new_integer(4)),
-        ("len(\"hello world\")", 1, Object::new_integer(11)),
+        ("len(\"\")", 1, Object::Integer(0)),
+        ("len(\"four\")", 1, Object::Integer(4)),
+        ("len(\"hello world\")", 1, Object::Integer(11)),
         (
             "len(1)",
             1,
@@ -259,33 +253,33 @@ fn test_builtin_functions() {
             "let list = [1, 2, 3]; insert(list, 1, 9)",
             2,
             Object::Array(vec![
-                Rc::new(Object::new_integer(1)),
-                Rc::new(Object::new_integer(9)),
-                Rc::new(Object::new_integer(2)),
-                Rc::new(Object::new_integer(3)),
+                Rc::new(Object::Integer(1)),
+                Rc::new(Object::Integer(9)),
+                Rc::new(Object::Integer(2)),
+                Rc::new(Object::Integer(3)),
             ]),
         ),
         (
             "let hashmap = {1: \"one\"}; insert(hashmap, 2, \"two\")[2]",
             2,
-            Object::new_string("two".into()),
+            Object::String("two".into()),
         ),
         (
             "let list = [1, 2, 3]; map(list, string)",
             2,
             Object::Array(vec![
-                Rc::new(Object::new_string("1".into())),
-                Rc::new(Object::new_string("2".into())),
-                Rc::new(Object::new_string("3".into())),
+                Rc::new(Object::String("1".into())),
+                Rc::new(Object::String("2".into())),
+                Rc::new(Object::String("3".into())),
             ]),
         ),
         (
             "let double = fn(x) { x * 2 }; let list = [1, 2, 3]; map(list, double)",
             3,
             Object::Array(vec![
-                Rc::new(Object::new_integer(2)),
-                Rc::new(Object::new_integer(4)),
-                Rc::new(Object::new_integer(6)),
+                Rc::new(Object::Integer(2)),
+                Rc::new(Object::Integer(4)),
+                Rc::new(Object::Integer(6)),
             ]),
         ),
     ];
@@ -300,9 +294,9 @@ fn test_array_literals() {
     assert_eq!(
         test_eval(input, 1),
         Rc::new(Object::Array(vec![
-            Rc::new(Object::new_integer(1)),
-            Rc::new(Object::new_integer(4)),
-            Rc::new(Object::new_integer(6)),
+            Rc::new(Object::Integer(1)),
+            Rc::new(Object::Integer(4)),
+            Rc::new(Object::Integer(6)),
         ]))
     );
 }
@@ -310,25 +304,25 @@ fn test_array_literals() {
 #[test]
 fn test_array_index_expressions() {
     let tests = [
-        ("[1, 2, 3][0]", 1, Object::new_integer(1)),
-        ("[1, 2, 3][1]", 1, Object::new_integer(2)),
-        ("[1, 2, 3][2]", 1, Object::new_integer(3)),
-        ("let i = 0; [1][i];", 2, Object::new_integer(1)),
-        ("[1, 2, 3][1 + 1];", 1, Object::new_integer(3)),
+        ("[1, 2, 3][0]", 1, Object::Integer(1)),
+        ("[1, 2, 3][1]", 1, Object::Integer(2)),
+        ("[1, 2, 3][2]", 1, Object::Integer(3)),
+        ("let i = 0; [1][i];", 2, Object::Integer(1)),
+        ("[1, 2, 3][1 + 1];", 1, Object::Integer(3)),
         (
             "let myArray = [1, 2, 3]; myArray[2];",
             2,
-            Object::new_integer(3),
+            Object::Integer(3),
         ),
         (
             "let myArray = [1, 2, 3]; myArray[0] + myArray[1] + myArray[2];",
             2,
-            Object::new_integer(6),
+            Object::Integer(6),
         ),
         (
             "let myArray = [1, 2, 3]; let i = myArray[0]; myArray[i]",
             3,
-            Object::new_integer(2),
+            Object::Integer(2),
         ),
         ("[1, 2, 3][3]", 1, Object::Null),
         ("[1, 2, 3][-1]", 1, Object::Null),
@@ -354,32 +348,32 @@ fn test_hash_literals() {
     let mut objutil = ObjectUtil::new();
     let one = Rc::new(Object::String("one".into()));
     let two = Rc::new(Object::String("two".into()));
-    let three = Rc::new(Object::new_string("three".into()));
+    let three = Rc::new(Object::String("three".into()));
     let four = Rc::new(Object::Integer(4));
     let tests = HashMap::from([
         (
             objutil.hash_key(one.clone()).unwrap(),
-            (one, Object::new_integer(1)),
+            (one, Object::Integer(1)),
         ),
         (
             objutil.hash_key(two.clone()).unwrap(),
-            (two, Object::new_integer(2)),
+            (two, Object::Integer(2)),
         ),
         (
             objutil.hash_key(three.clone()).unwrap(),
-            (three, Object::new_integer(3)),
+            (three, Object::Integer(3)),
         ),
         (
             objutil.hash_key(four.clone()).unwrap(),
-            (four, Object::new_integer(4)),
+            (four, Object::Integer(4)),
         ),
         (
             objutil.hash_key(objutil.obj_true.clone()).unwrap(),
-            (objutil.obj_true.clone(), Object::new_integer(5)),
+            (objutil.obj_true.clone(), Object::Integer(5)),
         ),
         (
             objutil.hash_key(objutil.obj_false.clone()).unwrap(),
-            (objutil.obj_false.clone(), Object::new_integer(6)),
+            (objutil.obj_false.clone(), Object::Integer(6)),
         ),
     ]);
 
@@ -401,17 +395,13 @@ fn test_hash_literals() {
 #[test]
 fn test_hash_index_expressions() {
     let tests = [
-        (r#"{"foo": 5}["foo"]"#, 1, Object::new_integer(5)),
+        (r#"{"foo": 5}["foo"]"#, 1, Object::Integer(5)),
         (r#"{"foo": 5}["bar"]"#, 1, Object::Null),
-        (
-            r#"let key = "foo"; {"foo": 5}[key]"#,
-            2,
-            Object::new_integer(5),
-        ),
+        (r#"let key = "foo"; {"foo": 5}[key]"#, 2, Object::Integer(5)),
         (r#"{}["foo"]"#, 1, Object::Null),
-        (r#"{5: 5}[5]"#, 1, Object::new_integer(5)),
-        (r#"{true: 5}[true]"#, 1, Object::new_integer(5)),
-        (r#"{false: 5}[false]"#, 1, Object::new_integer(5)),
+        (r#"{5: 5}[5]"#, 1, Object::Integer(5)),
+        (r#"{true: 5}[true]"#, 1, Object::Integer(5)),
+        (r#"{false: 5}[false]"#, 1, Object::Integer(5)),
     ];
 
     for (test_input, test_stmts, test_value) in tests {
@@ -425,22 +415,22 @@ fn test_loop_expressions() {
         (
             "let a = 0; loop { if (a > 5) { break 6; }; let a = a + 1; }",
             2,
-            Object::new_integer(6),
+            Object::Integer(6),
         ),
         (
             "fn(x) { let a = x; loop { if (a > 5) { break 6; }; let a = a + 1; return 2; } }(0)",
             1,
-            Object::new_integer(2),
+            Object::Integer(2),
         ),
         (
             "let a = 0; loop { if (a > 5) { break \"foo\"; }; let a = a + 1; }",
             2,
-            Object::new_string("foo".into()),
+            Object::String("foo".into()),
         ),
         (
             "let a = 0; let b = loop { if (a > 5) { break \"bar\"; }; let a = a + 1; }; b;",
             3,
-            Object::new_string("bar".into()),
+            Object::String("bar".into()),
         ),
         (
             "let a = 0; loop { if (a > 5) { break; }; let a = a + 1; }",

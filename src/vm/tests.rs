@@ -37,7 +37,7 @@ fn test_integer_arithmetic() {
         ("(5 + 10 * 2 + 15 / 3) * 2 + -10", 50),
     ];
     for (test_input, test_value) in tests {
-        run_vm_test(test_input, 1, Object::new_integer(test_value));
+        run_vm_test(test_input, 1, Object::Integer(test_value));
     }
 }
 
@@ -79,18 +79,18 @@ fn test_boolean_expressions() {
 #[test]
 fn test_conditionals() {
     let tests = [
-        ("if (true) { 10 }", Object::new_integer(10)),
-        ("if (true) { 10 } else { 20 }", Object::new_integer(10)),
-        ("if (false) { 10 } else { 20 } ", Object::new_integer(20)),
-        ("if (1) { 10 }", Object::new_integer(10)),
-        ("if (1 < 2) { 10 }", Object::new_integer(10)),
-        ("if (1 < 2) { 10 } else { 20 }", Object::new_integer(10)),
-        ("if (1 > 2) { 10 } else { 20 }", Object::new_integer(20)),
+        ("if (true) { 10 }", Object::Integer(10)),
+        ("if (true) { 10 } else { 20 }", Object::Integer(10)),
+        ("if (false) { 10 } else { 20 } ", Object::Integer(20)),
+        ("if (1) { 10 }", Object::Integer(10)),
+        ("if (1 < 2) { 10 }", Object::Integer(10)),
+        ("if (1 < 2) { 10 } else { 20 }", Object::Integer(10)),
+        ("if (1 > 2) { 10 } else { 20 }", Object::Integer(20)),
         ("if (1 > 2) { 10 }", Object::Null),
         ("if (false) { 10 }", Object::Null),
         (
             "if ((if (false) { 10 })) { 10 } else { 20 }",
-            Object::new_integer(20),
+            Object::Integer(20),
         ),
     ];
     for (test_input, test_value) in tests {
@@ -106,7 +106,7 @@ fn test_global_let_statements() {
         ("let one = 1; let two = one + one; one + two", 3, 3),
     ];
     for (test_input, test_stmts, test_value) in tests {
-        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+        run_vm_test(test_input, test_stmts, Object::Integer(test_value));
     }
 }
 
@@ -118,7 +118,7 @@ fn test_string_expressions() {
         (r#""mon" + "key" + "banana""#, "monkeybanana"),
     ];
     for (test_input, test_value) in tests {
-        run_vm_test(test_input, 1, Object::new_string(test_value.into()));
+        run_vm_test(test_input, 1, Object::String(test_value.into()));
     }
 }
 
@@ -132,7 +132,7 @@ fn test_array_literals() {
     for (test_input, test_value) in tests {
         let mut test_array = vec![];
         for v in test_value {
-            test_array.push(Rc::new(Object::new_integer(v)));
+            test_array.push(Rc::new(Object::Integer(v)));
         }
         run_vm_test(test_input, 1, Object::Array(test_array));
     }
@@ -149,8 +149,8 @@ fn test_hash_literals() {
     for (test_input, test_value) in tests {
         let mut test_hash = HashMap::new();
         for (k, v) in test_value {
-            let key = Rc::new(Object::new_integer(k));
-            let value = Rc::new(Object::new_integer(v));
+            let key = Rc::new(Object::Integer(k));
+            let value = Rc::new(Object::Integer(v));
             let hash = objutil
                 .hash_key(key.clone())
                 .expect("couldn't generate hash key");
@@ -164,14 +164,14 @@ fn test_hash_literals() {
 #[test]
 fn test_index_expressions() {
     let tests = [
-        ("[1, 2, 3][1]", Object::new_integer(2)),
-        ("[1, 2, 3][0 + 2]", Object::new_integer(3)),
-        ("[[1, 1, 1]][0][0]", Object::new_integer(1)),
+        ("[1, 2, 3][1]", Object::Integer(2)),
+        ("[1, 2, 3][0 + 2]", Object::Integer(3)),
+        ("[[1, 1, 1]][0][0]", Object::Integer(1)),
         ("[][0]", Object::Null),
         ("[1, 2, 3][99]", Object::Null),
         ("[1][-1]", Object::Null),
-        ("{1: 1, 2: 2}[1]", Object::new_integer(1)),
-        ("{1: 1, 2: 2}[2]", Object::new_integer(2)),
+        ("{1: 1, 2: 2}[1]", Object::Integer(1)),
+        ("{1: 1, 2: 2}[2]", Object::Integer(2)),
         ("{1: 1}[0]", Object::Null),
         ("{}[0]", Object::Null),
     ];
@@ -196,7 +196,7 @@ fn test_calling_functions_without_arguments() {
         ),
     ];
     for (test_input, test_stmts, test_value) in tests {
-        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+        run_vm_test(test_input, test_stmts, Object::Integer(test_value));
     }
 }
 
@@ -215,7 +215,7 @@ fn test_functions_with_return_statement() {
         ),
     ];
     for (test_input, test_stmts, test_value) in tests {
-        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+        run_vm_test(test_input, test_stmts, Object::Integer(test_value));
     }
 }
 
@@ -261,7 +261,7 @@ fn test_first_class_functions() {
         ),
     ];
     for (test_input, test_stmts, test_value) in tests {
-        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+        run_vm_test(test_input, test_stmts, Object::Integer(test_value));
     }
 }
 
@@ -310,7 +310,7 @@ fn test_calling_functions_with_bindings() {
         ),
     ];
     for (test_input, test_stmts, test_value) in tests {
-        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+        run_vm_test(test_input, test_stmts, Object::Integer(test_value));
     }
 }
 
@@ -351,7 +351,7 @@ fn test_calling_functions_with_arguments_and_bindings() {
         ),
     ];
     for (test_input, test_stmts, test_value) in tests {
-        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+        run_vm_test(test_input, test_stmts, Object::Integer(test_value));
     }
 }
 
@@ -380,47 +380,47 @@ fn test_calling_functions_with_wrong_arguments() {
 #[test]
 fn test_builtin_functions() {
     let tests = [
-        ("len(\"\")", 1, Object::new_integer(0)),
-        ("len(\"four\")", 1, Object::new_integer(4)),
-        ("len(\"hello world\")", 1, Object::new_integer(11)),
-        ("len([1, 2, 3])", 1, Object::new_integer(3)),
-        ("len([])", 1, Object::new_integer(0)),
+        ("len(\"\")", 1, Object::Integer(0)),
+        ("len(\"four\")", 1, Object::Integer(4)),
+        ("len(\"hello world\")", 1, Object::Integer(11)),
+        ("len([1, 2, 3])", 1, Object::Integer(3)),
+        ("len([])", 1, Object::Integer(0)),
         (r#"puts("")"#, 1, Object::None),
-        ("first([1, 2, 3])", 1, Object::new_integer(1)),
+        ("first([1, 2, 3])", 1, Object::Integer(1)),
         ("first([])", 1, Object::Null),
-        ("last([1, 2, 3])", 1, Object::new_integer(3)),
+        ("last([1, 2, 3])", 1, Object::Integer(3)),
         ("last([])", 1, Object::Null),
         (
             "rest([1, 2, 3])",
             1,
             Object::Array(vec![
-                Rc::new(Object::new_integer(2)),
-                Rc::new(Object::new_integer(3)),
+                Rc::new(Object::Integer(2)),
+                Rc::new(Object::Integer(3)),
             ]),
         ),
         ("rest([])", 1, Object::Null),
         (
             "push([], 1)",
             1,
-            Object::Array(vec![Rc::new(Object::new_integer(1))]),
+            Object::Array(vec![Rc::new(Object::Integer(1))]),
         ),
         (
             "let list = [1,2,3]; insert(list, 1, 9)",
             2,
             Object::Array(vec![
-                Rc::new(Object::new_integer(1)),
-                Rc::new(Object::new_integer(9)),
-                Rc::new(Object::new_integer(2)),
-                Rc::new(Object::new_integer(3)),
+                Rc::new(Object::Integer(1)),
+                Rc::new(Object::Integer(9)),
+                Rc::new(Object::Integer(2)),
+                Rc::new(Object::Integer(3)),
             ]),
         ),
         (
             "let list = [1,2,3]; map(list, string)",
             2,
             Object::Array(vec![
-                Rc::new(Object::new_string("1".into())),
-                Rc::new(Object::new_string("2".into())),
-                Rc::new(Object::new_string("3".into())),
+                Rc::new(Object::String("1".into())),
+                Rc::new(Object::String("2".into())),
+                Rc::new(Object::String("3".into())),
             ]),
         ),
     ];
@@ -547,7 +547,7 @@ fn test_closures() {
         ),
     ];
     for (test_input, test_stmts, test_value) in tests {
-        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+        run_vm_test(test_input, test_stmts, Object::Integer(test_value));
     }
 }
 
@@ -604,7 +604,7 @@ fn test_recursive_functions() {
         ),
     ];
     for (test_input, test_stmts, test_value) in tests {
-        run_vm_test(test_input, test_stmts, Object::new_integer(test_value));
+        run_vm_test(test_input, test_stmts, Object::Integer(test_value));
     }
 }
 
@@ -624,7 +624,7 @@ fn test_recursive_fibonacci() {
         "};\n",
         "fibonacci(15);\n",
     );
-    run_vm_test(input, 2, Object::new_integer(610));
+    run_vm_test(input, 2, Object::Integer(610));
 }
 
 #[test]
@@ -634,22 +634,22 @@ fn test_loop_expressions() {
         (
             "let a = 0; loop { if (a > 5) { break 6; }; let a = a + 1; }",
             2,
-            Object::new_integer(6),
+            Object::Integer(6),
         ),
         (
             "let a = 0; fn() { loop { if (a > 5) { break 6; }; let a = a + 1; return 2; } }()",
             2,
-            Object::new_integer(2),
+            Object::Integer(2),
         ),
         (
             "let a = 0; loop { if (a > 5) { break \"foo\"; }; let a = a + 1; }",
             2,
-            Object::new_string("foo".into()),
+            Object::String("foo".into()),
         ),
         (
             "let a = 0; let b = loop { if (a > 5) { break \"bar\"; }; let a = a + 1; }; b;",
             3,
-            Object::new_string("bar".into()),
+            Object::String("bar".into()),
         ),
         (
             "let a = 0; loop { if (a > 5) { break; }; let a = a + 1; }",
@@ -676,7 +676,7 @@ fn test_loop_expressions() {
             }
             "#,
             2,
-            Object::new_integer(6),
+            Object::Integer(6),
         ),
     ];
 

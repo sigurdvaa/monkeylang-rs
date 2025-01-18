@@ -46,7 +46,7 @@ impl TestCase {
             statements,
             constants: constants
                 .into_iter()
-                .map(|i| Rc::new(Object::new_integer(i as isize)))
+                .map(|i| Rc::new(Object::Integer(i as isize)))
                 .collect(),
             instructions: instructions.into_iter().flatten().collect(),
         }
@@ -63,7 +63,7 @@ impl TestCase {
             statements,
             constants: constants
                 .into_iter()
-                .map(|i| Rc::new(Object::new_string(i.into())))
+                .map(|i| Rc::new(Object::String(i.into())))
                 .collect(),
             instructions: instructions.into_iter().flatten().collect(),
         }
@@ -491,8 +491,8 @@ fn test_functions() {
             "fn() { return 5 + 10; }",
             1,
             vec![
-                Object::new_integer(5),
-                Object::new_integer(10),
+                Object::Integer(5),
+                Object::Integer(10),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
@@ -513,8 +513,8 @@ fn test_functions() {
             "fn() { 5 + 10 }",
             1,
             vec![
-                Object::new_integer(5),
-                Object::new_integer(10),
+                Object::Integer(5),
+                Object::Integer(10),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
@@ -535,8 +535,8 @@ fn test_functions() {
             "fn() { 1; 2 }",
             1,
             vec![
-                Object::new_integer(1),
-                Object::new_integer(2),
+                Object::Integer(1),
+                Object::Integer(2),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
@@ -638,7 +638,7 @@ fn test_function_calls() {
             "fn() { 24 }();",
             1,
             vec![
-                Object::new_integer(24),
+                Object::Integer(24),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
@@ -658,7 +658,7 @@ fn test_function_calls() {
             "let noArg = fn() { 24 }; noArg();",
             2,
             vec![
-                Object::new_integer(24),
+                Object::Integer(24),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
@@ -688,7 +688,7 @@ fn test_function_calls() {
                     1,
                     1,
                 ),
-                Object::new_integer(24),
+                Object::Integer(24),
             ],
             vec![
                 make_ins(Opcode::Closure, &[0, 0]),
@@ -715,9 +715,9 @@ fn test_function_calls() {
                     3,
                     3,
                 ),
-                Object::new_integer(24),
-                Object::new_integer(25),
-                Object::new_integer(26),
+                Object::Integer(24),
+                Object::Integer(25),
+                Object::Integer(26),
             ],
             vec![
                 make_ins(Opcode::Closure, &[0, 0]),
@@ -741,7 +741,7 @@ fn test_let_statement_scopes() {
             "let num = 55; fn() { num }",
             2,
             vec![
-                Object::new_integer(55),
+                Object::Integer(55),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::GetGlobal, &[0]),
@@ -762,7 +762,7 @@ fn test_let_statement_scopes() {
             "fn() { let num = 55; num }",
             1,
             vec![
-                Object::new_integer(55),
+                Object::Integer(55),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
@@ -783,8 +783,8 @@ fn test_let_statement_scopes() {
             "fn() { let a = 55; let b = 77; a + b }",
             1,
             vec![
-                Object::new_integer(55),
-                Object::new_integer(77),
+                Object::Integer(55),
+                Object::Integer(77),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[0]),
@@ -815,7 +815,7 @@ fn test_builtins() {
         TestCase::new(
             "len([]); push([], 1);",
             2,
-            vec![Object::new_integer(1)],
+            vec![Object::Integer(1)],
             vec![
                 make_ins(Opcode::GetBuiltin, &[0]),
                 make_ins(Opcode::Array, &[0]),
@@ -939,10 +939,10 @@ fn test_closures() {
             ),
             2,
             vec![
-                Object::new_integer(55),
-                Object::new_integer(66),
-                Object::new_integer(77),
-                Object::new_integer(88),
+                Object::Integer(55),
+                Object::Integer(66),
+                Object::Integer(77),
+                Object::Integer(88),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::Constant, &[3]),
@@ -1001,7 +1001,7 @@ fn test_recursive_functions() {
             "let countDown = fn(x) { countDown(x - 1); }; countDown(1);",
             2,
             vec![
-                Object::new_integer(1),
+                Object::Integer(1),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::CurrentClosure, &[]),
@@ -1034,7 +1034,7 @@ fn test_recursive_functions() {
             ),
             2,
             vec![
-                Object::new_integer(1),
+                Object::Integer(1),
                 make_compiled_func(
                     vec![
                         make_ins(Opcode::CurrentClosure, &[]),

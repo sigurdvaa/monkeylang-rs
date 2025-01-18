@@ -298,7 +298,7 @@ impl Vm {
             Opcode::Div => left / right,
             _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
-        self.push_stack(Rc::new(Object::new_integer(value)))
+        self.push_stack(Rc::new(Object::Integer(value)))
     }
 
     fn execute_binary_string_operation(
@@ -311,7 +311,7 @@ impl Vm {
             Opcode::Add => String::from_iter([left, right]),
             _ => return Err(VmError::InvalidStringOperator(op)),
         };
-        self.push_stack(Rc::new(Object::new_string(value)))
+        self.push_stack(Rc::new(Object::String(value)))
     }
 
     fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), VmError> {
@@ -405,7 +405,7 @@ impl Vm {
     fn execute_minus_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop_stack()?;
         match operand.as_ref() {
-            Object::Integer(value) => self.push_stack(Rc::new(Object::new_integer(-value))),
+            Object::Integer(value) => self.push_stack(Rc::new(Object::Integer(-value))),
             _ => Err(VmError::InvalidPrefixType(operand.kind())),
         }
     }

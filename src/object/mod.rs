@@ -86,15 +86,6 @@ impl fmt::Display for Object {
 }
 
 impl Object {
-    // TODO: remove new*?
-    pub fn new_integer(value: isize) -> Self {
-        Self::Integer(value)
-    }
-
-    pub fn new_string(value: String) -> Self {
-        Self::String(value)
-    }
-
     pub fn kind(&self) -> &'static str {
         match self {
             Self::Null => "NULL",

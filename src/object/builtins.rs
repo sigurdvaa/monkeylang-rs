@@ -26,8 +26,8 @@ fn len(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     }
 
     Rc::new(match &*args[0] {
-        Object::String(value) => Object::new_integer(value.len() as isize),
-        Object::Array(value) => Object::new_integer(value.len() as isize),
+        Object::String(value) => Object::Integer(value.len() as isize),
+        Object::Array(value) => Object::Integer(value.len() as isize),
         _ => Object::Error(format!(
             "argument to \"len\" not supported, got {}",
             args[0].kind()
@@ -223,9 +223,9 @@ fn string(args: &[Rc<Object>], _engine: &mut dyn Engine) -> Rc<Object> {
     }
 
     Rc::new(match &*args[0] {
-        Object::String(value) => Object::new_string(value.clone()),
-        Object::Integer(value) => Object::new_string(value.to_string()),
-        Object::Array(value) => Object::new_string(
+        Object::String(value) => Object::String(value.clone()),
+        Object::Integer(value) => Object::String(value.to_string()),
+        Object::Array(value) => Object::String(
             value
                 .iter()
                 .map(|i| i.to_string())

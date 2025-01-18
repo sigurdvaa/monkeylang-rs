@@ -233,12 +233,12 @@ impl Compiler {
                 false => self.emit(Opcode::False, &[]),
             },
             Expression::Integer(expr) => {
-                let obj = Object::new_integer(expr.value as isize);
+                let obj = Object::Integer(expr.value as isize);
                 let operands = &[self.add_constant(obj)];
                 self.emit(Opcode::Constant, operands)
             }
             Expression::String(expr) => {
-                let obj = Object::new_string(expr.value.clone());
+                let obj = Object::String(expr.value.clone());
                 let operands = &[self.add_constant(obj)];
                 self.emit(Opcode::Constant, operands)
             }

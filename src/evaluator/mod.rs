@@ -111,7 +111,7 @@ impl Eval {
 
     fn eval_minus_prefix_operator_expression(&self, right: Rc<Object>) -> Rc<Object> {
         Rc::new(match right.as_ref() {
-            Object::Integer(value) => Object::new_integer(-value),
+            Object::Integer(value) => Object::Integer(-value),
             _ => Object::Error(format!("unknown operator: -{}", right.kind())),
         })
     }
@@ -130,10 +130,10 @@ impl Eval {
 
     fn eval_integer_infix_expression(&self, operator: &Operator, a: isize, b: isize) -> Rc<Object> {
         match operator {
-            Operator::Plus => Rc::new(Object::new_integer(a + b)),
-            Operator::Minus => Rc::new(Object::new_integer(a - b)),
-            Operator::Asterisk => Rc::new(Object::new_integer(a * b)),
-            Operator::Slash => Rc::new(Object::new_integer(a / b)),
+            Operator::Plus => Rc::new(Object::Integer(a + b)),
+            Operator::Minus => Rc::new(Object::Integer(a - b)),
+            Operator::Asterisk => Rc::new(Object::Integer(a * b)),
+            Operator::Slash => Rc::new(Object::Integer(a / b)),
             Operator::Gt => self.get_obj_bool(a > b),
             Operator::Lt => self.get_obj_bool(a < b),
             Operator::Eq => self.get_obj_bool(a == b),
@@ -156,7 +156,7 @@ impl Eval {
 
     fn eval_string_infix_expression(&self, operator: &Operator, a: &str, b: &str) -> Rc<Object> {
         match operator {
-            Operator::Plus => Rc::new(Object::new_string(String::from_iter([a, b]))),
+            Operator::Plus => Rc::new(Object::String(String::from_iter([a, b]))),
             Operator::Eq => self.get_obj_bool(a == b),
             Operator::NotEq => self.get_obj_bool(a != b),
             _ => Rc::new(Object::Error(format!(
@@ -336,7 +336,7 @@ impl Eval {
                     return obj.clone();
                 }
                 let obj = Rc::new(match expr.value.try_into() {
-                    Ok(value) => Object::new_integer(value),
+                    Ok(value) => Object::Integer(value),
                     Err(err) => Object::Error(format!("invalid interger, {err}")),
                 });
                 self.constant_int.insert(expr.value, obj.clone());
@@ -346,7 +346,7 @@ impl Eval {
                 if let Some(obj) = self.constant_str.get(&expr.value) {
                     return obj.clone();
                 }
-                let obj = Rc::new(Object::new_string(expr.value.to_owned()));
+                let obj = Rc::new(Object::String(expr.value.to_owned()));
                 self.constant_str.insert(expr.value.clone(), obj.clone());
                 obj
             }
