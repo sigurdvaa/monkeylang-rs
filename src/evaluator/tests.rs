@@ -366,7 +366,11 @@ fn test_hash_literals() {
         ),
         (
             Object::new_integer(4).hash_key().unwrap(),
-            (Object::new_integer(4), Object::new_integer(4)),
+            (Object::new_integer(4), {
+                let obj = Object::new_integer(4);
+                _ = obj.hash_key();
+                obj
+            }),
         ),
         (
             Object::new_boolean(true).hash_key().unwrap(),
@@ -404,7 +408,11 @@ fn test_hash_index_expressions() {
             Object::new_integer(5),
         ),
         (r#"{}["foo"]"#, 1, Object::Null),
-        (r#"{5: 5}[5]"#, 1, Object::new_integer(5)),
+        (r#"{5: 5}[5]"#, 1, {
+            let obj = Object::new_integer(5);
+            _ = obj.hash_key();
+            obj
+        }),
         (r#"{true: 5}[true]"#, 1, Object::new_integer(5)),
         (r#"{false: 5}[false]"#, 1, Object::new_integer(5)),
     ];
