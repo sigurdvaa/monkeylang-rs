@@ -23,4 +23,5 @@ Customized with the following:
   - string: convert other objects to string object
   - map: for each object in array, run given function
 - no magic semicolons
+- deduplicate constants
 

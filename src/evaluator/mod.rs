@@ -8,12 +8,15 @@ use crate::ast::{
 };
 use crate::object::{builtins, BooleanObj, Engine, FunctionObj, IntegerObj, Object, StringObj};
 pub use environment::{Env, Environment};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 pub struct Eval {
     envs: Vec<Env>,
     ep: usize,
+    // TODO: const arr/hash?
+    constant_int: BTreeMap<usize, Rc<Object>>,
+    constant_str: BTreeMap<String, Rc<Object>>,
     obj_true: Rc<Object>,
     obj_false: Rc<Object>,
     obj_null: Rc<Object>,
@@ -69,6 +72,8 @@ impl Eval {
         Self {
             envs: vec![Environment::new()],
             ep: 0,
+            constant_int: BTreeMap::new(),
+            constant_str: BTreeMap::new(),
             obj_true: Rc::new(Object::new_boolean(true)),
             obj_false: Rc::new(Object::new_boolean(false)),
             obj_null: Rc::new(Object::Null),
@@ -339,9 +344,6 @@ impl Eval {
 
                 self.eval_infix_expression(&expr.operator, left, right)
             }
-            Expression::Integer(expr) => Rc::new(Object::new_integer(
-                expr.value.try_into().expect("integer too large"),
-            )),
             Expression::Prefix(expr) => {
                 let right = self.eval_expression(&expr.right);
                 match *right {
@@ -349,7 +351,25 @@ impl Eval {
                     _ => self.eval_prefix_expression(&expr.operator, right),
                 }
             }
-            Expression::String(expr) => Rc::new(Object::new_string(expr.value.to_owned())),
+            Expression::Integer(expr) => {
+                if let Some(obj) = self.constant_int.get(&expr.value) {
+                    return obj.clone();
+                }
+                let obj = Rc::new(match expr.value.try_into() {
+                    Ok(value) => Object::new_integer(value),
+                    Err(err) => Object::Error(format!("invalid interger, {err}")),
+                });
+                self.constant_int.insert(expr.value, obj.clone());
+                obj
+            }
+            Expression::String(expr) => {
+                if let Some(obj) = self.constant_str.get(&expr.value) {
+                    return obj.clone();
+                }
+                let obj = Rc::new(Object::new_string(expr.value.to_owned()));
+                self.constant_str.insert(expr.value.clone(), obj.clone());
+                obj
+            }
             Expression::Array(expr) => {
                 let array = self.eval_expressions(&expr.elements);
                 if array.len() == 1 {

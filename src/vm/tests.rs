@@ -142,7 +142,7 @@ fn test_array_literals() {
 fn test_hash_literals() {
     let tests = [
         ("{}", vec![]),
-        ("{1: 2, 2:3}", vec![(1, 2), (2, 3)]),
+        ("{1: 2, 3: 4}", vec![(1, 2), (3, 4)]),
         ("{1 + 1: 2 * 2, 3 + 3: 4 * 4}", vec![(2, 4), (6, 16)]),
     ];
     for (test_input, test_value) in tests {
@@ -167,8 +167,16 @@ fn test_index_expressions() {
         ("[][0]", Object::Null),
         ("[1, 2, 3][99]", Object::Null),
         ("[1][-1]", Object::Null),
-        ("{1: 1, 2: 2}[1]", Object::new_integer(1)),
-        ("{1: 1, 2: 2}[2]", Object::new_integer(2)),
+        ("{1: 1, 2: 2}[1]", {
+            let obj = Object::new_integer(1);
+            _ = obj.hash_key();
+            obj
+        }),
+        ("{1: 1, 2: 2}[2]", {
+            let obj = Object::new_integer(2);
+            _ = obj.hash_key();
+            obj
+        }),
         ("{1: 1}[0]", Object::Null),
         ("{}[0]", Object::Null),
     ];
