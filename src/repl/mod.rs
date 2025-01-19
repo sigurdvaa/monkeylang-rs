@@ -141,7 +141,6 @@ pub fn start_repl_vm() {
     let mut vm = Vm::new(None);
     let mut buf = String::new();
     loop {
-        // TODO: add history? will require tty raw mode
         print!("{PROMPT}");
         let _ = std::io::stdout().flush();
         input.read_line(&mut buf).expect("reading input failed");
