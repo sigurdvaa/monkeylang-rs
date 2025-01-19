@@ -3,6 +3,7 @@ use crate::evaluator::Eval;
 use crate::lexer::Lexer;
 use crate::object::{Engine, Object};
 use crate::parser::{Parser, ParserError};
+use crate::terminal::Terminal;
 use crate::vm::Vm;
 use std::fmt::Display;
 use std::io::{stdin, Write};
@@ -136,23 +137,16 @@ pub fn run_repl_vm(file: Option<String>, input: Peekable<Chars<'_>>) -> Option<R
 }
 
 pub fn start_repl_vm() {
-    let input = stdin();
+    let mut term = Terminal::new();
     let mut compiler = Compiler::new();
     let mut vm = Vm::new(None);
-    let mut buf = String::new();
-    loop {
-        print!("{PROMPT}");
-        let _ = std::io::stdout().flush();
-        input.read_line(&mut buf).expect("reading input failed");
-        if let Some(';') = buf.trim().chars().last() {
-            let result = repl_vm(None, buf.chars().peekable(), &mut compiler, &mut vm);
-            if let Some(result) = result {
-                match *result {
-                    Object::None => (),
-                    _ => println!("{}", result.inspect()),
-                }
+    while let Some(input) = term.get_input() {
+        let result = repl_vm(None, input.chars().peekable(), &mut compiler, &mut vm);
+        if let Some(result) = result {
+            match *result {
+                Object::None => (),
+                _ => term.writeln(result.inspect().as_bytes()),
             }
-            buf.clear();
         }
     }
 }
