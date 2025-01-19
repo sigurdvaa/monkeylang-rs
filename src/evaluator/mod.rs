@@ -14,7 +14,6 @@ use std::rc::Rc;
 pub struct Eval {
     envs: Vec<Env>,
     ep: usize,
-    // TODO: const arr/hash?
     constant_int: BTreeMap<usize, Rc<Object>>,
     constant_str: BTreeMap<String, Rc<Object>>,
     objutil: ObjectUtil,
@@ -175,7 +174,7 @@ impl Eval {
     }
 
     fn eval_hash_literal(&mut self, expr: &HashLiteral) -> Rc<Object> {
-        let mut pairs = HashMap::new();
+        let mut pairs = HashMap::with_capacity(expr.pairs.len());
 
         for (key_expr, value_expr) in &expr.pairs {
             let key = self.eval_expression(key_expr);

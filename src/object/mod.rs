@@ -3,9 +3,11 @@ pub mod builtins;
 use crate::ast::{BlockStatement, Expression, IdentifierLiteral};
 use crate::code::Instruction;
 use crate::evaluator::Env;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fmt::{self, Display};
 use std::rc::Rc;
+
+const HASHKEY_CACHE_SIZE: usize = 65535;
 
 pub trait Engine {
     fn call_func(&mut self, func: Rc<Object>, args: &[Rc<Object>]) -> Rc<Object>;
@@ -178,8 +180,8 @@ pub struct ObjectUtil {
     pub obj_false: Rc<Object>,
     pub obj_null: Rc<Object>,
     pub obj_none: Rc<Object>,
-    hashkey_cache_str: BTreeMap<String, HashKey>,
-    hashkey_cache_int: BTreeMap<isize, HashKey>,
+    hashkey_cache_str: HashMap<String, HashKey>,
+    hashkey_cache_int: HashMap<isize, HashKey>,
     hashkey_true: HashKey,
     hashkey_false: HashKey,
     hashkey_null: HashKey,
@@ -188,13 +190,12 @@ pub struct ObjectUtil {
 impl ObjectUtil {
     pub fn new() -> Self {
         Self {
-            // TODO: make cache lru, currently grows indefinitely
             obj_true: Rc::new(Object::Boolean(true)),
             obj_false: Rc::new(Object::Boolean(false)),
             obj_null: Rc::new(Object::Null),
             obj_none: Rc::new(Object::None),
-            hashkey_cache_str: BTreeMap::new(),
-            hashkey_cache_int: BTreeMap::new(),
+            hashkey_cache_str: HashMap::with_capacity(HASHKEY_CACHE_SIZE),
+            hashkey_cache_int: HashMap::with_capacity(HASHKEY_CACHE_SIZE),
             hashkey_true: HashKey {
                 kind: Object::Boolean(true).kind(),
                 value: 1,
@@ -225,6 +226,9 @@ impl ObjectUtil {
                     kind: obj.kind(),
                     value: *value as usize,
                 };
+                if self.hashkey_cache_int.len() > HASHKEY_CACHE_SIZE {
+                    self.hashkey_cache_int.clear();
+                }
                 self.hashkey_cache_int.insert(*value, hash_key.clone());
                 Ok(hash_key)
             }
@@ -236,6 +240,9 @@ impl ObjectUtil {
                     kind: obj.kind(),
                     value: value.chars().map(|c| c as usize).sum(),
                 };
+                if self.hashkey_cache_str.len() > HASHKEY_CACHE_SIZE {
+                    self.hashkey_cache_str.clear();
+                }
                 self.hashkey_cache_str
                     .insert(value.to_string(), hash_key.clone());
                 Ok(hash_key)

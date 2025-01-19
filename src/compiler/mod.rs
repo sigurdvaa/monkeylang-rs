@@ -83,7 +83,6 @@ impl Compiler {
     }
 
     fn add_constant(&mut self, obj: Object) -> usize {
-        // TODO: store idx in a map?
         if let Some(idx) = self.constants.iter().position(|v| v.as_ref() == &obj) {
             return idx;
         }
