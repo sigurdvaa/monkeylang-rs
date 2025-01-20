@@ -24,4 +24,6 @@ Customized with the following:
   - map: for each object in array, run given function
 - no magic semicolons
 - deduplicate constants
+- hashkey cache
+- terminal raw mode
 
