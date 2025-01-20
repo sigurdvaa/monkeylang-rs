@@ -242,6 +242,7 @@ impl Terminal<'_> {
                 c => {
                     // TODO: replace after cursor
                     self.write(c.to_string().as_bytes());
+                    // TODO: this is unsafe, insert at byte pos, not char pos
                     input.insert(self.cursor, c);
                     self.cursor += 1;
                 }
