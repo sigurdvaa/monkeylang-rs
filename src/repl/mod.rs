@@ -6,12 +6,10 @@ use crate::parser::{Parser, ParserError};
 use crate::terminal::Terminal;
 use crate::vm::Vm;
 use std::fmt::Display;
-use std::io::{stdin, Write};
 use std::iter::Peekable;
 use std::rc::Rc;
 use std::str::Chars;
 
-const PROMPT: &str = ">> ";
 const MONKEY_FACE: &str = concat!(
     "            __,__\n",
     "   .--.  .-\"     \"-.  .--.\n",
@@ -76,21 +74,16 @@ pub fn run_repl_eval(file: Option<String>, input: Peekable<Chars<'_>>) -> Rc<Obj
 }
 
 pub fn start_repl_eval() {
-    let input = stdin();
+    let mut term = Terminal::new();
     let mut eval = Eval::new();
     let mut macro_eval = Eval::new();
-    let mut buf = String::new();
     loop {
-        print!("{PROMPT}");
-        let _ = std::io::stdout().flush();
-        input.read_line(&mut buf).expect("reading input failed");
-        if let Some(';') = buf.trim().chars().last() {
-            let eval = repl_eval(None, buf.chars().peekable(), &mut eval, &mut macro_eval);
+        if let Some(input) = term.get_input() {
+            let eval = repl_eval(None, input.chars().peekable(), &mut eval, &mut macro_eval);
             match *eval {
                 Object::None => (),
-                _ => println!("{}", eval.inspect()),
+                _ => term.writeln(eval.inspect().as_bytes()),
             }
-            buf.clear();
         }
     }
 }

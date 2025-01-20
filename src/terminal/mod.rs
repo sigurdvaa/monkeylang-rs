@@ -48,7 +48,9 @@ pub struct Terminal<'a> {
     fd_in: RawFd,
     prev_cf: termios,
     history: VecDeque<String>,
+    history_offset: usize,
     buf: [u8; 1],
+    cursor: usize,
 }
 
 impl Drop for Terminal<'_> {
@@ -88,7 +90,9 @@ impl Terminal<'_> {
             fd_in,
             prev_cf,
             history: VecDeque::with_capacity(HISTORY_SIZE),
+            history_offset: 0,
             buf: [0],
+            cursor: 0,
         }
     }
 
@@ -121,6 +125,60 @@ impl Terminal<'_> {
         self.write(b"\n");
     }
 
+    fn remove_char(&mut self, input: &mut String) {
+        let mut new = input.chars().take(self.cursor).collect::<String>();
+        new.extend(input.chars().skip(self.cursor + 1));
+        *input = new;
+
+        self.write(&[0x08; 1]); // backspace one char
+        self.write(&[0x20; 1]); // clear prev text with whitespace
+
+        // self.write(
+        //     input
+        //         .chars()
+        //         .skip(self.cursor)
+        //         .collect::<String>()
+        //         .as_bytes(),
+        // );
+        // self.write(&vec![0x08; input.len() - self.cursor]); // backspace to cursor
+        self.replace_input(input, input.len() + 1);
+        self.write(&vec![0x08; input.len() - self.cursor]); // backspace to cursor
+    }
+
+    fn replace_input(&mut self, input: &str, prev_len: usize) {
+        self.write(b"\r");
+        self.write(PROMPT);
+        self.write(&vec![0x20; prev_len]); // clear prev text with whitespace
+        self.write(&vec![0x08; prev_len]); // backspace to the prompt
+        self.write(input.as_bytes());
+    }
+
+    fn prev_history(&mut self, input: &mut String) {
+        if self.history_offset == self.history.len() {
+            return;
+        }
+        let prev_len = input.len();
+        self.history_offset += 1;
+        let idx = self.history.len() - self.history_offset;
+        *input = self.history[idx].clone();
+        self.replace_input(input, prev_len);
+    }
+
+    fn next_history(&mut self, input: &mut String) {
+        let prev_len = input.len();
+        if self.history_offset > 0 {
+            self.history_offset -= 1;
+        }
+        if self.history_offset == 0 {
+            input.clear();
+            self.replace_input(input, prev_len);
+            return;
+        }
+        let idx = self.history.len() - self.history_offset;
+        *input = self.history[idx].clone();
+        self.replace_input(input, prev_len);
+    }
+
     pub fn get_input(&mut self) -> Option<String> {
         let mut input = String::new();
 
@@ -129,52 +187,63 @@ impl Terminal<'_> {
 
         while let Some(c) = self.read_char() {
             match c {
-                'q' => break,
                 // ctrl-c
                 '\u{3}' => break,
                 // newline
                 '\r' => {
                     self.write(b"\n");
-                    if let Some(';') = input.trim().chars().last() {
-                        self.history.push_back(input.clone());
-                        if self.history.len() > HISTORY_SIZE {
-                            self.history.pop_front();
-                        }
-                        return Some(input);
+                    if input.trim().is_empty() {
+                        self.write(PROMPT);
+                        self.flush();
+                        continue;
                     }
-                    input.push('\n');
-                    self.write(PROMPT);
+
+                    self.history_offset = 0;
+                    self.history.push_back(input.clone());
+                    if self.history.len() > HISTORY_SIZE {
+                        self.history.pop_front();
+                    }
+
+                    if !input.trim().ends_with(';') {
+                        input.push(';')
+                    }
+                    return Some(input);
                 }
                 // backspace
                 '\u{7f}' => {
-                    if !input.is_empty() {
-                        self.write(b"\x08 \x08");
-                        input.pop();
+                    // TODO: delete char in str at cursor pos
+                    if self.cursor > 0 {
+                        self.cursor -= 1;
+                        self.remove_char(&mut input);
                     }
                 }
                 // start of arrow key sequence
                 '\u{1b}' => {
                     if let Some('[') = self.read_char() {
                         match self.read_char() {
-                            Some('A') => {
-                                print!("up");
-                            }
-                            Some('B') => {
-                                print!("down");
-                            }
+                            Some('A') => self.prev_history(&mut input),
+                            Some('B') => self.next_history(&mut input),
                             Some('D') => {
-                                print!("left");
+                                if self.cursor > 0 {
+                                    self.cursor -= 1;
+                                    self.write(&[27, 91, 68]); // ESC[D
+                                }
                             }
                             Some('C') => {
-                                print!("right");
+                                if self.cursor < input.len() {
+                                    self.cursor += 1;
+                                    self.write(&[27, 91, 67]); // ESC[C
+                                }
                             }
                             _ => (),
                         }
                     }
                 }
                 c => {
+                    // TODO: replace after cursor
                     self.write(c.to_string().as_bytes());
-                    input.push(c);
+                    input.insert(self.cursor, c);
+                    self.cursor += 1;
                 }
             }
             self.flush();
