@@ -19,6 +19,11 @@ const OPOST: tcflag_t = 0o000001; // Enable implementation-defined output proces
 const ONLCR: tcflag_t = 0o000004; // Map NL to CR-NL on output.
 const TCSANOW: c_int = 0; // the change occurs immediately.
 
+const RIGHT: [u8; 3] = [27, 91, 67];
+const LEFT: [u8; 3] = [27, 91, 68];
+const BACKSPACE: u8 = 0x08;
+const SPACE: u8 = 0x20;
+
 const NCCS: usize = 32;
 const HISTORY_SIZE: usize = 1024;
 const PROMPT: &[u8] = b">> ";
@@ -47,7 +52,7 @@ pub struct Terminal<'a> {
     stdout: StdoutLock<'a>,
     fd_in: RawFd,
     prev_cf: termios,
-    history: VecDeque<String>,
+    history: VecDeque<Vec<char>>,
     history_offset: usize,
     buf: [u8; 1],
     cursor: usize,
@@ -125,35 +130,34 @@ impl Terminal<'_> {
         self.write(b"\n");
     }
 
-    fn remove_char(&mut self, input: &mut String) {
-        let mut new = input.chars().take(self.cursor).collect::<String>();
-        new.extend(input.chars().skip(self.cursor + 1));
-        *input = new;
-
-        self.write(&[0x08; 1]); // backspace one char
-        self.write(&[0x20; 1]); // clear prev text with whitespace
-
-        // self.write(
-        //     input
-        //         .chars()
-        //         .skip(self.cursor)
-        //         .collect::<String>()
-        //         .as_bytes(),
-        // );
-        // self.write(&vec![0x08; input.len() - self.cursor]); // backspace to cursor
-        self.replace_input(input, input.len() + 1);
-        self.write(&vec![0x08; input.len() - self.cursor]); // backspace to cursor
+    fn remove_char(&mut self, input: &mut Vec<char>) {
+        input.remove(self.cursor);
+        self.update_output_from_cursor(input, input.len() + 1);
     }
 
-    fn replace_input(&mut self, input: &str, prev_len: usize) {
+    fn update_output_from_cursor(&mut self, input: &[char], prev_len: usize) {
+        let output = input[self.cursor..].iter().collect::<String>();
+        self.write(output.as_bytes());
+        if prev_len > input.len() {
+            self.write(&vec![SPACE; prev_len - input.len()]); // clear prev text
+            self.write(&vec![BACKSPACE; prev_len - self.cursor]); // go to cursor
+        } else {
+            self.write(&vec![BACKSPACE; input.len() - self.cursor]); // go to cursor
+        }
+    }
+
+    fn replace_output(&mut self, input: &[char], prev_len: usize) {
         self.write(b"\r");
         self.write(PROMPT);
-        self.write(&vec![0x20; prev_len]); // clear prev text with whitespace
-        self.write(&vec![0x08; prev_len]); // backspace to the prompt
-        self.write(input.as_bytes());
+        if prev_len > input.len() {
+            self.write(&vec![SPACE; prev_len]); // clear prev text
+            self.write(&vec![BACKSPACE; prev_len]); // go to prompt
+        }
+        let output = input.iter().collect::<String>();
+        self.write(output.as_bytes());
     }
 
-    fn prev_history(&mut self, input: &mut String) {
+    fn prev_history(&mut self, input: &mut Vec<char>) {
         if self.history_offset == self.history.len() {
             return;
         }
@@ -161,26 +165,30 @@ impl Terminal<'_> {
         self.history_offset += 1;
         let idx = self.history.len() - self.history_offset;
         *input = self.history[idx].clone();
-        self.replace_input(input, prev_len);
+        self.replace_output(input, prev_len);
+        self.cursor = input.len();
     }
 
-    fn next_history(&mut self, input: &mut String) {
+    fn next_history(&mut self, input: &mut Vec<char>) {
         let prev_len = input.len();
         if self.history_offset > 0 {
             self.history_offset -= 1;
         }
         if self.history_offset == 0 {
             input.clear();
-            self.replace_input(input, prev_len);
+            self.replace_output(input, prev_len);
+            self.cursor = 0;
             return;
         }
         let idx = self.history.len() - self.history_offset;
         *input = self.history[idx].clone();
-        self.replace_input(input, prev_len);
+        self.replace_output(input, prev_len);
+        self.cursor = input.len();
     }
 
     pub fn get_input(&mut self) -> Option<String> {
-        let mut input = String::new();
+        let mut input: Vec<char> = vec![];
+        self.cursor = 0;
 
         self.write(PROMPT);
         self.flush();
@@ -192,7 +200,7 @@ impl Terminal<'_> {
                 // newline
                 '\r' => {
                     self.write(b"\n");
-                    if input.trim().is_empty() {
+                    if input.iter().filter(|c| !c.is_whitespace()).count() == 0 {
                         self.write(PROMPT);
                         self.flush();
                         continue;
@@ -204,47 +212,72 @@ impl Terminal<'_> {
                         self.history.pop_front();
                     }
 
-                    if !input.trim().ends_with(';') {
+                    if input.iter().filter(|c| !c.is_whitespace()).last() != Some(&';') {
                         input.push(';')
                     }
-                    return Some(input);
+                    return Some(input.into_iter().collect());
                 }
                 // backspace
                 '\u{7f}' => {
-                    // TODO: delete char in str at cursor pos
                     if self.cursor > 0 {
                         self.cursor -= 1;
+                        self.write(&LEFT);
                         self.remove_char(&mut input);
                     }
                 }
-                // start of arrow key sequence
+                // start of ESC sequence
                 '\u{1b}' => {
                     if let Some('[') = self.read_char() {
                         match self.read_char() {
+                            // up
                             Some('A') => self.prev_history(&mut input),
+                            // down
                             Some('B') => self.next_history(&mut input),
+                            // left
                             Some('D') => {
                                 if self.cursor > 0 {
                                     self.cursor -= 1;
-                                    self.write(&[27, 91, 68]); // ESC[D
+                                    self.write(&LEFT);
                                 }
                             }
+                            // right
                             Some('C') => {
                                 if self.cursor < input.len() {
                                     self.cursor += 1;
-                                    self.write(&[27, 91, 67]); // ESC[C
+                                    self.write(&RIGHT);
                                 }
                             }
+                            Some('3') => match self.read_char() {
+                                // delete
+                                Some('~') => {
+                                    if self.cursor < input.len() {
+                                        self.remove_char(&mut input);
+                                    }
+                                }
+                                Some(c) => panic!("unknown sequence <ESC>[3{c}"),
+                                _ => (),
+                            },
+                            Some(c) => panic!("unknown sequence <ESC>[{c}"),
                             _ => (),
                         }
                     }
                 }
+                // TODO: alt arrow sequence
+                // ;3D - left
+                // ;3C - right
+                // TODO: ctrl arrow sequence
+                // ;5D - left
+                // ;5C - right
+                // \u{17} - ctrl-w
+                // \u{15} - ctrl-u
+                // \u{8} - ctrl-backspace
+                // \u{1} - ctrl-a
+                // ;5~ - ctrl-del
                 c => {
-                    // TODO: replace after cursor
-                    self.write(c.to_string().as_bytes());
-                    // TODO: this is unsafe, insert at byte pos, not char pos
                     input.insert(self.cursor, c);
+                    self.update_output_from_cursor(&input, input.len() - 1);
                     self.cursor += 1;
+                    self.write(&RIGHT);
                 }
             }
             self.flush();
