@@ -147,7 +147,7 @@ impl Compiler {
     }
 
     fn emit(&mut self, op: Opcode, operands: &[usize]) -> usize {
-        let ins = make_ins(op.clone(), operands);
+        let ins = make_ins(op, operands);
         let pos = self.add_instruction(ins);
         self.set_prev_ins(op, pos);
         pos

@@ -13,7 +13,7 @@ impl Display for OpcodeError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Opcode {
     Constant,
     Add,
@@ -122,7 +122,7 @@ pub fn make_ins(opcode: Opcode, operands: &[usize]) -> Vec<Instruction> {
     if def.len() != operands.len() {
         panic!("Opcode with wrong number of operands, opcode {opcode:?}, operands {operands:?}",);
     }
-    let mut ins = vec![opcode.clone() as Instruction];
+    let mut ins = vec![opcode as Instruction];
     for (i, operand) in operands.iter().enumerate() {
         let witdh = def[i];
         match witdh {
@@ -265,7 +265,7 @@ pub mod tests {
             (Opcode::Closure, vec![65535, 255], 3),
         ];
         for (test_opcode, test_operands, test_read) in tests {
-            let ins = make_ins(test_opcode.clone(), &test_operands);
+            let ins = make_ins(test_opcode, &test_operands);
             let def = test_opcode.widths();
             let (operands_read, bytes_read) = read_operands(def, ins[1..].into());
             assert_eq!(bytes_read, test_read);

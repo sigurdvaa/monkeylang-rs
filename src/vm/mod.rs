@@ -369,7 +369,7 @@ impl Vm {
         let value = match op {
             Opcode::Eq => truth,
             Opcode::NotEq => !truth,
-            _ => return Err(VmError::InvalidNullOperator(op.clone())),
+            _ => return Err(VmError::InvalidNullOperator(op)),
         };
         match value {
             true => self.push_stack(self.objutil.obj_true.clone()),
@@ -523,7 +523,6 @@ impl Vm {
         if let Object::Error(err) = result.as_ref() {
             return Err(VmError::BuiltinFunction(err.clone()));
         }
-
         self.stack[self.sp - 1].replace(result); // replaces called func with result
         Ok(())
     }
