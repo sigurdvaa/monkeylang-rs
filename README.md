@@ -11,7 +11,7 @@ Customized with the following:
 - macro (from The Lost Chapter)
 - quote/unquote as tokens
 - loop (and break)
-- comments with "//"
+- comments using "//"
 - escape characters with \\ (n, t, \\, ")
 - puts no longer add newline
 - exit (with exit code)

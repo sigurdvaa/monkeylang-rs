@@ -157,6 +157,20 @@ impl Terminal<'_> {
         }
     }
 
+    fn move_to_start(&mut self) {
+        if self.cursor > 0 {
+            self.write(format!("\x1b[{}D", self.cursor).as_bytes());
+            self.cursor = 0;
+        }
+    }
+
+    fn move_to_end(&mut self, input: &[char]) {
+        if self.cursor < input.len() {
+            self.write(format!("\x1b[{}C", input.len() - self.cursor).as_bytes());
+            self.cursor = input.len();
+        }
+    }
+
     fn remove_word_left(&mut self, input: &mut Vec<char>) {
         let moves = match input[..self.cursor]
             .iter()
@@ -269,6 +283,91 @@ impl Terminal<'_> {
         self.cursor = input.len();
     }
 
+    fn handle_esc_sequence(&mut self, input: &mut Vec<char>) {
+        match self.read_char() {
+            Some('[') => match self.read_char() {
+                // up
+                Some('A') => self.prev_history(input),
+                // down
+                Some('B') => self.next_history(input),
+                // left
+                Some('D') => {
+                    if self.cursor > 0 {
+                        self.cursor -= 1;
+                        self.write(&LEFT);
+                    }
+                }
+                // right
+                Some('C') => {
+                    if self.cursor < input.len() {
+                        self.cursor += 1;
+                        self.write(&RIGHT);
+                    }
+                }
+                Some('1') => match self.read_char() {
+                    // Home
+                    Some('~') => self.move_to_start(),
+                    Some(';') => {
+                        match self.read_char() {
+                            // SHIFT
+                            Some('2') => _ = self.read_char(),
+                            // ALT
+                            Some('3') => match self.read_char() {
+                                Some('D') => self.move_word_left(input),
+                                Some('C') => self.move_word_right(input),
+                                _ => (),
+                            },
+                            // CTRL
+                            Some('5') => match self.read_char() {
+                                Some('D') => self.move_word_left(input),
+                                Some('C') => self.move_word_right(input),
+                                _ => (),
+                            },
+                            _ => (),
+                        }
+                    }
+                    _ => (),
+                },
+                Some('3') => match self.read_char() {
+                    // delete
+                    Some('~') => {
+                        if self.cursor < input.len() {
+                            self.remove_char(input);
+                        }
+                    }
+                    Some(';') => match self.read_char() {
+                        // SHIFT
+                        Some('2') => _ = self.read_char(),
+                        // ALT
+                        Some('3') => {
+                            if let Some('~') = self.read_char() {
+                                self.remove_word_right(input);
+                            }
+                        }
+                        // CTRL
+                        Some('5') => {
+                            if let Some('~') = self.read_char() {
+                                self.remove_word_right(input);
+                            }
+                        }
+                        _ => (),
+                    },
+                    _ => (),
+                },
+                Some('4') => {
+                    // End
+                    if let Some('~') = self.read_char() {
+                        self.move_to_end(input)
+                    }
+                }
+                _ => (),
+            },
+            // alt-del
+            Some('\u{7f}') => self.remove_word_left(input),
+            _ => (),
+        }
+    }
+
     pub fn get_input(&mut self) -> Option<String> {
         let mut input: Vec<char> = vec![];
         self.cursor = 0;
@@ -309,19 +408,9 @@ impl Terminal<'_> {
                     }
                 }
                 // ctrl-a
-                '\u{1}' => {
-                    if self.cursor > 0 {
-                        self.write(format!("\x1b[{}D", self.cursor).as_bytes());
-                        self.cursor = 0;
-                    }
-                }
+                '\u{1}' => self.move_to_start(),
                 // ctrl-e
-                '\u{5}' => {
-                    if self.cursor < input.len() {
-                        self.write(format!("\x1b[{}C", input.len() - self.cursor).as_bytes());
-                        self.cursor = input.len();
-                    }
-                }
+                '\u{5}' => self.move_to_end(&input),
                 // ctrl-backspace
                 '\u{8}' => self.remove_word_left(&mut input),
                 // ctrl-q
@@ -344,79 +433,7 @@ impl Terminal<'_> {
                 // ctrl-w
                 '\u{17}' => self.remove_word_left(&mut input),
                 // start of ESC sequence
-                '\u{1b}' => match self.read_char() {
-                    Some('[') => match self.read_char() {
-                        // up
-                        Some('A') => self.prev_history(&mut input),
-                        // down
-                        Some('B') => self.next_history(&mut input),
-                        // left
-                        Some('D') => {
-                            if self.cursor > 0 {
-                                self.cursor -= 1;
-                                self.write(&LEFT);
-                            }
-                        }
-                        // right
-                        Some('C') => {
-                            if self.cursor < input.len() {
-                                self.cursor += 1;
-                                self.write(&RIGHT);
-                            }
-                        }
-                        Some('3') => match self.read_char() {
-                            // delete
-                            Some('~') => {
-                                if self.cursor < input.len() {
-                                    self.remove_char(&mut input);
-                                }
-                            }
-                            Some(';') => match self.read_char() {
-                                // SHIFT
-                                Some('2') => _ = self.read_char(),
-                                // ALT
-                                Some('3') => {
-                                    if let Some('~') = self.read_char() {
-                                        self.remove_word_right(&mut input);
-                                    }
-                                }
-                                // CTRL
-                                Some('5') => {
-                                    if let Some('~') = self.read_char() {
-                                        self.remove_word_right(&mut input);
-                                    }
-                                }
-                                _ => (),
-                            },
-                            _ => (),
-                        },
-                        Some('1') => {
-                            if let Some(';') = self.read_char() {
-                                match self.read_char() {
-                                    // SHIFT
-                                    Some('2') => _ = self.read_char(),
-                                    // ALT
-                                    Some('3') => match self.read_char() {
-                                        Some('D') => self.move_word_left(&input),
-                                        Some('C') => self.move_word_right(&input),
-                                        _ => (),
-                                    },
-                                    // CTRL
-                                    Some('5') => match self.read_char() {
-                                        Some('D') => self.move_word_left(&input),
-                                        Some('C') => self.move_word_right(&input),
-                                        _ => (),
-                                    },
-                                    _ => (),
-                                }
-                            }
-                        }
-                        _ => (),
-                    },
-                    // alt-del
-                    Some('\u{7f}') => self.remove_word_left(&mut input),
-                    _ => (),
-                },
+                '\u{1b}' => self.handle_esc_sequence(&mut input),
                 c => {
                     input.insert(self.cursor, c);
                     self.update_output_from_cursor(&input, input.len() - 1);
