@@ -13,7 +13,7 @@ mod vm;
 
 use repl::{run_repl_vm, start_repl_eval, start_repl_vm, EngineKind};
 
-const VERSION: &str = "0.2.6";
+const VERSION: &str = "0.3.1";
 
 fn usage(args: &[String]) {
     eprintln!(
