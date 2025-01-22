@@ -52,7 +52,7 @@ pub struct ClosureObj {
     pub free: Vec<Rc<Object>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Copy, Clone)]
 pub struct HashKey {
     pub kind: &'static str,
     pub value: usize,
@@ -211,16 +211,16 @@ impl ObjectUtil {
         }
     }
 
-    pub fn hash_key(&mut self, obj: Rc<Object>) -> Result<HashKey, HashKeyError> {
+    pub fn hash_key(&mut self, obj: &Rc<Object>) -> Result<HashKey, HashKeyError> {
         match obj.as_ref() {
-            Object::Null => Ok(self.hashkey_null.clone()),
+            Object::Null => Ok(self.hashkey_null),
             Object::Boolean(value) => match value {
-                true => Ok(self.hashkey_true.clone()),
-                false => Ok(self.hashkey_false.clone()),
+                true => Ok(self.hashkey_true),
+                false => Ok(self.hashkey_false),
             },
             Object::Integer(value) => {
                 if let Some(hash_key) = self.hashkey_cache_int.get(value) {
-                    return Ok(hash_key.clone());
+                    return Ok(*hash_key);
                 }
                 let hash_key = HashKey {
                     kind: obj.kind(),
@@ -229,12 +229,12 @@ impl ObjectUtil {
                 if self.hashkey_cache_int.len() > HASHKEY_CACHE_SIZE {
                     self.hashkey_cache_int.clear();
                 }
-                self.hashkey_cache_int.insert(*value, hash_key.clone());
+                self.hashkey_cache_int.insert(*value, hash_key);
                 Ok(hash_key)
             }
             Object::String(ref value) => {
                 if let Some(hash_key) = self.hashkey_cache_str.get(value) {
-                    return Ok(hash_key.clone());
+                    return Ok(*hash_key);
                 }
                 let hash_key = HashKey {
                     kind: obj.kind(),
@@ -243,8 +243,7 @@ impl ObjectUtil {
                 if self.hashkey_cache_str.len() > HASHKEY_CACHE_SIZE {
                     self.hashkey_cache_str.clear();
                 }
-                self.hashkey_cache_str
-                    .insert(value.to_string(), hash_key.clone());
+                self.hashkey_cache_str.insert(value.to_string(), hash_key);
                 Ok(hash_key)
             }
             _ => Err(HashKeyError(obj.kind())),

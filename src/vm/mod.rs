@@ -125,7 +125,7 @@ pub struct Vm {
     stack: [Option<Rc<Object>>; STACK_SIZE],
     sp: usize,
     globals: Vec<Option<Rc<Object>>>,
-    builtins: Vec<(&'static str, Rc<Object>)>,
+    builtins: Vec<Rc<Object>>,
     frames: [Option<Frame>; FRAMES_SIZE],
     fp: usize,
     objutil: ObjectUtil,
@@ -197,7 +197,7 @@ impl Vm {
             stack: [const { None }; STACK_SIZE],
             sp: 0,
             globals: vec![None; GLOBALS_SIZE],
-            builtins: builtins::get_all(),
+            builtins: builtins::get_all().into_iter().map(|item| item.1).collect(),
             frames: [const { None }; FRAMES_SIZE],
             fp: 1,
             objutil: ObjectUtil::new(),
@@ -431,7 +431,7 @@ impl Vm {
             (Object::Hash(obj), _) => {
                 let hash_key = self
                     .objutil
-                    .hash_key(idx)
+                    .hash_key(&idx)
                     .map_err(VmError::InvalidHashKey)?;
                 match obj.get(&hash_key) {
                     Some((_key, value)) => value.clone(),
@@ -467,7 +467,7 @@ impl Vm {
             };
             let hash_key = self
                 .objutil
-                .hash_key(key.clone())
+                .hash_key(&key)
                 .map_err(VmError::InvalidHashKey)?;
             let pair = (key, value);
             hash.insert(hash_key, pair);
@@ -504,8 +504,9 @@ impl Vm {
                 num_args,
             ));
         }
-        let new_frame = Frame::new(closure.clone(), self.sp - num_args);
-        self.sp = new_frame.bp + closure.func.num_locals;
+        let num_locals = closure.func.num_locals;
+        let new_frame = Frame::new(closure, self.sp - num_args);
+        self.sp = new_frame.bp + num_locals;
         self.push_frame(frame)?;
         Ok(new_frame)
     }
@@ -618,7 +619,7 @@ impl Vm {
                 Opcode::GetBuiltin => {
                     let idx = ins[frame.ip + 1] as usize;
                     frame.ip += 2;
-                    let func = self.builtins[idx].1.clone();
+                    let func = self.builtins[idx].clone();
                     self.push_stack(func)?;
                 }
                 Opcode::Array => {

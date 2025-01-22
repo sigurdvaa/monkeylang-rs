@@ -151,7 +151,7 @@ fn insert(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
         }
         Object::Hash(value) => {
             let mut new = value.clone();
-            let key = match engine.get_objutil().hash_key(args[1].clone()) {
+            let key = match engine.get_objutil().hash_key(&args[1]) {
                 Ok(key) => key,
                 Err(err) => return Rc::new(Object::Error(err.to_string())),
             };

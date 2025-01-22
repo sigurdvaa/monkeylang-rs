@@ -92,7 +92,7 @@ impl Eval {
                 None => self.objutil.obj_null.clone(),
             },
             (Object::Hash(left), _) => {
-                let hash_key = match self.objutil.hash_key(index) {
+                let hash_key = match self.objutil.hash_key(&index) {
                     Ok(hash_key) => hash_key,
                     Err(err) => return Rc::new(Object::Error(err.to_string())),
                 };
@@ -182,7 +182,7 @@ impl Eval {
                 return key;
             }
 
-            let hash_key = match self.objutil.hash_key(key.clone()) {
+            let hash_key = match self.objutil.hash_key(&key) {
                 Ok(hash_key) => hash_key,
                 Err(err) => return Rc::new(Object::Error(err.to_string())),
             };
