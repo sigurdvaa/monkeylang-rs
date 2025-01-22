@@ -234,7 +234,7 @@ impl Vm {
         if self.sp >= STACK_SIZE {
             return Err(VmError::StackOverflow(obj));
         }
-        self.stack[self.sp].replace(obj.clone());
+        self.stack[self.sp].replace(obj);
         self.sp += 1;
         Ok(())
     }
