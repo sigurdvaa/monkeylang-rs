@@ -264,8 +264,8 @@ mod tests {
 
         let mut objutil = ObjectUtil::new();
 
-        assert_eq!(objutil.hash_key(hello1.clone()), objutil.hash_key(hello2));
-        assert_eq!(objutil.hash_key(diff1.clone()), objutil.hash_key(diff2));
-        assert_ne!(objutil.hash_key(hello1), objutil.hash_key(diff1));
+        assert_eq!(objutil.hash_key(&hello1), objutil.hash_key(&hello2));
+        assert_eq!(objutil.hash_key(&diff1), objutil.hash_key(&diff2));
+        assert_ne!(objutil.hash_key(&hello1), objutil.hash_key(&diff1));
     }
 }

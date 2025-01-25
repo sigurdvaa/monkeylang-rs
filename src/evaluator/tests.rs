@@ -351,28 +351,19 @@ fn test_hash_literals() {
     let three = Rc::new(Object::String("three".into()));
     let four = Rc::new(Object::Integer(4));
     let tests = HashMap::from([
+        (objutil.hash_key(&one).unwrap(), (one, Object::Integer(1))),
+        (objutil.hash_key(&two).unwrap(), (two, Object::Integer(2))),
         (
-            objutil.hash_key(one.clone()).unwrap(),
-            (one, Object::Integer(1)),
-        ),
-        (
-            objutil.hash_key(two.clone()).unwrap(),
-            (two, Object::Integer(2)),
-        ),
-        (
-            objutil.hash_key(three.clone()).unwrap(),
+            objutil.hash_key(&three).unwrap(),
             (three, Object::Integer(3)),
         ),
+        (objutil.hash_key(&four).unwrap(), (four, Object::Integer(4))),
         (
-            objutil.hash_key(four.clone()).unwrap(),
-            (four, Object::Integer(4)),
-        ),
-        (
-            objutil.hash_key(objutil.obj_true.clone()).unwrap(),
+            objutil.hash_key(&objutil.obj_true.clone()).unwrap(),
             (objutil.obj_true.clone(), Object::Integer(5)),
         ),
         (
-            objutil.hash_key(objutil.obj_false.clone()).unwrap(),
+            objutil.hash_key(&objutil.obj_false.clone()).unwrap(),
             (objutil.obj_false.clone(), Object::Integer(6)),
         ),
     ]);
@@ -383,7 +374,7 @@ fn test_hash_literals() {
             assert_eq!(hash.len(), 6);
             for (hash, (key, value)) in hash {
                 let (test_key, test_value) = &tests[hash];
-                let _ = objutil.hash_key(test_key.clone());
+                let _ = objutil.hash_key(test_key);
                 assert_eq!(key, test_key);
                 assert_eq!(**value, *test_value);
             }

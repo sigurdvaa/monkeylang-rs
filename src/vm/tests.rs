@@ -151,9 +151,7 @@ fn test_hash_literals() {
         for (k, v) in test_value {
             let key = Rc::new(Object::Integer(k));
             let value = Rc::new(Object::Integer(v));
-            let hash = objutil
-                .hash_key(key.clone())
-                .expect("couldn't generate hash key");
+            let hash = objutil.hash_key(&key).expect("couldn't generate hash key");
             let pair = (key, value);
             test_hash.insert(hash, pair);
         }
