@@ -53,3 +53,7 @@ engine=vm, result=9227465, duration=5.304828126s
 version 0.3.1 (desktop: AMD Ryzen 9 5900X)
 engine=eval, result=9227465, duration=7.085456615s
 engine=vm, result=9227465, duration=2.364309431s
+
+version 0.3.2 (laptop: dell precision i9-9980HK (no turbo)) - force inline in eval
+engine=eval, result=9227465, duration=16.686211666s
+engine=vm, result=9227465, duration=5.394119686s

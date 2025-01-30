@@ -78,6 +78,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn get_obj_bool(&self, value: bool) -> Rc<Object> {
         match value {
             true => self.objutil.obj_true.clone(),
@@ -85,6 +86,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn eval_index_expression(&mut self, left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
         match (left.as_ref(), index.as_ref()) {
             (Object::Array(left), Object::Integer(index)) => match left.get(*index as usize) {
@@ -108,6 +110,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn eval_minus_prefix_operator_expression(&self, right: Rc<Object>) -> Rc<Object> {
         Rc::new(match right.as_ref() {
             Object::Integer(value) => Object::Integer(-value),
@@ -127,6 +130,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn eval_integer_infix_expression(&self, operator: &Operator, a: isize, b: isize) -> Rc<Object> {
         match operator {
             Operator::Plus => Rc::new(Object::Integer(a + b)),
@@ -143,6 +147,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn eval_boolean_infix_expression(&self, operator: &Operator, a: bool, b: bool) -> Rc<Object> {
         match operator {
             Operator::Eq => self.get_obj_bool(a == b),
@@ -153,6 +158,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn eval_string_infix_expression(&self, operator: &Operator, a: &str, b: &str) -> Rc<Object> {
         match operator {
             Operator::Plus => Rc::new(Object::String(String::from_iter([a, b]))),
@@ -164,6 +170,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn eval_null_infix_expression(&self, operator: &Operator, other: &Object) -> Rc<Object> {
         let truth = matches!(other, Object::Null);
         match operator {
@@ -198,6 +205,7 @@ impl Eval {
         Rc::new(Object::Hash(pairs))
     }
 
+    #[inline(always)]
     fn eval_infix_expression(
         &self,
         operator: &Operator,
@@ -230,6 +238,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn eval_prefix_expression(&self, operator: &Operator, right: Rc<Object>) -> Rc<Object> {
         match operator {
             Operator::Bang => self.eval_bang_operator_expression(right),
@@ -256,6 +265,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn eval_expressions(&mut self, expressions: &[Expression]) -> Vec<Rc<Object>> {
         let mut result = vec![];
         for expr in expressions {
@@ -424,6 +434,7 @@ impl Eval {
         }
     }
 
+    #[inline(always)]
     fn eval_block_statement(&mut self, block: &BlockStatement) -> Rc<Object> {
         let mut result = self.objutil.obj_null.clone();
         for stmt in &block.statements {
@@ -435,6 +446,7 @@ impl Eval {
         result
     }
 
+    #[inline(always)]
     fn eval_loop_block_statement(&mut self, block: &BlockStatement) -> Rc<Object> {
         let mut result = self.objutil.obj_null.clone();
         for stmt in &block.statements {
