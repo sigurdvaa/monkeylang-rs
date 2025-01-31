@@ -14,6 +14,7 @@ use std::rc::Rc;
 const STACK_SIZE: usize = 32768;
 const GLOBALS_SIZE: usize = 65536;
 const FRAMES_SIZE: usize = STACK_SIZE / 2;
+const RCPOOL_SIZE: usize = 1024;
 
 #[derive(Debug, PartialEq)]
 pub enum VmError {
@@ -129,6 +130,7 @@ pub struct Vm {
     frames: [Option<Frame>; FRAMES_SIZE],
     fp: usize,
     objutil: ObjectUtil,
+    rcpool: Vec<Rc<Object>>,
 }
 
 impl Engine for Vm {
@@ -201,6 +203,7 @@ impl Vm {
             frames: [const { None }; FRAMES_SIZE],
             fp: 1,
             objutil: ObjectUtil::new(),
+            rcpool: Vec::with_capacity(RCPOOL_SIZE),
         };
         let func = Rc::new(CompiledFunctionObj {
             instructions,
@@ -230,11 +233,30 @@ impl Vm {
         self.frames[0].replace(frame);
     }
 
+    fn get_rc(&mut self, obj: Object) -> Rc<Object> {
+        match self.rcpool.pop() {
+            None => Rc::new(obj),
+            Some(mut rc) => {
+                *Rc::get_mut(&mut rc).expect("rc in use") = obj;
+                rc
+            }
+        }
+    }
+
+    fn return_rc(&mut self, mut rc: Rc<Object>) {
+        if Rc::strong_count(&rc) == 1 && self.rcpool.len() < RCPOOL_SIZE {
+            *Rc::get_mut(&mut rc).expect("rc in use") = const { Object::None };
+            self.rcpool.push(rc);
+        }
+    }
+
     fn push_stack(&mut self, obj: Rc<Object>) -> Result<(), VmError> {
         if self.sp >= STACK_SIZE {
             return Err(VmError::StackOverflow(obj));
         }
-        self.stack[self.sp].replace(obj);
+        if let Some(obj) = self.stack[self.sp].replace(obj) {
+            self.return_rc(obj);
+        }
         self.sp += 1;
         Ok(())
     }
@@ -279,7 +301,8 @@ impl Vm {
                     func: func.clone(),
                     free,
                 };
-                self.push_stack(Rc::new(Object::Closure(Rc::new(closure))))
+                let closure = self.get_rc(Object::Closure(Rc::new(closure)));
+                self.push_stack(closure)
             }
             _ => Err(VmError::InvalidClosure(idx, self.constants[idx].clone())),
         }
@@ -298,7 +321,8 @@ impl Vm {
             Opcode::Div => left / right,
             _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
-        self.push_stack(Rc::new(Object::Integer(value)))
+        let obj = self.get_rc(Object::Integer(value));
+        self.push_stack(obj)
     }
 
     fn execute_binary_string_operation(
@@ -311,7 +335,8 @@ impl Vm {
             Opcode::Add => String::from_iter([left, right]),
             _ => return Err(VmError::InvalidStringOperator(op)),
         };
-        self.push_stack(Rc::new(Object::String(value)))
+        let obj = self.get_rc(Object::String(value));
+        self.push_stack(obj)
     }
 
     fn execute_binary_operation(&mut self, op: Opcode) -> Result<(), VmError> {
@@ -319,13 +344,16 @@ impl Vm {
         let left = self.pop_stack()?;
         match (left.as_ref(), right.as_ref()) {
             (Object::Integer(left), Object::Integer(right)) => {
-                self.execute_binary_integer_operation(op, *left, *right)
+                self.execute_binary_integer_operation(op, *left, *right)?;
             }
             (Object::String(left), Object::String(right)) => {
-                self.execute_binary_string_operation(op, left, right)
+                self.execute_binary_string_operation(op, left, right)?;
             }
-            _ => Err(VmError::InvalidBinaryTypes(left.kind(), right.kind())),
+            _ => return Err(VmError::InvalidBinaryTypes(left.kind(), right.kind())),
         }
+        self.return_rc(right);
+        self.return_rc(left);
+        Ok(())
     }
 
     fn execute_integer_comparison(
@@ -382,32 +410,42 @@ impl Vm {
         let left = self.pop_stack()?;
         match (left.as_ref(), right.as_ref()) {
             (Object::Integer(left), Object::Integer(right)) => {
-                self.execute_integer_comparison(op, *left, *right)
+                self.execute_integer_comparison(op, *left, *right)?;
             }
             (Object::Boolean(left), Object::Boolean(right)) => {
-                self.execute_boolean_comparison(op, *left, *right)
+                self.execute_boolean_comparison(op, *left, *right)?;
             }
             (Object::Null, other) | (other, Object::Null) => {
-                self.execute_null_comparison(op, other)
+                self.execute_null_comparison(op, other)?;
             }
-            _ => Err(VmError::InvalidComparisonTypes(left.kind(), right.kind())),
+            _ => return Err(VmError::InvalidComparisonTypes(left.kind(), right.kind())),
         }
+        self.return_rc(right);
+        self.return_rc(left);
+        Ok(())
     }
 
     fn execute_bang_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop_stack()?;
         match operand.is_truthy() {
-            true => self.push_stack(self.objutil.obj_false.clone()),
-            false => self.push_stack(self.objutil.obj_true.clone()),
-        }
+            true => self.push_stack(self.objutil.obj_false.clone())?,
+            false => self.push_stack(self.objutil.obj_true.clone())?,
+        };
+        self.return_rc(operand);
+        Ok(())
     }
 
     fn execute_minus_operator(&mut self) -> Result<(), VmError> {
         let operand = self.pop_stack()?;
         match operand.as_ref() {
-            Object::Integer(value) => self.push_stack(Rc::new(Object::Integer(-value))),
-            _ => Err(VmError::InvalidPrefixType(operand.kind())),
+            Object::Integer(value) => {
+                let obj = self.get_rc(Object::Integer(-value));
+                self.push_stack(obj)?;
+            }
+            _ => return Err(VmError::InvalidPrefixType(operand.kind())),
         }
+        self.return_rc(operand);
+        Ok(())
     }
 
     fn execute_exit(&mut self) -> Result<(), VmError> {
@@ -440,6 +478,8 @@ impl Vm {
             }
             _ => return Err(VmError::InvalidIndexTypes(left.kind(), idx.kind())),
         };
+        self.return_rc(idx);
+        self.return_rc(left);
         self.push_stack(obj)
     }
 
@@ -524,7 +564,10 @@ impl Vm {
         if let Object::Error(err) = result.as_ref() {
             return Err(VmError::BuiltinFunction(err.clone()));
         }
-        self.stack[self.sp - 1].replace(result); // replaces called func with result
+        // replaces called func with result
+        if let Some(obj) = self.stack[self.sp - 1].replace(result) {
+            self.return_rc(obj);
+        }
         Ok(())
     }
 
@@ -569,6 +612,7 @@ impl Vm {
                 }
                 Opcode::Pop => {
                     frame.ip += 1;
+                    self.return_rc(last_pop);
                     last_pop = self.pop_stack()?;
                 }
                 Opcode::Jump => {
@@ -582,6 +626,7 @@ impl Vm {
                     if !condition.is_truthy() {
                         frame.ip = pos;
                     }
+                    self.return_rc(condition);
                 }
                 Opcode::Constant => {
                     let idx = read_u16_as_usize(&ins[frame.ip + 1..]);
@@ -600,7 +645,9 @@ impl Vm {
                     let idx = read_u16_as_usize(&ins[frame.ip + 1..]);
                     frame.ip += 3;
                     let obj = self.pop_stack()?;
-                    self.globals[idx] = Some(obj);
+                    if let Some(obj) = self.globals[idx].replace(obj) {
+                        self.return_rc(obj);
+                    }
                 }
                 Opcode::GetLocal => {
                     let idx = ins[frame.ip + 1] as usize;
@@ -614,7 +661,9 @@ impl Vm {
                     let idx = ins[frame.ip + 1] as usize;
                     frame.ip += 2;
                     let obj = self.pop_stack()?;
-                    self.stack[frame.bp + idx].replace(obj);
+                    if let Some(obj) = self.stack[frame.bp + idx].replace(obj) {
+                        self.return_rc(obj);
+                    }
                 }
                 Opcode::GetBuiltin => {
                     let idx = ins[frame.ip + 1] as usize;
@@ -627,14 +676,16 @@ impl Vm {
                     frame.ip += 3;
                     let array = self.build_array(self.sp - len, self.sp)?;
                     self.sp -= len;
-                    self.push_stack(Rc::new(array))?;
+                    let obj = self.get_rc(array);
+                    self.push_stack(obj)?
                 }
                 Opcode::Hash => {
                     let len = read_u16_as_usize(&ins[frame.ip + 1..]);
                     frame.ip += 3;
                     let hash = self.build_hash(self.sp - len, self.sp)?;
                     self.sp -= len;
-                    self.push_stack(Rc::new(hash))?;
+                    let obj = self.get_rc(hash);
+                    self.push_stack(obj)?
                 }
                 Opcode::Index => {
                     frame.ip += 1;
@@ -652,14 +703,30 @@ impl Vm {
                     self.push_closure(idx, num_free)?;
                 }
                 Opcode::Return => {
+                    let obj = self.pop_stack()?;
+                    self.return_rc(obj);
                     self.sp = frame.bp;
-                    self.stack[self.sp - 1].replace(self.objutil.obj_null.clone());
+                    if let Some(obj) =
+                        self.stack[self.sp - 1].replace(self.objutil.obj_null.clone())
+                    {
+                        self.return_rc(obj);
+                    }
                     frame = self.pop_frame()?;
                 }
                 Opcode::ReturnValue => {
                     let value = self.pop_stack()?;
+
+                    // cleanup stack after call
+                    for idx in frame.bp..self.sp {
+                        if let Some(obj) = self.stack[idx].take() {
+                            self.return_rc(obj);
+                        }
+                    }
+
                     self.sp = frame.bp;
-                    self.stack[self.sp - 1].replace(value);
+                    if let Some(obj) = self.stack[self.sp - 1].replace(value) {
+                        self.return_rc(obj);
+                    }
                     frame = self.pop_frame()?;
                 }
                 Opcode::GetFree => {
@@ -670,8 +737,8 @@ impl Vm {
                 }
                 Opcode::CurrentClosure => {
                     frame.ip += 1;
-                    let closure = frame.closure.clone();
-                    self.push_stack(Rc::new(Object::Closure(closure)))?;
+                    let obj = self.get_rc(Object::Closure(frame.closure.clone()));
+                    self.push_stack(obj)?;
                 }
                 Opcode::Exit => self.execute_exit()?,
                 Opcode::Break => {
@@ -680,6 +747,11 @@ impl Vm {
                 }
             }
         }
+        let dirty = self.stack[frame.bp..]
+            .iter()
+            .filter(|i| i.is_some())
+            .count();
+        println!("dirty stack: {dirty}");
         Ok(last_pop)
     }
 }
