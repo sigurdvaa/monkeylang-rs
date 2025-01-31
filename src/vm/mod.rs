@@ -7,7 +7,7 @@ use crate::object::{
     builtins, BuiltinFunction, ClosureObj, CompiledFunctionObj, Engine, HashKeyError, Object,
     ObjectUtil,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Display;
 use std::rc::Rc;
 
@@ -130,7 +130,7 @@ pub struct Vm {
     frames: [Option<Frame>; FRAMES_SIZE],
     fp: usize,
     objutil: ObjectUtil,
-    rcpool: Vec<Rc<Object>>,
+    rcpool: VecDeque<Rc<Object>>,
 }
 
 impl Engine for Vm {
@@ -203,7 +203,7 @@ impl Vm {
             frames: [const { None }; FRAMES_SIZE],
             fp: 1,
             objutil: ObjectUtil::new(),
-            rcpool: Vec::with_capacity(RCPOOL_SIZE),
+            rcpool: VecDeque::with_capacity(RCPOOL_SIZE),
         };
         let func = Rc::new(CompiledFunctionObj {
             instructions,
@@ -234,7 +234,7 @@ impl Vm {
     }
 
     fn get_rc(&mut self, obj: Object) -> Rc<Object> {
-        match self.rcpool.pop() {
+        match self.rcpool.pop_front() {
             None => Rc::new(obj),
             Some(mut rc) => {
                 *Rc::get_mut(&mut rc).expect("rc in use") = obj;
@@ -243,10 +243,9 @@ impl Vm {
         }
     }
 
-    fn return_rc(&mut self, mut rc: Rc<Object>) {
+    fn return_rc(&mut self, rc: Rc<Object>) {
         if Rc::strong_count(&rc) == 1 && self.rcpool.len() < RCPOOL_SIZE {
-            *Rc::get_mut(&mut rc).expect("rc in use") = const { Object::None };
-            self.rcpool.push(rc);
+            self.rcpool.push_back(rc);
         }
     }
 
