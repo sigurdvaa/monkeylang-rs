@@ -61,12 +61,10 @@ impl Engine for Eval {
         &mut self.objutil
     }
 
-    #[inline(always)]
     fn get_obj_null(&self) -> Rc<Object> {
         self.objutil.obj_null.clone()
     }
 
-    #[inline(always)]
     fn get_obj_none(&self) -> Rc<Object> {
         self.objutil.obj_none.clone()
     }
