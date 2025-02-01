@@ -14,8 +14,8 @@ pub trait Engine {
     fn get_objutil(&mut self) -> &mut ObjectUtil;
     fn get_obj_null(&self) -> Rc<Object>;
     fn get_obj_none(&self) -> Rc<Object>;
-    fn get_rc(&mut self, obj: Object) -> Rc<Object>;
-    fn return_rc(&mut self, rc: Rc<Object>);
+    fn get_rcobj(&mut self, obj: Object) -> Rc<Object>;
+    fn return_rcobj(&mut self, rc: Rc<Object>);
 }
 
 pub type Integer = isize;

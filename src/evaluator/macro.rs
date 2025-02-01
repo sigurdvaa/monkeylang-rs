@@ -42,7 +42,7 @@ impl Eval {
 
     pub fn quote(&mut self, mut expr: Expression) -> Rc<Object> {
         self.eval_unquote_calls(&mut expr);
-        self.get_rc(Object::Quote(Box::new(expr)))
+        self.get_rcobj(Object::Quote(Box::new(expr)))
     }
 
     pub fn define_macros(&mut self, prog: &mut Program) {
@@ -58,7 +58,7 @@ impl Eval {
                 _ => continue,
             };
 
-            let obj = self.get_rc(Object::Macro(Box::new(FunctionObj {
+            let obj = self.get_rcobj(Object::Macro(Box::new(FunctionObj {
                 parameters: expr.parameters.clone(),
                 body: expr.body.clone(),
                 env: self.envs[self.ep].clone(),
@@ -93,10 +93,10 @@ impl Eval {
             let args: Vec<_> = call
                 .arguments
                 .iter()
-                .map(|a| eval.get_rc(Object::Quote(Box::new(a.clone()))))
+                .map(|a| eval.get_rcobj(Object::Quote(Box::new(a.clone()))))
                 .collect();
 
-            let macro_env = Environment::new_enclosed(macr.env.clone());
+            let macro_env = Environment::new_enclosed(eval, macr.env.clone());
             for (i, param) in macr.parameters.iter().enumerate() {
                 macro_env.set(param.value.to_owned(), args[i].to_owned());
             }

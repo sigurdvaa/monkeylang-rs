@@ -143,7 +143,7 @@ impl Engine for Vm {
                 return Rc::new(Object::Error(e.to_string()));
             }
         }
-        match func.as_ref() {
+        let obj = match func.as_ref() {
             Object::Closure(_) => {
                 let func = Rc::new(CompiledFunctionObj {
                     instructions: vec![Opcode::Call as u8, args.len() as u8],
@@ -172,7 +172,9 @@ impl Engine for Vm {
                     .unwrap_or_else(|e| Rc::new(Object::Error(e.to_string())))
             }
             _ => unreachable!(),
-        }
+        };
+        self.return_rcobj(func);
+        obj
     }
 
     fn get_objutil(&mut self) -> &mut ObjectUtil {
@@ -187,7 +189,7 @@ impl Engine for Vm {
         self.objutil.obj_none.clone()
     }
 
-    fn get_rc(&mut self, obj: Object) -> Rc<Object> {
+    fn get_rcobj(&mut self, obj: Object) -> Rc<Object> {
         match self.rcpool.pop_front() {
             None => Rc::new(obj),
             Some(mut rc) => {
@@ -197,7 +199,7 @@ impl Engine for Vm {
         }
     }
 
-    fn return_rc(&mut self, rc: Rc<Object>) {
+    fn return_rcobj(&mut self, rc: Rc<Object>) {
         if Rc::strong_count(&rc) == 1 && self.rcpool.len() < RCPOOL_SIZE {
             self.rcpool.push_back(rc);
         }
@@ -254,7 +256,7 @@ impl Vm {
             return Err(VmError::StackOverflow(obj));
         }
         if let Some(obj) = self.stack[self.sp].replace(obj) {
-            self.return_rc(obj);
+            self.return_rcobj(obj);
         }
         self.sp += 1;
         Ok(())
@@ -300,7 +302,7 @@ impl Vm {
                     func: func.clone(),
                     free,
                 };
-                let closure = self.get_rc(Object::Closure(Rc::new(closure)));
+                let closure = self.get_rcobj(Object::Closure(Rc::new(closure)));
                 self.push_stack(closure)
             }
             _ => Err(VmError::InvalidClosure(idx, self.constants[idx].clone())),
@@ -320,7 +322,7 @@ impl Vm {
             Opcode::Div => left / right,
             _ => return Err(VmError::InvalidIntegerOperator(op)),
         };
-        let obj = self.get_rc(Object::Integer(value));
+        let obj = self.get_rcobj(Object::Integer(value));
         self.push_stack(obj)
     }
 
@@ -334,7 +336,7 @@ impl Vm {
             Opcode::Add => String::from_iter([left, right]),
             _ => return Err(VmError::InvalidStringOperator(op)),
         };
-        let obj = self.get_rc(Object::String(value));
+        let obj = self.get_rcobj(Object::String(value));
         self.push_stack(obj)
     }
 
@@ -350,8 +352,8 @@ impl Vm {
             }
             _ => return Err(VmError::InvalidBinaryTypes(left.kind(), right.kind())),
         }
-        self.return_rc(right);
-        self.return_rc(left);
+        self.return_rcobj(right);
+        self.return_rcobj(left);
         Ok(())
     }
 
@@ -419,8 +421,8 @@ impl Vm {
             }
             _ => return Err(VmError::InvalidComparisonTypes(left.kind(), right.kind())),
         }
-        self.return_rc(right);
-        self.return_rc(left);
+        self.return_rcobj(right);
+        self.return_rcobj(left);
         Ok(())
     }
 
@@ -430,7 +432,7 @@ impl Vm {
             true => self.push_stack(self.objutil.obj_false.clone())?,
             false => self.push_stack(self.objutil.obj_true.clone())?,
         };
-        self.return_rc(operand);
+        self.return_rcobj(operand);
         Ok(())
     }
 
@@ -438,12 +440,12 @@ impl Vm {
         let operand = self.pop_stack()?;
         match operand.as_ref() {
             Object::Integer(value) => {
-                let obj = self.get_rc(Object::Integer(-value));
+                let obj = self.get_rcobj(Object::Integer(-value));
                 self.push_stack(obj)?;
             }
             _ => return Err(VmError::InvalidPrefixType(operand.kind())),
         }
-        self.return_rc(operand);
+        self.return_rcobj(operand);
         Ok(())
     }
 
@@ -477,8 +479,8 @@ impl Vm {
             }
             _ => return Err(VmError::InvalidIndexTypes(left.kind(), idx.kind())),
         };
-        self.return_rc(idx);
-        self.return_rc(left);
+        self.return_rcobj(idx);
+        self.return_rcobj(left);
         self.push_stack(obj)
     }
 
@@ -566,7 +568,7 @@ impl Vm {
         }
 
         if let Some(obj) = self.stack[self.sp - 1].replace(result) {
-            self.return_rc(obj);
+            self.return_rcobj(obj);
         }
         Ok(())
     }
@@ -612,7 +614,7 @@ impl Vm {
                 }
                 Opcode::Pop => {
                     frame.ip += 1;
-                    self.return_rc(last_pop);
+                    self.return_rcobj(last_pop);
                     last_pop = self.pop_stack()?;
                 }
                 Opcode::Jump => {
@@ -626,7 +628,7 @@ impl Vm {
                     if !condition.is_truthy() {
                         frame.ip = pos;
                     }
-                    self.return_rc(condition);
+                    self.return_rcobj(condition);
                 }
                 Opcode::Constant => {
                     let idx = read_u16_as_usize(&ins[frame.ip + 1..]);
@@ -646,7 +648,7 @@ impl Vm {
                     frame.ip += 3;
                     let obj = self.pop_stack()?;
                     if let Some(obj) = self.globals[idx].replace(obj) {
-                        self.return_rc(obj);
+                        self.return_rcobj(obj);
                     }
                 }
                 Opcode::GetLocal => {
@@ -662,7 +664,7 @@ impl Vm {
                     frame.ip += 2;
                     let obj = self.pop_stack()?;
                     if let Some(obj) = self.stack[frame.bp + idx].replace(obj) {
-                        self.return_rc(obj);
+                        self.return_rcobj(obj);
                     }
                 }
                 Opcode::GetBuiltin => {
@@ -676,7 +678,7 @@ impl Vm {
                     frame.ip += 3;
                     let array = self.build_array(self.sp - len, self.sp)?;
                     self.sp -= len;
-                    let obj = self.get_rc(array);
+                    let obj = self.get_rcobj(array);
                     self.push_stack(obj)?
                 }
                 Opcode::Hash => {
@@ -684,7 +686,7 @@ impl Vm {
                     frame.ip += 3;
                     let hash = self.build_hash(self.sp - len, self.sp)?;
                     self.sp -= len;
-                    let obj = self.get_rc(hash);
+                    let obj = self.get_rcobj(hash);
                     self.push_stack(obj)?
                 }
                 Opcode::Index => {
@@ -706,7 +708,7 @@ impl Vm {
                     // cleanup stack after call
                     for idx in frame.bp..self.sp {
                         if let Some(obj) = self.stack[idx].take() {
-                            self.return_rc(obj);
+                            self.return_rcobj(obj);
                         }
                     }
 
@@ -714,7 +716,7 @@ impl Vm {
                     if let Some(obj) =
                         self.stack[self.sp - 1].replace(self.objutil.obj_null.clone())
                     {
-                        self.return_rc(obj);
+                        self.return_rcobj(obj);
                     }
                     frame = self.pop_frame()?;
                 }
@@ -724,13 +726,13 @@ impl Vm {
                     // cleanup stack after call
                     for idx in frame.bp..self.sp {
                         if let Some(obj) = self.stack[idx].take() {
-                            self.return_rc(obj);
+                            self.return_rcobj(obj);
                         }
                     }
 
                     self.sp = frame.bp;
                     if let Some(obj) = self.stack[self.sp - 1].replace(value) {
-                        self.return_rc(obj);
+                        self.return_rcobj(obj);
                     }
                     frame = self.pop_frame()?;
                 }
@@ -742,7 +744,7 @@ impl Vm {
                 }
                 Opcode::CurrentClosure => {
                     frame.ip += 1;
-                    let obj = self.get_rc(Object::Closure(frame.closure.clone()));
+                    let obj = self.get_rcobj(Object::Closure(frame.closure.clone()));
                     self.push_stack(obj)?;
                 }
                 Opcode::Exit => self.execute_exit()?,

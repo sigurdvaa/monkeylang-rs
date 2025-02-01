@@ -19,13 +19,13 @@ pub fn get_all() -> Vec<(&'static str, Rc<Object>)> {
 
 fn len(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
-        return engine.get_rc(Object::Error(format!(
+        return engine.get_rcobj(Object::Error(format!(
             "wrong number of arguments to \"len\". got={}, want=1",
             args.len()
         )));
     }
 
-    engine.get_rc(match &*args[0] {
+    engine.get_rcobj(match &*args[0] {
         Object::String(value) => Object::Integer(value.len() as isize),
         Object::Array(value) => Object::Integer(value.len() as isize),
         _ => Object::Error(format!(
@@ -37,7 +37,7 @@ fn len(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
 
 fn first(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
-        return engine.get_rc(Object::Error(format!(
+        return engine.get_rcobj(Object::Error(format!(
             "wrong number of arguments to \"first\". got={}, want=1",
             args.len()
         )));
@@ -48,7 +48,7 @@ fn first(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
             Some(value) => value.clone(),
             None => engine.get_obj_null(),
         },
-        _ => engine.get_rc(Object::Error(format!(
+        _ => engine.get_rcobj(Object::Error(format!(
             "argument to \"first\" not supported, got {}",
             args[0].kind()
         ))),
@@ -57,7 +57,7 @@ fn first(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
 
 fn last(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
-        return engine.get_rc(Object::Error(format!(
+        return engine.get_rcobj(Object::Error(format!(
             "wrong number of arguments to \"last\". got={}, want=1",
             args.len()
         )));
@@ -68,7 +68,7 @@ fn last(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
             Some(value) => value.clone(),
             None => engine.get_obj_null(),
         },
-        _ => engine.get_rc(Object::Error(format!(
+        _ => engine.get_rcobj(Object::Error(format!(
             "argument to \"last\" not supported, got {}",
             args[0].kind()
         ))),
@@ -77,7 +77,7 @@ fn last(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
 
 fn rest(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
-        return engine.get_rc(Object::Error(format!(
+        return engine.get_rcobj(Object::Error(format!(
             "wrong number of arguments to \"rest\". got={}, want=1",
             args.len()
         )));
@@ -88,10 +88,10 @@ fn rest(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
             if value.is_empty() {
                 engine.get_obj_null()
             } else {
-                engine.get_rc(Object::Array(value.iter().skip(1).cloned().collect()))
+                engine.get_rcobj(Object::Array(value.iter().skip(1).cloned().collect()))
             }
         }
-        _ => engine.get_rc(Object::Error(format!(
+        _ => engine.get_rcobj(Object::Error(format!(
             "argument to \"rest\" not supported, got {}",
             args[0].kind()
         ))),
@@ -100,13 +100,13 @@ fn rest(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
 
 fn push(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 2 && args.len() != 3 {
-        return engine.get_rc(Object::Error(format!(
+        return engine.get_rcobj(Object::Error(format!(
             "wrong number of arguments to \"push\", got={}, want=2",
             args.len()
         )));
     }
 
-    engine.get_rc(match &*args[0] {
+    engine.get_rcobj(match &*args[0] {
         Object::Array(value) => {
             let mut new = value.clone();
             new.push(args[1].clone());
@@ -121,7 +121,7 @@ fn push(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
 
 fn insert(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 3 {
-        return engine.get_rc(Object::Error(format!(
+        return engine.get_rcobj(Object::Error(format!(
             "wrong number of arguments \"insert\", got={}, want=3",
             args.len()
         )));
@@ -133,7 +133,7 @@ fn insert(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
             match &*args[1] {
                 Object::Integer(i) => {
                     if *i as usize >= value.len() {
-                        return engine.get_rc(Object::Error(format!(
+                        return engine.get_rcobj(Object::Error(format!(
                             "2nd argument to \"insert\" is out of range, got {i}, length is {}",
                             value.len()
                         )));
@@ -141,7 +141,7 @@ fn insert(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
                     new.insert(*i as usize, args[2].clone());
                 }
                 _ => {
-                    return engine.get_rc(Object::Error(format!(
+                    return engine.get_rcobj(Object::Error(format!(
                         "2nd argument to \"insert\" not supported, got {}, want=INTEGER",
                         args[1].kind()
                     )))
@@ -153,7 +153,7 @@ fn insert(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
             let mut new = value.clone();
             let key = match engine.get_objutil().hash_key(&args[1]) {
                 Ok(key) => key,
-                Err(err) => return engine.get_rc(Object::Error(err.to_string())),
+                Err(err) => return engine.get_rcobj(Object::Error(err.to_string())),
             };
             new.insert(key, (args[1].clone(), args[2].clone()));
             Object::Hash(new)
@@ -163,24 +163,24 @@ fn insert(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
             args.iter().map(|v| v.kind()).collect::<Vec<_>>().join(", ")
         )),
     };
-    engine.get_rc(obj)
+    engine.get_rcobj(obj)
 }
 
 fn replace(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 3 {
-        return engine.get_rc(Object::Error(format!(
+        return engine.get_rcobj(Object::Error(format!(
             "wrong number of arguments \"replace\", got={}, want=3",
             args.len()
         )));
     }
 
-    engine.get_rc(match &*args[0] {
+    engine.get_rcobj(match &*args[0] {
         Object::Array(value) => {
             let mut new = value.clone();
             match &*args[1] {
                 Object::Integer(i) => {
                     if *i as usize >= value.len() {
-                        return engine.get_rc(Object::Error(format!(
+                        return engine.get_rcobj(Object::Error(format!(
                             "2nd argument to \"replace\" is out of range, got {i}, length is {}",
                             value.len()
                         )));
@@ -188,7 +188,7 @@ fn replace(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
                     new[*i as usize] = args[2].clone();
                 }
                 _ => {
-                    return engine.get_rc(Object::Error(format!(
+                    return engine.get_rcobj(Object::Error(format!(
                         "2nd argument to \"replace\" not supported, got {}, want=INTEGER",
                         args[1].kind()
                     )))
@@ -217,13 +217,13 @@ fn puts(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
 
 fn string(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 1 {
-        return engine.get_rc(Object::Error(format!(
+        return engine.get_rcobj(Object::Error(format!(
             "wrong number of arguments to \"string\", got={}, want=1",
             args.len()
         )));
     }
 
-    engine.get_rc(match &*args[0] {
+    engine.get_rcobj(match &*args[0] {
         Object::String(value) => Object::String(value.clone()),
         Object::Integer(value) => Object::String(value.to_string()),
         Object::Array(value) => Object::String(
@@ -242,7 +242,7 @@ fn string(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
 
 fn map(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
     if args.len() != 2 {
-        return engine.get_rc(Object::Error(format!(
+        return engine.get_rcobj(Object::Error(format!(
             "wrong number of arguments to \"map\", got={}, want=2",
             args.len()
         )));
@@ -258,9 +258,9 @@ fn map(args: &[Rc<Object>], engine: &mut dyn Engine) -> Rc<Object> {
                     _ => new.push(result),
                 }
             }
-            engine.get_rc(Object::Array(new))
+            engine.get_rcobj(Object::Array(new))
         }
-        _ => engine.get_rc(Object::Error(format!(
+        _ => engine.get_rcobj(Object::Error(format!(
             "argument to \"map\" not supported, got {} and {}",
             args[0].kind(),
             args[1].kind()
