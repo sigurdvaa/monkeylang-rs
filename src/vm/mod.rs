@@ -189,6 +189,7 @@ impl Engine for Vm {
         self.objutil.obj_none.clone()
     }
 
+    #[inline(always)]
     fn get_rcobj(&mut self, obj: Object) -> Rc<Object> {
         match self.rcpool.pop_front() {
             None => Rc::new(obj),
@@ -199,6 +200,7 @@ impl Engine for Vm {
         }
     }
 
+    #[inline(always)]
     fn return_rcobj(&mut self, rc: Rc<Object>) {
         if Rc::strong_count(&rc) == 1 && self.rcpool.len() < RCPOOL_SIZE {
             self.rcpool.push_back(rc);

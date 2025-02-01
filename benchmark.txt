@@ -59,5 +59,5 @@ engine=eval, result=9227465, duration=16.686211666s
 engine=vm, result=9227465, duration=5.394119686s
 
 version 0.3.3 (laptop: dell precision i9-9980HK (no turbo)) - rc pool
-engine=eval, result=9227465, duration=16.158501415s
-engine=vm, result=9227465, duration=4.656490529s
+engine=eval, result=9227465, duration=16.024003998s
+engine=vm, result=9227465, duration=4.320619046s
