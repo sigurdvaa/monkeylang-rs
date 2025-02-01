@@ -8,8 +8,10 @@ use crate::ast::{
 };
 use crate::object::{builtins, Engine, FunctionObj, Object, ObjectUtil};
 pub use environment::{Env, Environment};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::rc::Rc;
+
+const RCPOOL_SIZE: usize = 1024;
 
 pub struct Eval {
     envs: Vec<Env>,
@@ -17,6 +19,7 @@ pub struct Eval {
     constant_int: BTreeMap<usize, Rc<Object>>,
     constant_str: BTreeMap<String, Rc<Object>>,
     objutil: ObjectUtil,
+    rcpool: VecDeque<Rc<Object>>,
 }
 
 impl Engine for Eval {
@@ -24,7 +27,7 @@ impl Engine for Eval {
         match func.as_ref() {
             Object::Function(func) => {
                 if func.parameters.len() != args.len() {
-                    return Rc::new(Object::Error(format!(
+                    return self.get_rc(Object::Error(format!(
                         "unmatched number of arguments in function call, expected {}, got {}",
                         func.parameters.len(),
                         args.len(),
@@ -50,7 +53,7 @@ impl Engine for Eval {
                 }
             }
             Object::Builtin(func) => func(args, self),
-            _ => Rc::new(Object::Error(format!("not a function: {}", func.kind()))),
+            _ => self.get_rc(Object::Error(format!("not a function: {}", func.kind()))),
         }
     }
 
@@ -58,12 +61,32 @@ impl Engine for Eval {
         &mut self.objutil
     }
 
+    #[inline(always)]
     fn get_obj_null(&self) -> Rc<Object> {
         self.objutil.obj_null.clone()
     }
 
+    #[inline(always)]
     fn get_obj_none(&self) -> Rc<Object> {
         self.objutil.obj_none.clone()
+    }
+
+    #[inline(always)]
+    fn get_rc(&mut self, obj: Object) -> Rc<Object> {
+        match self.rcpool.pop_front() {
+            None => Rc::new(obj),
+            Some(mut rc) => {
+                *Rc::get_mut(&mut rc).expect("rc in use") = obj;
+                rc
+            }
+        }
+    }
+
+    #[inline(always)]
+    fn return_rc(&mut self, rc: Rc<Object>) {
+        if Rc::strong_count(&rc) == 1 && self.rcpool.len() < RCPOOL_SIZE {
+            self.rcpool.push_back(rc);
+        }
     }
 }
 
@@ -75,6 +98,7 @@ impl Eval {
             constant_int: BTreeMap::new(),
             constant_str: BTreeMap::new(),
             objutil: ObjectUtil::new(),
+            rcpool: VecDeque::with_capacity(RCPOOL_SIZE),
         }
     }
 
@@ -88,7 +112,7 @@ impl Eval {
 
     #[inline(always)]
     fn eval_index_expression(&mut self, left: Rc<Object>, index: Rc<Object>) -> Rc<Object> {
-        match (left.as_ref(), index.as_ref()) {
+        let obj = match (left.as_ref(), index.as_ref()) {
             (Object::Array(left), Object::Integer(index)) => match left.get(*index as usize) {
                 Some(value) => value.clone(),
                 None => self.objutil.obj_null.clone(),
@@ -96,87 +120,109 @@ impl Eval {
             (Object::Hash(left), _) => {
                 let hash_key = match self.objutil.hash_key(&index) {
                     Ok(hash_key) => hash_key,
-                    Err(err) => return Rc::new(Object::Error(err.to_string())),
+                    Err(err) => return self.get_rc(Object::Error(err.to_string())),
                 };
                 match left.get(&hash_key) {
                     Some((_key, value)) => value.clone(),
                     None => self.objutil.obj_null.clone(),
                 }
             }
-            _ => Rc::new(Object::Error(format!(
+            _ => self.get_rc(Object::Error(format!(
                 "index operator not supported for: {}",
                 left.kind()
             ))),
-        }
+        };
+        self.return_rc(index);
+        self.return_rc(left);
+        obj
     }
 
     #[inline(always)]
-    fn eval_minus_prefix_operator_expression(&self, right: Rc<Object>) -> Rc<Object> {
-        Rc::new(match right.as_ref() {
+    fn eval_minus_prefix_operator_expression(&mut self, right: Rc<Object>) -> Rc<Object> {
+        let obj = self.get_rc(match right.as_ref() {
             Object::Integer(value) => Object::Integer(-value),
             _ => Object::Error(format!("unknown operator: -{}", right.kind())),
-        })
+        });
+        self.return_rc(right);
+        obj
     }
 
-    fn eval_bang_operator_expression(&self, right: Rc<Object>) -> Rc<Object> {
-        match right.as_ref() {
+    fn eval_bang_operator_expression(&mut self, right: Rc<Object>) -> Rc<Object> {
+        let obj = match right.as_ref() {
             Object::Null => self.get_obj_bool(true),
             Object::Integer(value) => self.get_obj_bool(*value < 1),
             Object::Boolean(value) => self.get_obj_bool(!value),
-            _ => Rc::new(Object::Error(format!(
+            _ => self.get_rc(Object::Error(format!(
                 "unknown operator: !{}",
                 right.kind()
             ))),
-        }
+        };
+        self.return_rc(right);
+        obj
     }
 
     #[inline(always)]
-    fn eval_integer_infix_expression(&self, operator: &Operator, a: isize, b: isize) -> Rc<Object> {
+    fn eval_integer_infix_expression(
+        &mut self,
+        operator: &Operator,
+        a: isize,
+        b: isize,
+    ) -> Rc<Object> {
         match operator {
-            Operator::Plus => Rc::new(Object::Integer(a + b)),
-            Operator::Minus => Rc::new(Object::Integer(a - b)),
-            Operator::Asterisk => Rc::new(Object::Integer(a * b)),
-            Operator::Slash => Rc::new(Object::Integer(a / b)),
+            Operator::Plus => self.get_rc(Object::Integer(a + b)),
+            Operator::Minus => self.get_rc(Object::Integer(a - b)),
+            Operator::Asterisk => self.get_rc(Object::Integer(a * b)),
+            Operator::Slash => self.get_rc(Object::Integer(a / b)),
             Operator::Gt => self.get_obj_bool(a > b),
             Operator::Lt => self.get_obj_bool(a < b),
             Operator::Eq => self.get_obj_bool(a == b),
             Operator::NotEq => self.get_obj_bool(a != b),
-            _ => Rc::new(Object::Error(format!(
+            _ => self.get_rc(Object::Error(format!(
                 "unknown integer operator: {operator}",
             ))),
         }
     }
 
     #[inline(always)]
-    fn eval_boolean_infix_expression(&self, operator: &Operator, a: bool, b: bool) -> Rc<Object> {
+    fn eval_boolean_infix_expression(
+        &mut self,
+        operator: &Operator,
+        a: bool,
+        b: bool,
+    ) -> Rc<Object> {
         match operator {
             Operator::Eq => self.get_obj_bool(a == b),
             Operator::NotEq => self.get_obj_bool(a != b),
-            _ => Rc::new(Object::Error(format!(
+            _ => self.get_rc(Object::Error(format!(
                 "unknown boolean operator: {operator}",
             ))),
         }
     }
 
     #[inline(always)]
-    fn eval_string_infix_expression(&self, operator: &Operator, a: &str, b: &str) -> Rc<Object> {
+    fn eval_string_infix_expression(
+        &mut self,
+        operator: &Operator,
+        a: &str,
+        b: &str,
+    ) -> Rc<Object> {
         match operator {
-            Operator::Plus => Rc::new(Object::String(String::from_iter([a, b]))),
+            Operator::Plus => self.get_rc(Object::String(String::from_iter([a, b]))),
             Operator::Eq => self.get_obj_bool(a == b),
             Operator::NotEq => self.get_obj_bool(a != b),
-            _ => Rc::new(Object::Error(format!(
+            _ => self.get_rc(Object::Error(format!(
                 "unknown string operator: {operator}",
             ))),
         }
     }
 
     #[inline(always)]
-    fn eval_null_infix_expression(&self, operator: &Operator, other: &Object) -> Rc<Object> {
+    fn eval_null_infix_expression(&mut self, operator: &Operator, other: &Object) -> Rc<Object> {
         let truth = matches!(other, Object::Null);
         match operator {
             Operator::Eq => self.get_obj_bool(truth),
             Operator::NotEq => self.get_obj_bool(!truth),
-            _ => Rc::new(Object::Error(format!("unknown null operator: {operator}",))),
+            _ => self.get_rc(Object::Error(format!("unknown null operator: {operator}",))),
         }
     }
 
@@ -191,7 +237,7 @@ impl Eval {
 
             let hash_key = match self.objutil.hash_key(&key) {
                 Ok(hash_key) => hash_key,
-                Err(err) => return Rc::new(Object::Error(err.to_string())),
+                Err(err) => return self.get_rc(Object::Error(err.to_string())),
             };
 
             let value = self.eval_expression(value_expr);
@@ -202,17 +248,17 @@ impl Eval {
             pairs.insert(hash_key, (key, value));
         }
 
-        Rc::new(Object::Hash(pairs))
+        self.get_rc(Object::Hash(pairs))
     }
 
     #[inline(always)]
     fn eval_infix_expression(
-        &self,
+        &mut self,
         operator: &Operator,
         left: Rc<Object>,
         right: Rc<Object>,
     ) -> Rc<Object> {
-        match (left.as_ref(), right.as_ref()) {
+        let obj = match (left.as_ref(), right.as_ref()) {
             (Object::Integer(a), Object::Integer(b)) => {
                 self.eval_integer_infix_expression(operator, *a, *b)
             }
@@ -225,25 +271,28 @@ impl Eval {
             (Object::Null, other) | (other, Object::Null) => {
                 self.eval_null_infix_expression(operator, other)
             }
-            (a, b) if a.kind() != b.kind() => Rc::new(Object::Error(format!(
+            (a, b) if a.kind() != b.kind() => self.get_rc(Object::Error(format!(
                 "type mismatch: {} {operator} {}",
                 left.kind(),
                 right.kind(),
             ))),
-            _ => Rc::new(Object::Error(format!(
+            _ => self.get_rc(Object::Error(format!(
                 "unknown operator: {} {operator} {}",
                 left.kind(),
                 right.kind(),
             ))),
-        }
+        };
+        self.return_rc(left);
+        self.return_rc(right);
+        obj
     }
 
     #[inline(always)]
-    fn eval_prefix_expression(&self, operator: &Operator, right: Rc<Object>) -> Rc<Object> {
+    fn eval_prefix_expression(&mut self, operator: &Operator, right: Rc<Object>) -> Rc<Object> {
         match operator {
             Operator::Bang => self.eval_bang_operator_expression(right),
             Operator::Minus => self.eval_minus_prefix_operator_expression(right),
-            _ => Rc::new(Object::Error(format!(
+            _ => self.get_rc(Object::Error(format!(
                 "unknown operator: {operator}{}",
                 right.kind(),
             ))),
@@ -304,7 +353,7 @@ impl Eval {
                     expr.token
                 )
             }
-            Expression::Function(expr) => Rc::new(Object::Function(Box::new(FunctionObj {
+            Expression::Function(expr) => self.get_rc(Object::Function(Box::new(FunctionObj {
                 parameters: expr.parameters.clone(),
                 body: expr.body.clone(),
                 env: self.envs[self.ep].clone(),
@@ -314,7 +363,7 @@ impl Eval {
             }
             Expression::Identifier(expr) => match self.envs[self.ep].get(&expr.value) {
                 Some(value) => value.clone(),
-                None => Rc::new(Object::Error(format!(
+                None => self.get_rc(Object::Error(format!(
                     "identifier not found: {}",
                     expr.value
                 ))),
@@ -344,7 +393,7 @@ impl Eval {
                 if let Some(obj) = self.constant_int.get(&expr.value) {
                     return obj.clone();
                 }
-                let obj = Rc::new(match expr.value.try_into() {
+                let obj = self.get_rc(match expr.value.try_into() {
                     Ok(value) => Object::Integer(value),
                     Err(err) => Object::Error(format!("invalid interger, {err}")),
                 });
@@ -355,7 +404,7 @@ impl Eval {
                 if let Some(obj) = self.constant_str.get(&expr.value) {
                     return obj.clone();
                 }
-                let obj = Rc::new(Object::String(expr.value.to_owned()));
+                let obj = self.get_rc(Object::String(expr.value.to_owned()));
                 self.constant_str.insert(expr.value.clone(), obj.clone());
                 obj
             }
@@ -366,7 +415,7 @@ impl Eval {
                         return array[0].clone();
                     }
                 }
-                Rc::new(Object::Array(array))
+                self.get_rc(Object::Array(array))
             }
             Expression::Index(expr) => {
                 let left = self.eval_expression(&expr.left);
@@ -407,7 +456,7 @@ impl Eval {
                 let eval = self.eval_expression(&stmt.value);
                 match *eval {
                     Object::Error(_) => eval,
-                    _ => Rc::new(Object::Return(eval)),
+                    _ => self.get_rc(Object::Return(eval)),
                 }
             }
             Statement::Expression(stmt) => self.eval_expression(&stmt.value),
@@ -418,7 +467,7 @@ impl Eval {
                     Object::Integer(value) if i32::try_from(*value).is_ok() => {
                         std::process::exit(*value as i32)
                     }
-                    _ => Rc::new(Object::Error(format!(
+                    _ => self.get_rc(Object::Error(format!(
                         "invalid exit code: {obj} ({})",
                         obj.kind()
                     ))),
@@ -428,7 +477,7 @@ impl Eval {
                 let eval = self.eval_expression(&stmt.value);
                 match eval.as_ref() {
                     Object::Error(_) => eval,
-                    _ => Rc::new(Object::Break(eval)),
+                    _ => self.get_rc(Object::Break(eval)),
                 }
             }
         }

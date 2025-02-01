@@ -186,6 +186,22 @@ impl Engine for Vm {
     fn get_obj_none(&self) -> Rc<Object> {
         self.objutil.obj_none.clone()
     }
+
+    fn get_rc(&mut self, obj: Object) -> Rc<Object> {
+        match self.rcpool.pop_front() {
+            None => Rc::new(obj),
+            Some(mut rc) => {
+                *Rc::get_mut(&mut rc).expect("rc in use") = obj;
+                rc
+            }
+        }
+    }
+
+    fn return_rc(&mut self, rc: Rc<Object>) {
+        if Rc::strong_count(&rc) == 1 && self.rcpool.len() < RCPOOL_SIZE {
+            self.rcpool.push_back(rc);
+        }
+    }
 }
 
 impl Vm {
@@ -231,22 +247,6 @@ impl Vm {
         let closure = Rc::new(ClosureObj { func, free: vec![] });
         let frame = Frame::new(closure, 0);
         self.frames[0].replace(frame);
-    }
-
-    fn get_rc(&mut self, obj: Object) -> Rc<Object> {
-        match self.rcpool.pop_front() {
-            None => Rc::new(obj),
-            Some(mut rc) => {
-                *Rc::get_mut(&mut rc).expect("rc in use") = obj;
-                rc
-            }
-        }
-    }
-
-    fn return_rc(&mut self, rc: Rc<Object>) {
-        if Rc::strong_count(&rc) == 1 && self.rcpool.len() < RCPOOL_SIZE {
-            self.rcpool.push_back(rc);
-        }
     }
 
     fn push_stack(&mut self, obj: Rc<Object>) -> Result<(), VmError> {
@@ -558,12 +558,13 @@ impl Vm {
                 None => return Err(VmError::InvalidStackAccess(idx)),
             }
         }
+
         self.sp -= num_args;
         let result = func(&args, self);
         if let Object::Error(err) = result.as_ref() {
             return Err(VmError::BuiltinFunction(err.clone()));
         }
-        // replaces called func with result
+
         if let Some(obj) = self.stack[self.sp - 1].replace(result) {
             self.return_rc(obj);
         }
@@ -702,8 +703,13 @@ impl Vm {
                     self.push_closure(idx, num_free)?;
                 }
                 Opcode::Return => {
-                    let obj = self.pop_stack()?;
-                    self.return_rc(obj);
+                    // cleanup stack after call
+                    for idx in frame.bp..self.sp {
+                        if let Some(obj) = self.stack[idx].take() {
+                            self.return_rc(obj);
+                        }
+                    }
+
                     self.sp = frame.bp;
                     if let Some(obj) =
                         self.stack[self.sp - 1].replace(self.objutil.obj_null.clone())
@@ -746,11 +752,6 @@ impl Vm {
                 }
             }
         }
-        let dirty = self.stack[frame.bp..]
-            .iter()
-            .filter(|i| i.is_some())
-            .count();
-        println!("dirty stack: {dirty}");
         Ok(last_pop)
     }
 }

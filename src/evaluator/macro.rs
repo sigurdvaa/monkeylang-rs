@@ -1,4 +1,4 @@
-use super::{Environment, Eval};
+use super::{Engine, Environment, Eval};
 use crate::ast::{
     modify::{modify_expression, modify_program, ModifierFunc},
     BooleanLiteral, Expression, IntegerLiteral, Program, Statement, StringLiteral,
@@ -42,7 +42,7 @@ impl Eval {
 
     pub fn quote(&mut self, mut expr: Expression) -> Rc<Object> {
         self.eval_unquote_calls(&mut expr);
-        Rc::new(Object::Quote(Box::new(expr)))
+        self.get_rc(Object::Quote(Box::new(expr)))
     }
 
     pub fn define_macros(&mut self, prog: &mut Program) {
@@ -58,13 +58,13 @@ impl Eval {
                 _ => continue,
             };
 
-            let obj = Object::Macro(Box::new(FunctionObj {
+            let obj = self.get_rc(Object::Macro(Box::new(FunctionObj {
                 parameters: expr.parameters.clone(),
                 body: expr.body.clone(),
                 env: self.envs[self.ep].clone(),
-            }));
+            })));
 
-            self.envs[self.ep].set(stmt.name.value.to_owned(), Rc::new(obj));
+            self.envs[self.ep].set(stmt.name.value.to_owned(), obj);
             defs.push(i);
         }
         for i in defs.into_iter().rev() {
@@ -93,7 +93,7 @@ impl Eval {
             let args: Vec<_> = call
                 .arguments
                 .iter()
-                .map(|a| Rc::new(Object::Quote(Box::new(a.clone()))))
+                .map(|a| eval.get_rc(Object::Quote(Box::new(a.clone()))))
                 .collect();
 
             let macro_env = Environment::new_enclosed(macr.env.clone());
