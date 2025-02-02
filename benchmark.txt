@@ -61,3 +61,7 @@ engine=vm, result=9227465, duration=5.394119686s
 version 0.3.3 (laptop: dell precision i9-9980HK (no turbo)) - rc pool
 engine=eval, result=9227465, duration=16.024003998s
 engine=vm, result=9227465, duration=4.320619046s
+
+version 0.3.3 (desktop: AMD Ryzen 9 5900X)
+engine=eval, result=9227465, duration=6.450090355s
+engine=vm, result=9227465, duration=1.960268534s
